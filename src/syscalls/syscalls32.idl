@@ -1,0 +1,70 @@
+//-----------------------------------------------------------------------------
+// Copyright (c) 2016 Michael G. Brehm
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//-----------------------------------------------------------------------------
+
+import "wtypes.idl";
+
+// Interface uapi32
+//
+// Includes the 32-bit linux user-mode API declarations
+[local] interface uapi32
+{
+	#include "uapi-x86.h"
+}
+
+// Interface syscalls32
+//
+// Provides the 32-bit system calls interface for the virtual kernel instance
+[
+	version(1.0),
+	uuid(a34c31bb-f2b9-4f1f-b6ba-f493d1fef1f0),
+	pointer_default(unique),
+]
+
+interface syscalls32
+{
+	// sys32_context_exclusive_t
+	//
+	// Exclusive (write) access context handle; use when the handle or the data that
+	// the handle points to needs to be changed by an interface method
+	typedef [context_handle] void* sys32_context_exclusive_t;
+
+	// sys32_context_t
+	//
+	// Shared (read) access context handle; use when the handle or the data that
+	// the handle points to does not need to be changed by an interface method
+	typedef [context_handle] sys32_context_exclusive_t sys32_context_t;
+
+	// sys32_attach_process (synchronous)
+	//
+	// Allocates a new context handle and startup information for a process
+	HRESULT sys32_attach_process(/*[in] sys32_uint_t tid, [in] sys32_addr_t threadproc, [out, ref] sys32_process_t* process,*/ [out, ref] sys32_context_exclusive_t* context);
+
+	// sys32_attach_thread (synchronous)
+	//
+	// Allocates a new context handle and startup information for a thread
+	HRESULT sys32_attach_thread(/*[in] sys32_uint_t tid, [out, ref] sys32_thread_t* thread,*/ [out, ref] sys32_context_exclusive_t* context);
+
+	// sys32_xxxxx
+	//
+	// Linux kernel system calls
+	/* 001 */ long sys32_exit([in, out, ref] sys32_context_exclusive_t* context, [in] int exitcode);
+}
