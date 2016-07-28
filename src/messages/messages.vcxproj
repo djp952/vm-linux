@@ -56,7 +56,7 @@ MC.EXE -v -U -c -h "$(SolutionDir)tmp\messages" -r "$(SolutionDir)tmp\messages" 
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\tmp\messages\messages.h" />
+    <ClInclude Include="..\..\tmp\messages\messages.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\tmp\version\version.rc" />

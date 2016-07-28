@@ -20,46 +20,51 @@
 // SOFTWARE.
 //-----------------------------------------------------------------------------
 
-#ifndef __STDAFX_H_
-#define __STDAFX_H_
-#pragma once
+#include "stdafx.h"
+#include "VirtualMachine.h"
 
-//-----------------------------------------------------------------------------
-// Win32 Declarations
+#pragma warning(push, 4)
 
-#define NTDDI_VERSION			NTDDI_WIN8
-#define	_WIN32_WINNT			_WIN32_WINNT_WIN8
-#define WINVER					_WIN32_WINNT_WIN8
-#define	_WIN32_IE				_WIN32_IE_IE100
-#define NOMINMAX
-
-// Windows / CRT
+//---------------------------------------------------------------------------
+// VirtualMachine Constructor
 //
-#include <Windows.h>
-#include <rpc.h>
-#include <stdint.h>
-#include <tchar.h>
-#include <memory>
-#include <string>
-
-#pragma comment(lib, "rpcrt4.lib")
-#pragma comment(lib, "rpcns4.lib")
-
-// KiB / MiB / GiB
+// Arguments:
 //
-#define KiB		*(1 << 10)		// KiB multiplier
-#define MiB		*(1 << 20)		// MiB multiplier
-#define GiB		*(1 << 30)		// GiB multiplier
+//	NONE
 
-// external-servicelib
+VirtualMachine::VirtualMachine()
+{
+}
+
+//---------------------------------------------------------------------------
+// VirtualMachine::OnStart (private)
 //
-#include <servicelib.h>
-
-// Generated Headers
+// Invoked when the service is started
 //
-#include <exceptions.h>
-#include <messages.h>
+// Arguments:
+//
+//	argc		- Number of command line arguments
+//	argv		- Array of command line argument strings
 
-//-----------------------------------------------------------------------------
+void VirtualMachine::OnStart(int argc, LPTSTR* argv)
+{
+	UNREFERENCED_PARAMETER(argc);
+	UNREFERENCED_PARAMETER(argv);
+}
 
-#endif	// __STDAFX_H_
+//---------------------------------------------------------------------------
+// VirtualMachine::OnStop (private)
+//
+// Invoked when the service is stopped
+//
+// Arguments:
+//
+//	NONE
+
+void VirtualMachine::OnStop(void)
+{
+}
+
+//---------------------------------------------------------------------------
+
+#pragma warning(pop)

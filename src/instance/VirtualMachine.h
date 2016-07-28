@@ -20,46 +20,59 @@
 // SOFTWARE.
 //-----------------------------------------------------------------------------
 
-#ifndef __STDAFX_H_
-#define __STDAFX_H_
+#ifndef __VIRTUALMACHINE_H_
+#define __VIRTUALMACHINE_H_
 #pragma once
 
-//-----------------------------------------------------------------------------
-// Win32 Declarations
-
-#define NTDDI_VERSION			NTDDI_WIN8
-#define	_WIN32_WINNT			_WIN32_WINNT_WIN8
-#define WINVER					_WIN32_WINNT_WIN8
-#define	_WIN32_IE				_WIN32_IE_IE100
-#define NOMINMAX
-
-// Windows / CRT
-//
-#include <Windows.h>
-#include <rpc.h>
-#include <stdint.h>
-#include <tchar.h>
-#include <memory>
-#include <string>
-
-#pragma comment(lib, "rpcrt4.lib")
-#pragma comment(lib, "rpcns4.lib")
-
-// KiB / MiB / GiB
-//
-#define KiB		*(1 << 10)		// KiB multiplier
-#define MiB		*(1 << 20)		// MiB multiplier
-#define GiB		*(1 << 30)		// GiB multiplier
-
-// external-servicelib
-//
-#include <servicelib.h>
-
-// Generated Headers
-//
-#include <exceptions.h>
-#include <messages.h>
+#pragma warning(push, 4)
 
 //-----------------------------------------------------------------------------
+// Class VirtualMachine
+//
+// Implements the top-level virtual machine instance
 
-#endif	// __STDAFX_H_
+class VirtualMachine : public Service<VirtualMachine>
+{
+public:
+
+	// Instance Constructor
+	//
+	VirtualMachine();
+
+	// Destructor
+	//
+	~VirtualMachine()=default;
+
+	//-------------------------------------------------------------------------
+	// Member Functions
+
+private:
+
+	VirtualMachine(VirtualMachine const&)=delete;
+	VirtualMachine& operator=(VirtualMachine const&)=delete;
+
+	// Service<> Control Handler Map
+	//
+	BEGIN_CONTROL_HANDLER_MAP(VirtualMachine)
+		CONTROL_HANDLER_ENTRY(SERVICE_CONTROL_STOP, OnStop)
+	END_CONTROL_HANDLER_MAP()
+
+	// OnStart (Service)
+	//
+	// Invoked when the service is started
+	virtual void OnStart(int argc, LPTSTR* argv);
+
+	// OnStop
+	//
+	// Invoked when the service is stopped
+	void OnStop(void);
+
+	//-------------------------------------------------------------------------
+	// Member Variables
+};
+
+//-----------------------------------------------------------------------------
+
+#pragma warning(pop)
+
+#endif	// __VIRTUALMACHINE_H_

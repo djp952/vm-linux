@@ -24,7 +24,7 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\tmp\messages\messages.h">
+    <ClInclude Include="..\..\tmp\messages\messages.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
   </ItemGroup>
