@@ -74,18 +74,16 @@ std::tstring GenerateDefaultInstanceName(void)
 
 int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdline, int show)
 {
-	BOOL				hasconsole = FALSE;				// Flag if console is active
-	int					result = ERROR_SUCCESS;			// Result code from _tWinMain
-
 	UNREFERENCED_PARAMETER(instance);
 	UNREFERENCED_PARAMETER(previnstance);
 	UNREFERENCED_PARAMETER(show);
 
 #ifdef _DEBUG
 
-	int nDbgFlags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);	// Get current flags
-	nDbgFlags |= _CRTDBG_LEAK_CHECK_DF;						// Enable leak-check
-	_CrtSetDbgFlag(nDbgFlags);								// Set the new flags
+	// Initialize CRT memory leak checking in DEBUG builds
+	int nDbgFlags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+	nDbgFlags |= _CRTDBG_LEAK_CHECK_DF;
+	_CrtSetDbgFlag(nDbgFlags);
 
 #endif	// _DEBUG
 
@@ -100,7 +98,7 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 		RPC_STATUS rpcresult = RpcServerUseProtseq(reinterpret_cast<rpc_tchar_t*>(TEXT("ncalrpc")), RPC_C_PROTSEQ_MAX_REQS_DEFAULT, nullptr);
 		if(rpcresult != RPC_S_OK) throw Win32Exception(rpcresult);
 
-		// -service
+		// -service[:name]
 		//
 		// Start the instance as a service
 		if(commandline.Switches.Contains(TEXT("service"))) {
@@ -113,19 +111,19 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 			services.Dispatch();
 		}
 
-		// -console
+		// -console[:name]
 		//
-		// Start the instance as a standalone process, forcing creation of a console if necessary
+		// Start the instance as a standalone process with a console for output and
+		// an ability to terminate the instance with a break event
 		else if(commandline.Switches.Contains(TEXT("console"))) {
 
 			// Get the instance name from the command line, generate a unique one if not present
 			auto instancename = commandline.Switches.GetValue(TEXT("console"));
 			if(instancename.length() == 0) instancename = GenerateDefaultInstanceName();
 
-			// Attempt to attach to a parent console if one exists, otherwise allocate a new one
-			hasconsole = AttachConsole(ATTACH_PARENT_PROCESS);
-			if(!hasconsole) hasconsole = AllocConsole();
-			if(hasconsole) SetConsoleTitle(instancename.c_str());
+			// Attempt to create a new console for the instance
+			BOOL hasconsole = AllocConsole();
+			if(hasconsole) SetConsoleTitle(std::tstring(TEXT("VM:")).append(instancename).c_str());
 
 			// Start the service harness using the specified or generated instance name
 			g_harness.Start(instancename);
@@ -133,48 +131,30 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 			// Register a handler to stop the service on any break event
 			if(hasconsole) SetConsoleCtrlHandler([](DWORD) -> BOOL { g_harness.SendControl(ServiceControl::Stop); return TRUE; }, TRUE);
 
-			// Wait for the service to stop naturally or was broken by an event
+			// Wait for the service to stop naturally or be broken by a console event
 			g_harness.WaitForStatus(ServiceStatus::Stopped);
+
+			// Release the console once the service has terminated
+			if(hasconsole) FreeConsole();
 		}
 
 		// not -service or -console
 		//
-		// Start the instance as a standalone process with a unique instance name. If there
-		// is a parent console to attach to use it, otherwise run unattended
+		// Start the instance as a standalone process with a unique instance name
 		else {
 
-			// Generate a unique instance name
-			auto instancename = GenerateDefaultInstanceName();
-
-			// Attempt to attach to a parent console if one exists; if there is no parent
-			// console this process will be non-interactive and needs to stop on its own
-			hasconsole = AttachConsole(ATTACH_PARENT_PROCESS);
-			if(hasconsole) SetConsoleTitle(instancename.c_str());
-
 			// Start the service harness using a unique identifier as the instance name
-			g_harness.Start(instancename);
+			g_harness.Start(GenerateDefaultInstanceName());
 
-			// Register a handler to stop the service on any break event
-			if(hasconsole) SetConsoleCtrlHandler([](DWORD) -> BOOL { g_harness.SendControl(ServiceControl::Stop); return TRUE; }, TRUE);
-
-			// Wait for the service to stop naturally or was broken by an event
+			// Wait for the service to stop on its own
 			g_harness.WaitForStatus(ServiceStatus::Stopped);
 		}
 	}
 
-	catch(Exception& exception) {
+	// On exception, use the HRESULT as the return code from the process
+	catch(Exception& exception) { return static_cast<int>(exception.HResult); }
 
-		//
-		// todo: dump the exception to stdout
-		//
-
-		// Use the exception HRESULT as the return code from the process
-		result = static_cast<int>(exception.HResult);
-	}
-
-	if(hasconsole) FreeConsole();		// Release attached/allocated console
-
-	return result;
+	return ERROR_SUCCESS;
 }
 
 //-----------------------------------------------------------------------------
