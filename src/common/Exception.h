@@ -30,7 +30,7 @@
 #include <vector>
 #include <stdint.h>
 #include <Windows.h>
-#include "generic_text.h"
+#include "text.h"
 
 #pragma warning(push, 4)	
 
@@ -172,7 +172,7 @@ protected:
 	// GetDefaultMessage
 	//
 	// Invoked when an HRESULT code cannot be mapped to a message table string
-	virtual std::tstring GetDefaultMessage(HRESULT const& hresult);
+	virtual text::tstring GetDefaultMessage(HRESULT const& hresult);
 
 private:
 
@@ -219,7 +219,7 @@ private:
 	// m_message
 	//
 	// Generic text exception message string
-	std::tstring m_message;
+	text::tstring m_message;
 
 	// m_what
 	//

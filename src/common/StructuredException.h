@@ -28,7 +28,7 @@
 #include <Windows.h>
 #include "Exception.h"
 #include "NtApi.h"
-#include "generic_text.h"
+#include "text.h"
 
 #pragma warning(push, 4)	
 
@@ -71,7 +71,7 @@ protected:
 	// GetDefaultMessage (Exception)
 	//
 	// Invoked when an HRESULT code cannot be mapped to a message table string
-	virtual std::tstring GetDefaultMessage(HRESULT const& hresult);
+	virtual text::tstring GetDefaultMessage(HRESULT const& hresult);
 };
 
 //-----------------------------------------------------------------------------

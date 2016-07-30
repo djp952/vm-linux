@@ -41,7 +41,7 @@ ServiceHarness<VirtualMachine> g_harness;
 //
 //	NONE
 
-std::tstring GenerateDefaultInstanceName(void)
+text::tstring GenerateDefaultInstanceName(void)
 {
 	uuid_t				uuid;					// Generated UUID
 	rpc_tchar_t*		szuuid = nullptr;		// Converted UUID string
@@ -54,7 +54,7 @@ std::tstring GenerateDefaultInstanceName(void)
 	rpcresult = UuidToString(&uuid, &szuuid);
 	if(rpcresult != RPC_S_OK) throw Win32Exception(rpcresult);
 
-	std::tstring result(reinterpret_cast<tchar_t*>(szuuid));
+	text::tstring result(reinterpret_cast<tchar_t*>(szuuid));
 	RpcStringFree(&szuuid);
 
 	return result;
@@ -123,7 +123,7 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 
 			// Attempt to create a new console for the instance
 			BOOL hasconsole = AllocConsole();
-			if(hasconsole) SetConsoleTitle(std::tstring(TEXT("VM:")).append(instancename).c_str());
+			if(hasconsole) SetConsoleTitle(text::tstring(TEXT("VM:")).append(instancename).c_str());
 
 			// Start the service harness using the specified or generated instance name
 			g_harness.Start(instancename);

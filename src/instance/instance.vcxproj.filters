@@ -52,9 +52,6 @@
     <ClInclude Include="..\common\Exception.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\generic_text.h">
-      <Filter>Header Files\common</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\StructuredException.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
@@ -62,6 +59,9 @@
       <Filter>Header Files\common</Filter>
     </ClInclude>
     <ClInclude Include="..\common\Win32Exception.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\text.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
   </ItemGroup>

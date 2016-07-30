@@ -27,7 +27,7 @@
 #include <map>
 #include <memory>
 #include <vector>
-#include "generic_text.h"
+#include "text.h"
 #include "Exception.h"
 
 #pragma warning(push, 4)				
@@ -79,7 +79,7 @@ private:
 	CommandLine& operator=(const CommandLine&)=delete;
 
 	// Private Constructor
-	CommandLine(const std::vector<std::tstring>& rawargs);
+	CommandLine(const std::vector<text::tstring>& rawargs);
 
 	//-------------------------------------------------------------------------
 	// Private Type Declarations
@@ -92,15 +92,15 @@ private:
 	public:
 
 		// Constructor
-		explicit CommandLineArguments(const std::vector<std::tstring>& rawargs);
+		explicit CommandLineArguments(const std::vector<text::tstring>& rawargs);
 
 		// Subscript operator
-		std::tstring operator[](int index) const { return Get(index); }
+		text::tstring operator[](int index) const { return Get(index); }
 
 		// Get
 		//
 		// Retrieves the unswitched argument at the specified index
-		std::tstring Get(int index) const;
+		text::tstring Get(int index) const;
 
 		// Count
 		//
@@ -116,7 +116,7 @@ private:
 		// m_args
 		//
 		// Contained collection of unswitched argument strings
-		std::vector<std::tstring> m_args;
+		std::vector<text::tstring> m_args;
 	};
 
 	// CommandLineSwitches
@@ -127,22 +127,22 @@ private:
 	public:
 
 		// Constructor
-		explicit CommandLineSwitches(const std::vector<std::tstring>& rawargs);
+		explicit CommandLineSwitches(const std::vector<text::tstring>& rawargs);
 
 		// Contains
 		//
 		// Determines if the collection contains at least one of the switches
-		bool Contains(const std::tstring& key) const;
+		bool Contains(const text::tstring& key) const;
 
 		// GetValue
 		//
 		// Gets the first value associated with a switch key
-		std::tstring GetValue(const std::tstring& key) const;
+		text::tstring GetValue(const text::tstring& key) const;
 
 		// GetValues
 		//
 		// Gets all values associated with a switch key
-		std::vector<std::tstring> GetValues(const std::tstring key) const;
+		std::vector<text::tstring> GetValues(const text::tstring key) const;
 
 	private:
 
@@ -154,7 +154,7 @@ private:
 		// Case-insensitive key comparison for the switch collection
 		struct SwitchCompare 
 		{ 
-			bool operator() (const std::tstring& lhs, const std::tstring& rhs) const 
+			bool operator() (const text::tstring& lhs, const text::tstring& rhs) const 
 			{ 
 				return _tcsicmp(lhs.c_str(), rhs.c_str()) < 0; 
 			}
@@ -163,7 +163,7 @@ private:
 		// m_switches
 		//
 		// Collection of switched arguments and optional values
-		std::multimap<std::tstring, std::tstring, SwitchCompare> m_switches;
+		std::multimap<text::tstring, text::tstring, SwitchCompare> m_switches;
 	};
 
 	//-------------------------------------------------------------------------
@@ -172,14 +172,14 @@ private:
 	// MakeVector
 	//
 	// Converts the raw argument data into a temporary vector<>
-	static std::vector<std::tstring> MakeVector(const tchar_t* commandline);
-	static std::vector<std::tstring> MakeVector(int argc, tchar_t** argv);
+	static std::vector<text::tstring> MakeVector(const tchar_t* commandline);
+	static std::vector<text::tstring> MakeVector(int argc, tchar_t** argv);
 
 	//-------------------------------------------------------------------------
 	// Member Variables
 
 	CommandLineArguments		m_args;				// Unswitched arguments
-	std::tstring				m_executable;		// Executable name (argv[0])
+	text::tstring				m_executable;		// Executable name (argv[0])
 	CommandLineSwitches			m_switches;			// Switched arguments
 };
 

@@ -53,6 +53,7 @@ CommandLine::CommandLine(const tchar_t* commandline) : CommandLine(MakeVector(co
 	size_t					length = 0;			// Executable name length
 
 	do { 
+
 		// GetModuleFileName() is horrible and doesn't have a way to find out how much
 		// space you actually need; call it repeatedly doubling the buffer each time
 		length = GetModuleFileName(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
@@ -61,7 +62,7 @@ CommandLine::CommandLine(const tchar_t* commandline) : CommandLine(MakeVector(co
 	} while(GetLastError() == ERROR_INSUFFICIENT_BUFFER);
 
 	// Set the contained executable name using a move rather than a copy
-	m_executable = std::tstring(buffer.data(), length);
+	m_executable = text::tstring(buffer.data(), length);
 }
 
 //-----------------------------------------------------------------------------
@@ -71,9 +72,8 @@ CommandLine::CommandLine(const tchar_t* commandline) : CommandLine(MakeVector(co
 //
 //	rawargs		- All raw arguments as a vector<tstring> collection
 
-CommandLine::CommandLine(const std::vector<std::tstring>& rawargs) : m_args(rawargs), m_switches(rawargs)
+CommandLine::CommandLine(const std::vector<text::tstring>& rawargs) : m_args(rawargs), m_switches(rawargs)
 {
-	// nothing interesting to do here?
 }
 
 //-----------------------------------------------------------------------------
@@ -85,19 +85,19 @@ CommandLine::CommandLine(const std::vector<std::tstring>& rawargs) : m_args(rawa
 //
 //	commandline		- Command line string to be converted
 
-std::vector<std::tstring> CommandLine::MakeVector(const tchar_t* commandline)
+std::vector<text::tstring> CommandLine::MakeVector(const tchar_t* commandline)
 {
 	int							argc = 0;		// Number of argument strings
-	std::vector<std::tstring>	args;			// vector<> of argument strings
+	std::vector<text::tstring>	args;			// vector<> of argument strings
 
 	// No command line was specified, return the empty vector<> instance
 	if((commandline == nullptr) || (commandline[0] == 0)) return args;
 
 	// Convert the command line into an argc/argv array; no generic text version of this
-	wchar_t** wargv = CommandLineToArgvW(std::to_wstring(commandline).c_str(), &argc);
+	wchar_t** wargv = CommandLineToArgvW(text::to_wstring(commandline).c_str(), &argc);
 
 	// Convert each returned command line argument into a tstring for the vector<>
-	for(int index = 0; index < argc; index++) args.push_back(std::to_tstring(wargv[index]));
+	for(int index = 0; index < argc; index++) args.push_back(text::to_tstring(wargv[index]));
 
 	LocalFree(wargv);							// Release allocated string array
 	return args;								// Return generated vector<>
@@ -114,9 +114,9 @@ std::vector<std::tstring> CommandLine::MakeVector(const tchar_t* commandline)
 //	argc		- Number of command line arguments
 //	argv		- Array of command line argument strings
 
-std::vector<std::tstring> CommandLine::MakeVector(int argc, tchar_t** argv)
+std::vector<text::tstring> CommandLine::MakeVector(int argc, tchar_t** argv)
 {
-	std::vector<std::tstring> args;			// vector<> of argument strings
+	std::vector<text::tstring> args;			// vector<> of argument strings
 
 	// Skip the first argument, which will be the executable/module name string,
 	// otherwise this is a simple iteration over the array to convert it
@@ -132,7 +132,7 @@ std::vector<std::tstring> CommandLine::MakeVector(int argc, tchar_t** argv)
 //
 //	rawargs		- Vector<> of all raw command line argument strings
 
-CommandLine::CommandLineArguments::CommandLineArguments(const std::vector<std::tstring>& rawargs)
+CommandLine::CommandLineArguments::CommandLineArguments(const std::vector<text::tstring>& rawargs)
 {
 	// Iterate over all the raw arguments and add just the ones that aren't switches
 	for(const auto& arg : rawargs)
@@ -148,10 +148,10 @@ CommandLine::CommandLineArguments::CommandLineArguments(const std::vector<std::t
 //
 //	index		- Unswitched argument index
 
-std::tstring CommandLine::CommandLineArguments::Get(int index) const
+text::tstring CommandLine::CommandLineArguments::Get(int index) const
 {
 	// Check the index against the vector<> size and return the string
-	if(static_cast<size_t>(index + 1) > m_args.size()) return std::tstring();
+	if(static_cast<size_t>(index + 1) > m_args.size()) return text::tstring();
 	return m_args[index];
 }
 
@@ -162,7 +162,7 @@ std::tstring CommandLine::CommandLineArguments::Get(int index) const
 //
 //	rawargs		- Vector<> of all raw command line argument strings
 
-CommandLine::CommandLineSwitches::CommandLineSwitches(const std::vector<std::tstring>& rawargs)
+CommandLine::CommandLineSwitches::CommandLineSwitches(const std::vector<text::tstring>& rawargs)
 {
 	// Iterate over all the raw arguments to find and process the switched ones
 	for(const auto& arg : rawargs) {
@@ -173,7 +173,7 @@ CommandLine::CommandLineSwitches::CommandLineSwitches(const std::vector<std::tst
 			// Insert the switch into the collection, with or with the optional value after a colon
 
 			size_t colon = arg.find(_T(':'));
-			if(colon == std::tstring::npos) { m_switches.insert(std::make_pair(arg.substr(1), std::tstring())); }
+			if(colon == text::tstring::npos) { m_switches.insert(std::make_pair(arg.substr(1), text::tstring())); }
 			else { m_switches.insert(std::make_pair(arg.substr(1, colon - 1), arg.substr(colon + 1))); }
 		}
 	}
@@ -188,7 +188,7 @@ CommandLine::CommandLineSwitches::CommandLineSwitches(const std::vector<std::tst
 //
 //	key		- Switch name/key to check in the collection
 
-bool CommandLine::CommandLineSwitches::Contains(const std::tstring& key) const
+bool CommandLine::CommandLineSwitches::Contains(const text::tstring& key) const
 {
 	// Use the count of the specified key in the collection to determine this
 	return (m_switches.count(key) > 0);
@@ -203,11 +203,11 @@ bool CommandLine::CommandLineSwitches::Contains(const std::tstring& key) const
 //
 //	key		- Switch name/key to retrieve a single value for
 
-std::tstring CommandLine::CommandLineSwitches::GetValue(const std::tstring& key) const
+text::tstring CommandLine::CommandLineSwitches::GetValue(const text::tstring& key) const
 {
 	// Use find to locate the first element with the specified key
 	const auto& iterator = m_switches.find(key);
-	return (iterator == m_switches.cend()) ? std::tstring() : iterator->second;
+	return (iterator == m_switches.cend()) ? text::tstring() : iterator->second;
 }
 
 //-----------------------------------------------------------------------------
@@ -219,9 +219,9 @@ std::tstring CommandLine::CommandLineSwitches::GetValue(const std::tstring& key)
 //
 //	key		- Switch name/key to retrieve all values for
 
-std::vector<std::tstring> CommandLine::CommandLineSwitches::GetValues(const std::tstring key) const
+std::vector<text::tstring> CommandLine::CommandLineSwitches::GetValues(const text::tstring key) const
 {
-	std::vector<std::tstring> values;			// vector<> of values to return
+	std::vector<text::tstring> values;			// vector<> of values to return
 
 	// Use equal_range to retrieve all the elements with the specified key
 	const auto& range = m_switches.equal_range(key);

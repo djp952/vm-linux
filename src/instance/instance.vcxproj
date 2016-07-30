@@ -163,7 +163,7 @@
     <ClInclude Include="..\..\tmp\messages\messages.h" />
     <ClInclude Include="..\common\CommandLine.h" />
     <ClInclude Include="..\common\Exception.h" />
-    <ClInclude Include="..\common\generic_text.h" />
+    <ClInclude Include="..\common\text.h" />
     <ClInclude Include="..\common\NtApi.h" />
     <ClInclude Include="..\common\StructuredException.h" />
     <ClInclude Include="..\common\Win32Exception.h" />
