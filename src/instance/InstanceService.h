@@ -20,51 +20,66 @@
 // SOFTWARE.
 //-----------------------------------------------------------------------------
 
-#include "stdafx.h"
-#include "VirtualMachine.h"
+#ifndef __INSTANCESERVICE_H_
+#define __INSTANCESERVICE_H_
+#pragma once
+
+#include <memory>
+#include <VirtualMachine.h>
+
+#include "SystemLog.h"
 
 #pragma warning(push, 4)
 
-//---------------------------------------------------------------------------
-// VirtualMachine Constructor
+//-----------------------------------------------------------------------------
+// Class InstanceService
 //
-// Arguments:
-//
-//	NONE
+// Implements a virtual machine instance as a service
 
-VirtualMachine::VirtualMachine()
+class InstanceService : public Service<InstanceService>, public VirtualMachine
 {
-}
+public:
 
-//---------------------------------------------------------------------------
-// VirtualMachine::OnStart (private)
-//
-// Invoked when the service is started
-//
-// Arguments:
-//
-//	argc		- Number of command line arguments
-//	argv		- Array of command line argument strings
+	// Instance Constructor
+	//
+	InstanceService();
 
-void VirtualMachine::OnStart(int argc, LPTSTR* argv)
-{
-	UNREFERENCED_PARAMETER(argc);
-	UNREFERENCED_PARAMETER(argv);
-}
+	// Destructor
+	//
+	~InstanceService()=default;
 
-//---------------------------------------------------------------------------
-// VirtualMachine::OnStop (private)
-//
-// Invoked when the service is stopped
-//
-// Arguments:
-//
-//	NONE
+	//-------------------------------------------------------------------------
+	// Member Functions
 
-void VirtualMachine::OnStop(void)
-{
-}
+private:
 
-//---------------------------------------------------------------------------
+	InstanceService(InstanceService const&)=delete;
+	InstanceService& operator=(InstanceService const&)=delete;
+
+	// Service<> Control Handler Map
+	//
+	BEGIN_CONTROL_HANDLER_MAP(InstanceService)
+		CONTROL_HANDLER_ENTRY(SERVICE_CONTROL_STOP, OnStop)
+	END_CONTROL_HANDLER_MAP()
+
+	// OnStart (Service)
+	//
+	// Invoked when the service is started
+	virtual void OnStart(int argc, LPTSTR* argv);
+
+	// OnStop
+	//
+	// Invoked when the service is stopped
+	void OnStop(void);
+
+	//-------------------------------------------------------------------------
+	// Member Variables
+
+	std::unique_ptr<SystemLog>	m_syslog;		// SystemLog instance
+};
+
+//-----------------------------------------------------------------------------
 
 #pragma warning(pop)
+
+#endif	// __INSTANCESERVICE_H_

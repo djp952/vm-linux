@@ -24,51 +24,53 @@
 #define __VIRTUALMACHINE_H_
 #pragma once
 
+#include <stdint.h>
+
 #pragma warning(push, 4)
 
 //-----------------------------------------------------------------------------
 // Class VirtualMachine
 //
-// Implements the top-level virtual machine instance
+// Defines the virtual machine interface that sits between the instance
+// service and the system call implementation(s)
 
-class VirtualMachine : public Service<VirtualMachine>
+class VirtualMachine
 {
 public:
 
+	// LogLevel
+	//
+	// Strongly typed enumeration defining the level of a log entry
+	enum class LogLevel : int8_t
+	{
+		Default			= -1,	// LOGLEVEL_DEFAULT: Default (or last) log level
+		Emergency		= 0,	// LOGLEVEL_EMERG: System is unusable
+		Alert			= 1,	// LOGLEVEL_ALERT: Action must be taken immediately
+		Critical		= 2,	// LOGLEVEL_CRIT: Critical conditions
+		Error			= 3,	// LOGLEVEL_ERR: Error conditions
+		Warning			= 4,	// LOGLEVEL_WARN: Warning conditions
+		Notice			= 5,	// LOGLEVEL_NOTICE: Normal but significant condition
+		Informational	= 6,	// LOGLEVEL_INFO: Informational
+		Debug			= 7,	// LOGLEVEL_DEBUG: Debug-level messages
+	};
+
+	//-------------------------------------------------------------------------
+	// Member Functions
+
+protected:
+
 	// Instance Constructor
 	//
-	VirtualMachine();
+	VirtualMachine()=default;
 
 	// Destructor
 	//
 	~VirtualMachine()=default;
 
-	//-------------------------------------------------------------------------
-	// Member Functions
-
 private:
 
 	VirtualMachine(VirtualMachine const&)=delete;
 	VirtualMachine& operator=(VirtualMachine const&)=delete;
-
-	// Service<> Control Handler Map
-	//
-	BEGIN_CONTROL_HANDLER_MAP(VirtualMachine)
-		CONTROL_HANDLER_ENTRY(SERVICE_CONTROL_STOP, OnStop)
-	END_CONTROL_HANDLER_MAP()
-
-	// OnStart (Service)
-	//
-	// Invoked when the service is started
-	virtual void OnStart(int argc, LPTSTR* argv);
-
-	// OnStop
-	//
-	// Invoked when the service is stopped
-	void OnStop(void);
-
-	//-------------------------------------------------------------------------
-	// Member Variables
 };
 
 //-----------------------------------------------------------------------------

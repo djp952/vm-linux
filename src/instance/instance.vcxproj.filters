@@ -43,9 +43,6 @@
     <ClInclude Include="..\..\..\external-servicelib\servicelib.h">
       <Filter>External Libraries\servicelib</Filter>
     </ClInclude>
-    <ClInclude Include="VirtualMachine.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\CommandLine.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
@@ -64,6 +61,27 @@
     <ClInclude Include="..\common\text.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\MemoryRegion.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="InstanceService.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\VirtualMachine.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\sync.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="SystemLog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\SystemInformation.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\align.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -74,9 +92,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\external-servicelib\servicelib.cpp">
       <Filter>External Libraries\servicelib</Filter>
-    </ClCompile>
-    <ClCompile Include="VirtualMachine.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\common\CommandLine.cpp">
       <Filter>Source Files\common</Filter>
@@ -91,6 +106,18 @@
       <Filter>Source Files\common</Filter>
     </ClCompile>
     <ClCompile Include="..\common\Win32Exception.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\MemoryRegion.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="InstanceService.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SystemLog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\SystemInformation.cpp">
       <Filter>Source Files\common</Filter>
     </ClCompile>
   </ItemGroup>

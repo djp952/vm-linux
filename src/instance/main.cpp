@@ -23,14 +23,14 @@
 #include "stdafx.h"
 
 #include "CommandLine.h"
+#include "InstanceService.h"
 #include "StructuredException.h"
-#include "VirtualMachine.h"
 #include "Win32Exception.h"
 
 // g_harness
 //
 // Service harness used when instance is launched as a standalone process
-ServiceHarness<VirtualMachine> g_harness;
+ServiceHarness<InstanceService> g_harness;
 
 //-----------------------------------------------------------------------------
 // GenerateDefaultInstanceName
@@ -107,7 +107,7 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 			auto instancename = commandline.Switches.GetValue(TEXT("service"));
 			if(instancename.length() == 0) instancename = GenerateDefaultInstanceName();
 
-			ServiceTable services = { ServiceTableEntry<VirtualMachine>(instancename) };
+			ServiceTable services = { ServiceTableEntry<InstanceService>(instancename) };
 			services.Dispatch();
 		}
 
@@ -134,8 +134,35 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 			// Wait for the service to stop naturally or be broken by a console event
 			g_harness.WaitForStatus(ServiceStatus::Stopped);
 
-			// Release the console once the service has terminated
-			if(hasconsole) FreeConsole();
+			// Emit a "Press any key to continue ..." message and wait before releasing the console
+			if(hasconsole) {
+
+				// Get the console standard output handle, note that GetStdHandle can return either
+				// INVALID_HANDLE_VALUE (-1) to indicate an error, or NULL (0) if there is no STDIN
+				HANDLE standardout = GetStdHandle(STD_OUTPUT_HANDLE);
+				if(reinterpret_cast<intptr_t>(standardout) > 0) {
+
+					HANDLE standardin = GetStdHandle(STD_INPUT_HANDLE);
+					if(reinterpret_cast<intptr_t>(standardin) > 0) {
+
+						DWORD		dw;			// Generic DWORD for character counts and flags
+						tchar_t		ch;			// Character read from the console
+
+						text::tstring msg(TEXT("Press any key to continue . . ."));
+						WriteConsole(standardout, msg.data(), msg.size(), &dw, nullptr);
+
+						// Before reading 'any key' from STDIN, set the console mode and flush it
+						GetConsoleMode(standardin, &dw);
+						SetConsoleMode(standardin, dw & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT));
+						FlushConsoleInputBuffer(standardin);
+
+						ReadConsole(standardin, &ch, 1, &dw, nullptr);
+					}
+				}
+
+				// Release the console instance regardless of STDOUT/STDIN handles
+				FreeConsole();
+			}
 		}
 
 		// not -service or -console
