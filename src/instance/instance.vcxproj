@@ -172,6 +172,7 @@
     <ClInclude Include="..\common\StructuredException.h" />
     <ClInclude Include="..\common\VirtualMachine.h" />
     <ClInclude Include="..\common\Win32Exception.h" />
+    <ClInclude Include="Parameter.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="InstanceService.h" />
     <ClInclude Include="SystemLog.h" />

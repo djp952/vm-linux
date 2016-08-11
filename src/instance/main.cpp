@@ -76,6 +76,7 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 {
 	UNREFERENCED_PARAMETER(instance);
 	UNREFERENCED_PARAMETER(previnstance);
+	UNREFERENCED_PARAMETER(cmdline);
 	UNREFERENCED_PARAMETER(show);
 
 #ifdef _DEBUG
@@ -92,7 +93,7 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 
 	try {
 
-		CommandLine commandline(cmdline);					// Convert command line
+		CommandLine commandline(__argc, __targv);		// Convert the command line
 
 		// Register the RPC protocol sequence(s) that will be used by the instance process
 		RPC_STATUS rpcresult = RpcServerUseProtseq(reinterpret_cast<rpc_tchar_t*>(TEXT("ncalrpc")), RPC_C_PROTSEQ_MAX_REQS_DEFAULT, nullptr);
@@ -126,7 +127,7 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 			if(hasconsole) SetConsoleTitle(text::tstring(TEXT("VM:")).append(instancename).c_str());
 
 			// Start the service harness using the specified or generated instance name
-			g_harness.Start(instancename);
+			g_harness.Start(instancename, __argc, __targv);
 
 			// Register a handler to stop the service on any break event
 			if(hasconsole) SetConsoleCtrlHandler([](DWORD) -> BOOL { g_harness.SendControl(ServiceControl::Stop); return TRUE; }, TRUE);
@@ -149,7 +150,7 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 						tchar_t		ch;			// Character read from the console
 
 						text::tstring msg(TEXT("Press any key to continue . . ."));
-						WriteConsole(standardout, msg.data(), msg.size(), &dw, nullptr);
+						WriteConsole(standardout, msg.data(), static_cast<DWORD>(msg.size()), &dw, nullptr);
 
 						// Before reading 'any key' from STDIN, set the console mode and flush it
 						GetConsoleMode(standardin, &dw);

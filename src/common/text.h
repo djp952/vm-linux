@@ -128,8 +128,10 @@ namespace text {
 #endif
 	}
 
+	// text::tolower
 	//
 	// Performs an lowercase conversion of a string
+	inline std::string tolower(const std::string& str)
 	{
 		std::string result;
 
@@ -139,8 +141,10 @@ namespace text {
 		return result;
 	}
 
+	// text::tolower
 	//
 	// Performs an lowercase conversion of a string
+	inline std::wstring tolower(const std::wstring& str)
 	{
 		std::wstring result;
 
@@ -150,8 +154,10 @@ namespace text {
 		return result;
 	}
 
+	// text::toupper
 	//
 	// Performs an uppercase conversion of a string
+	inline std::string toupper(const std::string& str)
 	{
 		std::string result;
 
@@ -161,8 +167,10 @@ namespace text {
 		return result;
 	}
 
+	// text::toupper
 	//
 	// Performs an uppercase conversion of a string
+	inline std::wstring toupper(const std::wstring& str)
 	{
 		std::wstring result;
 

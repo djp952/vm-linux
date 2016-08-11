@@ -205,7 +205,7 @@ void SystemLog::WriteEntry(uint8_t facility, VirtualMachine::LogLevel level, cha
 		
 		writer.unlock();			// Release the write lock manually
 
-		WriteConsoleA(m_stdout, message, length, &cch, nullptr);
+		WriteConsoleA(m_stdout, message, static_cast<DWORD>(length), &cch, nullptr);
 		WriteConsoleA(m_stdout, crlf, 2, &cch, nullptr);
 	}
 }

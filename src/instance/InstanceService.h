@@ -24,12 +24,22 @@
 #define __INSTANCESERVICE_H_
 #pragma once
 
+#include <map>
 #include <memory>
+#include <vector>
 #include <VirtualMachine.h>
 
+#include "Parameter.h"
 #include "SystemLog.h"
 
 #pragma warning(push, 4)
+
+// PARAMETER_MAP
+//
+// Helper macros used to simplify the declaration of the parameters collection
+#define BEGIN_PARAMETER_MAP(__mvar) std::map<text::tstring, ParameterBase*> __mvar = {
+#define PARAMETER_ENTRY(__name, __paramvar) std::make_pair(text::tstring(__name), &__paramvar),
+#define END_PARAMETER_MAP() };
 
 //-----------------------------------------------------------------------------
 // Class InstanceService
@@ -62,6 +72,16 @@ private:
 		CONTROL_HANDLER_ENTRY(SERVICE_CONTROL_STOP, OnStop)
 	END_CONTROL_HANDLER_MAP()
 
+	// Parameter Map
+	//
+	BEGIN_PARAMETER_MAP(m_params)
+		PARAMETER_ENTRY(TEXT("log_buf_len"), param_log_buf_len)
+		PARAMETER_ENTRY(TEXT("loglevel"), param_loglevel)
+	END_PARAMETER_MAP()
+
+	//-------------------------------------------------------------------------
+	// Private Member Functions
+
 	// OnStart (Service)
 	//
 	// Invoked when the service is started
@@ -75,7 +95,12 @@ private:
 	//-------------------------------------------------------------------------
 	// Member Variables
 
-	std::unique_ptr<SystemLog>	m_syslog;		// SystemLog instance
+	std::unique_ptr<SystemLog>		m_syslog;		// SystemLog instance
+
+	// Parameters
+	//
+	Parameter<size_t>			param_log_buf_len	= 8 MiB;
+	Parameter<LogLevel>			param_loglevel		= LogLevel::Warning;
 };
 
 //-----------------------------------------------------------------------------
