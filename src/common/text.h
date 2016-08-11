@@ -31,6 +31,7 @@
 #include <string>
 #include <type_traits>
 #include <tchar.h>
+#include <vector>
 #include <Windows.h>
 
 #pragma warning(push, 4)
@@ -125,6 +126,50 @@ namespace text {
 #else
 		return to_string(value, cch);
 #endif
+	}
+
+	//
+	// Performs an lowercase conversion of a string
+	{
+		std::string result;
+
+		result.resize(str.size());
+		std::transform(str.begin(), str.end(), result.begin(), ::tolower);
+
+		return result;
+	}
+
+	//
+	// Performs an lowercase conversion of a string
+	{
+		std::wstring result;
+
+		result.resize(str.size());
+		std::transform(str.begin(), str.end(), result.begin(), ::towlower);
+
+		return result;
+	}
+
+	//
+	// Performs an uppercase conversion of a string
+	{
+		std::string result;
+
+		result.resize(str.size());
+		std::transform(str.begin(), str.end(), result.begin(), ::toupper);
+
+		return result;
+	}
+
+	//
+	// Performs an uppercase conversion of a string
+	{
+		std::wstring result;
+
+		result.resize(str.size());
+		std::transform(str.begin(), str.end(), result.begin(), ::towupper);
+
+		return result;
 	}
 
 	// text::ltrim
@@ -232,6 +277,32 @@ namespace text {
 	inline bool endswith(const std::wstring& str, const wchar_t& value)
 	{
 		return !str.empty() && str[str.size() - 1] == value;
+	}
+
+	// text::split
+	//
+	// Splits a tstring into a vector<> of delimited parts
+	template<typename _type = std::basic_string>
+	std::vector<typename _type> split(const typename _type& str, const typename _type::value_type& delimiter)
+	{
+		std::vector<_type> parts;			// Resultant vector<>
+
+		_type::size_type offset = 0;
+		_type::size_type position = str.find(delimiter);
+		auto substring = str.substr(offset, position - offset);
+		if(substring.length() > 0) parts.emplace_back(std::move(substring));
+		//parts.emplace_back(str.substr(offset, position));
+
+		while(position != _type::npos) {
+
+			offset = ++position;
+			position = str.find(delimiter, position);
+			substring = str.substr(offset, position - offset);
+			if(substring.length() > 0) parts.emplace_back(std::move(substring));
+			//parts.emplace_back(str.substr(offset, position));
+		}
+
+		return parts;			
 	}
 
 } // namespace text
