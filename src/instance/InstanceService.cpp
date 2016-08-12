@@ -112,10 +112,10 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 	m_syslog = std::make_unique<SystemLog>(param_log_buf_len);
 
 	// Dump the arguments that couldn't be parsed as warnings into the system log
-	for(auto p : invalidargs) LogMessage(VirtualMachine::LogLevel::Warning, TEXT("Failed to parse parameter:"), p);
+	for(auto p : invalidargs) LogMessage(VirtualMachine::LogLevel::Warning, TEXT("Failed to parse parameter: "), p);
 
 	// Instance service has been started successfully
-	LogMessage(VirtualMachine::LogLevel::Notice, TEXT("Instance"), argv[0], TEXT("started"));
+	LogMessage(VirtualMachine::LogLevel::Warning, TEXT("Instance "), argv[0], TEXT(" started"));
 }
 
 //---------------------------------------------------------------------------

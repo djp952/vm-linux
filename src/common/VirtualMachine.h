@@ -68,8 +68,7 @@ public:
 	template<typename... _remaining>
 	void LogMessage(LogLevel level, _remaining const&... remaining)
 	{
-		std::string message;
-		WriteSystemLogEntry(0, level, message, remaining...);
+		LogMessage(0, level, remaining...);
 	}
 
 	// LogMessage
@@ -79,7 +78,8 @@ public:
 	void LogMessage(uint8_t facility, LogLevel level, _remaining const&... remaining)
 	{
 		std::string message;
-		WriteSystemLogEntry(facility, level, message, remaining...);
+		ConstructLogMessage(message, remaining...);
+		WriteSystemLogEntry(facility, level, message.data(), message.size());
 	}
 
 protected:
@@ -104,23 +104,21 @@ private:
 	//--------------------------------------------------------------------------
 	// Private Member Functions
 
-	// WriteSystemLogEntry
+	// ConstructLogMessage
 	//
 	// Intermediate variadic overload; concatenates remaining message arguments
 	template<typename _first, typename... _remaining>
-	void WriteSystemLogEntry(uint8_t facility, LogLevel level, std::string& message, _first const& first, _remaining const&... remaining)
+	void ConstructLogMessage(std::string& message, _first const& first, _remaining const&... remaining)
 	{
-		message += std::to_string(first);
-		WriteSystemLogEntry(facility, level, message, remaining...);
+		ConstructLogMessage(message += std::to_string(first), remaining...);
 	}
 
-	// WriteSystemLogEntry
+	// ConstructLogMessage
 	//
-	// Final variadic overload; concatenates final message argument and writes the log
-	void WriteSystemLogEntry(uint8_t facility, LogLevel level, std::string& message)
+	// Final variadic overload of ConstructLogMessage
+	void ConstructLogMessage(std::string& message)
 	{
-		// Invoke the pure virtual function that accepts the raw ANSI/UTF-8 character input
-		WriteSystemLogEntry(facility, level, message.data(), message.size());
+		UNREFERENCED_PARAMETER(message);
 	}
 };
 
