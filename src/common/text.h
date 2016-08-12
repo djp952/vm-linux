@@ -53,14 +53,14 @@ using char_t = char;
 // Typedef for a generic text character
 using tchar_t = std::conditional<sizeof(TCHAR) == sizeof(wchar_t), wchar_t, char>::type;
 
-namespace text { 
+namespace std { 
 	
-	// text::tstring
+	// std::tstring
 	//
 	// Typedef for a generic text std::[w]string
 	using tstring = std::conditional<sizeof(TCHAR) == sizeof(wchar_t), std::wstring, std::string>::type;
 
-	// text::to_string (conversion)
+	// std::to_string (conversion)
 	//
 	inline std::string to_string(const wchar_t* psz, int cch)
 	{
@@ -75,14 +75,14 @@ namespace text {
 		return std::string(buffer.get(), buffercch);
 	}
 
-	// text::to_string overloads
+	// std::to_string overloads
 	//
 	inline std::string to_string(const wchar_t* psz) { return to_string(psz, -1); }
 	inline std::string to_string(const char_t* psz, int cch) { return std::string(psz, cch); }
 	inline std::string to_string(const char_t* psz) { return std::string(psz); }
 	inline std::string to_string(const std::wstring& str) { return to_string(str.data(), static_cast<int>(str.size())); }
 
-	// text::to_wstring (conversion)
+	// std::to_wstring (conversion)
 	//
 	inline std::wstring to_wstring(const char_t* psz, int cch)
 	{
@@ -97,14 +97,14 @@ namespace text {
 		return std::wstring(buffer.get(), buffercch);
 	}
 
-	// text::to_wstring overloads
+	// std::to_wstring overloads
 	//
 	inline std::wstring to_wstring(const char_t* psz) { return to_wstring(psz, -1); }
 	inline std::wstring to_wstring(const wchar_t* psz, int cch) { return std::wstring(psz, cch); }
 	inline std::wstring to_wstring(const wchar_t* psz) { return std::wstring(psz); }
 	inline std::wstring to_wstring(const std::string& str) { return to_wstring(str.data(), static_cast<int>(str.size())); }
 
-	// text::to_tstring
+	// std::to_tstring
 	//
 	// Generic text wrapper around std::to_[w]string
 	template <typename _type> inline tstring to_tstring(_type value)
@@ -116,7 +116,7 @@ namespace text {
 #endif
 	}
 
-	// text::to_tstring
+	// std::to_tstring
 	//
 	// Generic text wrapper around std::to_[w]string
 	template <typename _type> inline tstring to_tstring(_type value, int cch)
@@ -128,7 +128,7 @@ namespace text {
 #endif
 	}
 
-	// text::tolower
+	// std::tolower
 	//
 	// Performs an lowercase conversion of a string
 	inline std::string tolower(const std::string& str)
@@ -141,7 +141,7 @@ namespace text {
 		return result;
 	}
 
-	// text::tolower
+	// std::tolower
 	//
 	// Performs an lowercase conversion of a string
 	inline std::wstring tolower(const std::wstring& str)
@@ -154,7 +154,7 @@ namespace text {
 		return result;
 	}
 
-	// text::toupper
+	// std::toupper
 	//
 	// Performs an uppercase conversion of a string
 	inline std::string toupper(const std::string& str)
@@ -167,7 +167,7 @@ namespace text {
 		return result;
 	}
 
-	// text::toupper
+	// std::toupper
 	//
 	// Performs an uppercase conversion of a string
 	inline std::wstring toupper(const std::wstring& str)
@@ -180,7 +180,7 @@ namespace text {
 		return result;
 	}
 
-	// text::ltrim
+	// std::ltrim
 	//
 	// Performs a left trim of a string
 	inline std::string ltrim(const std::string& str)
@@ -207,7 +207,7 @@ namespace text {
 		return std::wstring(left, str.end());
 	}
 
-	// text::rtrim
+	// std::rtrim
 	//
 	// Performs a right trim of a string
 	inline std::string rtrim(const std::string& str)
@@ -234,7 +234,7 @@ namespace text {
 		return std::wstring(str.begin(), right.base());
 	}
 
-	// text::trim
+	// std::trim
 	//
 	// Performs a full trim of a string
 	inline std::string trim(const std::string& str)
@@ -287,7 +287,7 @@ namespace text {
 		return !str.empty() && str[str.size() - 1] == value;
 	}
 
-	// text::split
+	// std::split
 	//
 	// Splits a tstring into a vector<> of delimited parts
 	template<typename _type = std::basic_string>

@@ -24,6 +24,7 @@
 ;// Facility Codes
 FacilityNames=(
 			Generic=0:FACILITY_GENERIC
+			Instance=1:FACILITY_INSTANCE
 			)
 
 ;//--------------------------------------------------------------------------
@@ -56,3 +57,16 @@ SymbolicName=E_ARGUMENTOUTOFRANGE
 Language=English
 Parameter %1 was out of the range of valid values.
 .
+
+;//--------------------------------------------------------------------------
+;// Instance
+
+MessageId=1
+;//ExceptionName=SystemLogNotInitializedException
+Severity=Error
+Facility=Instance
+SymbolicName=E_SYSTEMLOGNOTINITIALIZED
+Language=English
+System log has not been initialized.
+.
+

@@ -25,6 +25,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <text.h>
 
 #pragma warning(push, 4)
 
@@ -37,6 +38,10 @@
 class VirtualMachine
 {
 public:
+
+	// Destructor
+	//
+	virtual ~VirtualMachine()=default;
 
 	// LogLevel
 	//
@@ -57,20 +62,66 @@ public:
 	//-------------------------------------------------------------------------
 	// Member Functions
 
+	// LogMessage
+	//
+	// Variadic template function to write a message to the system log
+	template<typename... _remaining>
+	void LogMessage(LogLevel level, _remaining const&... remaining)
+	{
+		std::string message;
+		WriteSystemLogEntry(0, level, message, remaining...);
+	}
+
+	// LogMessage
+	//
+	// Variadic template function to write a message to the system log
+	template<typename... _remaining>
+	void LogMessage(uint8_t facility, LogLevel level, _remaining const&... remaining)
+	{
+		std::string message;
+		WriteSystemLogEntry(facility, level, message, remaining...);
+	}
+
 protected:
 
 	// Instance Constructor
 	//
 	VirtualMachine()=default;
 
-	// Destructor
+	//--------------------------------------------------------------------------
+	// Protected Member Functions
+
+	// WriteSystemLogEntry
 	//
-	~VirtualMachine()=default;
+	// Writes an entry into the system log
+	virtual void WriteSystemLogEntry(uint8_t facility, LogLevel level, char_t const* message, size_t length) = 0;
 
 private:
 
 	VirtualMachine(VirtualMachine const&)=delete;
 	VirtualMachine& operator=(VirtualMachine const&)=delete;
+
+	//--------------------------------------------------------------------------
+	// Private Member Functions
+
+	// WriteSystemLogEntry
+	//
+	// Intermediate variadic overload; concatenates remaining message arguments
+	template<typename _first, typename... _remaining>
+	void WriteSystemLogEntry(uint8_t facility, LogLevel level, std::string& message, _first const& first, _remaining const&... remaining)
+	{
+		message += std::to_string(first);
+		WriteSystemLogEntry(facility, level, message, remaining...);
+	}
+
+	// WriteSystemLogEntry
+	//
+	// Final variadic overload; concatenates final message argument and writes the log
+	void WriteSystemLogEntry(uint8_t facility, LogLevel level, std::string& message)
+	{
+		// Invoke the pure virtual function that accepts the raw ANSI/UTF-8 character input
+		WriteSystemLogEntry(facility, level, message.data(), message.size());
+	}
 };
 
 //-----------------------------------------------------------------------------

@@ -34,7 +34,7 @@
 //
 //	hresult		- Thrown HRESULT code
 
-text::tstring StructuredException::GetDefaultMessage(HRESULT const& hresult)
+std::tstring StructuredException::GetDefaultMessage(HRESULT const& hresult)
 {
 	tchar_t buffer[256];			// Stack buffer to hold formatted string
 
@@ -45,7 +45,7 @@ text::tstring StructuredException::GetDefaultMessage(HRESULT const& hresult)
 	else 
 		_sntprintf_s(buffer, 256, _TRUNCATE, _T("NTSTATUS code 0x%08X\r\n"), hresult);
 
-	return text::tstring(buffer);
+	return std::tstring(buffer);
 }
 
 //-----------------------------------------------------------------------------

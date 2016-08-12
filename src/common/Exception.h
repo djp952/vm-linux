@@ -172,7 +172,7 @@ protected:
 	// GetDefaultMessage
 	//
 	// Invoked when an HRESULT code cannot be mapped to a message table string
-	virtual text::tstring GetDefaultMessage(HRESULT const& hresult);
+	virtual std::tstring GetDefaultMessage(HRESULT const& hresult);
 
 private:
 
@@ -219,7 +219,7 @@ private:
 	// m_message
 	//
 	// Generic text exception message string
-	text::tstring m_message;
+	std::tstring m_message;
 
 	// m_what
 	//

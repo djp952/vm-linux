@@ -43,9 +43,10 @@ class SystemLog
 {
 public:
 
-	// Instance Constructor
+	// Instance Constructors
 	//
 	SystemLog(size_t size);
+	SystemLog(size_t size, VirtualMachine::LogLevel defaultlevel);
 
 	// Destructor
 	//

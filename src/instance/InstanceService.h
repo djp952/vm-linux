@@ -37,8 +37,8 @@
 // PARAMETER_MAP
 //
 // Helper macros used to simplify the declaration of the parameters collection
-#define BEGIN_PARAMETER_MAP(__mvar) std::map<text::tstring, ParameterBase*> __mvar = {
-#define PARAMETER_ENTRY(__name, __paramvar) std::make_pair(text::tstring(__name), &__paramvar),
+#define BEGIN_PARAMETER_MAP(__mvar) std::map<std::tstring, ParameterBase*> __mvar = {
+#define PARAMETER_ENTRY(__name, __paramvar) std::make_pair(std::tstring(__name), &__paramvar),
 #define END_PARAMETER_MAP() };
 
 //-----------------------------------------------------------------------------
@@ -56,10 +56,20 @@ public:
 
 	// Destructor
 	//
-	~InstanceService()=default;
+	virtual ~InstanceService()=default;
 
 	//-------------------------------------------------------------------------
 	// Member Functions
+
+protected:
+
+	//-------------------------------------------------------------------------
+	// Protected Member Functions
+
+	// WriteSystemLogEntry (VirtualMachine)
+	//
+	// Writes an entry into the system log
+	virtual void WriteSystemLogEntry(uint8_t facility, VirtualMachine::LogLevel level, char_t const* message, size_t length);
 
 private:
 
@@ -99,7 +109,7 @@ private:
 
 	// Parameters
 	//
-	Parameter<size_t>			param_log_buf_len	= 8 MiB;
+	Parameter<size_t>			param_log_buf_len	= 2 MiB;
 	Parameter<LogLevel>			param_loglevel		= LogLevel::Warning;
 };
 

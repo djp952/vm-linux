@@ -120,7 +120,7 @@ tchar_t* Exception::FormatMessage(HRESULT hresult, DWORD langid, HMODULE module,
 //
 //	hresult		- Thrown HRESULT code
 
-text::tstring Exception::GetDefaultMessage(HRESULT const& hresult)
+std::tstring Exception::GetDefaultMessage(HRESULT const& hresult)
 {
 	tchar_t buffer[256];			// Stack buffer to hold formatted string
 
@@ -129,7 +129,7 @@ text::tstring Exception::GetDefaultMessage(HRESULT const& hresult)
 		hresult, HRESULT_SEVERITY(hresult), HRESULT_SEVERITY(hresult), HRESULT_FACILITY(hresult), HRESULT_FACILITY(hresult), 
 		HRESULT_CODE(hresult), HRESULT_CODE(hresult));
 
-	return text::tstring(buffer);
+	return std::tstring(buffer);
 }
 
 //-----------------------------------------------------------------------------
@@ -180,7 +180,7 @@ void Exception::SetExceptionMessage(HRESULT const& hresult, HMODULE module, std:
 	else m_message = GetDefaultMessage(hresult);
 
 	// std::exception::what() is stored separately since it must always be ANSI, regardless of tchar_t type
-	m_what = text::to_string(m_message);
+	m_what = std::to_string(m_message);
 }
 
 //-----------------------------------------------------------------------------

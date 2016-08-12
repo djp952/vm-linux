@@ -34,10 +34,22 @@
 //
 // Arguments:
 //
-//	size		- Size of the system log ring buffer in bytes
+//	size			- Size of the system log ring buffer in bytes
 
-SystemLog::SystemLog(size_t size) : m_tsfreq(GetTimestampFrequency()), m_tsbias(GetTimestampBias()), 
-	m_defaultlevel(VirtualMachine::LogLevel::Warning), m_stdout(GetStdHandle(STD_OUTPUT_HANDLE))
+SystemLog::SystemLog(size_t size) : SystemLog(size, VirtualMachine::LogLevel::Warning)
+{
+}
+
+//-----------------------------------------------------------------------------
+// SystemLog Constructor
+//
+// Arguments:
+//
+//	size			- Size of the system log ring buffer in bytes
+//	defaultlevel	- Default message logging level
+
+SystemLog::SystemLog(size_t size, VirtualMachine::LogLevel defaultlevel) : m_tsfreq(GetTimestampFrequency()), 
+	m_tsbias(GetTimestampBias()), m_defaultlevel(defaultlevel), m_stdout(GetStdHandle(STD_OUTPUT_HANDLE))
 {
 	// Minimum log size is the page size, maximum is constant MAX_BUFFER
 	size = std::min(std::max(size, SystemInformation::PageSize), MAX_BUFFER);
@@ -201,7 +213,7 @@ void SystemLog::WriteEntry(uint8_t facility, VirtualMachine::LogLevel level, cha
 	// GetStdHandle can return INVALID_HANDLE_VALUE or NULL (-1 or 0, respectively) if
 	// an error occurred or if there is no STDOUT handle for this process.  If there is
 	// a valid STDOUT handle, write the message and a CRLF pair to it
-	if(reinterpret_cast<intptr_t>(m_stdout) > 0) {
+	if((level <= m_defaultlevel) && (reinterpret_cast<intptr_t>(m_stdout)) > 0) {
 		
 		writer.unlock();			// Release the write lock manually
 

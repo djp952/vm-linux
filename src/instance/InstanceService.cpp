@@ -51,33 +51,34 @@ InstanceService::InstanceService()
 
 void InstanceService::OnStart(int argc, LPTSTR* argv)
 {
-	std::vector<text::tstring>	initargs;		// Arguments passed to init
-	std::vector<text::tstring>	initenv;		// Environment variables passed to init
-	std::vector<text::tstring>	invalidargs;	// Invalid parameter arguments
+	std::vector<tchar_t const*>		initargs;		// Arguments passed to init
+	std::vector<tchar_t const*>		initenv;		// Environment variables passed to init
+	std::vector<tchar_t const*>		invalidargs;	// Invalid parameter arguments
 
 	//
 	// PROCESS COMMAND LINE ARGUMENTS
 	//
 
-	// argv[0] --> Service name; start at argv[1]
+	// argv[0] is the service name; start at argv[1]
 	int index = 1;
 
 	// Attempt to process all command line arguments as parameters
 	while(index < argc) {
 
 		// Convert the entire argument into a tstring for processing
-		auto arg = text::tstring(argv[index++]);
+		auto arg = std::tstring(argv[index]);
 
-		// Split the argument into a vector<> based upon equal signs
-		auto argparts = text::split(arg, TEXT('='));
-		if(argparts.size() == 0) continue;
+		// An argument of "--" indicates that the remaining arguments are passed to init
+		if(arg.compare(TEXT("--")) == 0) { index++; break; }
 
-		// An argument string of "--" indicates that all remaining arguments are passed
-		// into init directly without being processed as a parameter
-		if(argparts[0].compare(TEXT("--")) == 0) break;
+		// Split the argument into a key/value pair, use a blank string as the value if one
+		// was not specified as part of the argument
+		auto equalsign = arg.find(TEXT('='));
+		auto key = arg.substr(0, equalsign);
+		auto value = (equalsign == std::tstring::npos) ? std::tstring() : arg.substr(equalsign + 1);
 
-		// Convert the parameter name to lower case and replace all hyphens with underscores
-		auto key = text::tolower(argparts[0]);
+		// Convert the key to lower case and replace all hyphens with underscores
+		key = std::tolower(key);
 		std::replace(key.begin(), key.end(), TEXT('-'), TEXT('_'));
 
 		// Check if the parameter exists in the collection and attempt to parse it
@@ -85,34 +86,36 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		if(found != m_params.end()) {
 
 			// If the parameter fails to parse, keep track of it for when the system log is running
-			if(!found->second->TryParse((argparts.size() > 1) ? argparts[1] : text::tstring())) invalidargs.push_back(arg);
+			if(!found->second->TryParse(value)) invalidargs.push_back(argv[index]);
 		}
 
 		else {
 			
 			// The key does not represent a known parameter; if the argument is in the format key=value it
 			// gets passed as an environment variable, otherwise it gets passed as a command line argument
-			if(argparts.size() > 1) initenv.push_back(arg);
-			else initargs.push_back(arg);
+			if(value.length() > 0) initenv.push_back(argv[index]);
+			else initargs.push_back(argv[index]);
 		}
+
+		index++;
 	}
 
 	// Any remaining arguments not processed above are passed into init
-	while(index < argc) { initargs.emplace_back(argv[index++]); }
+	while(index < argc) { initargs.push_back(argv[index++]); }
 
 	//
 	// INITIALIZE SYSTEM LOG
 	//
 
-	// Create the system log instance
+	// Create the system log instance, enforce a minimum size of 128KiB
+	param_log_buf_len = std::max<size_t>(128 KiB, param_log_buf_len);
 	m_syslog = std::make_unique<SystemLog>(param_log_buf_len);
 
-	//
-	// todo: for each invalid argument, write a warning to the system log
-	//
+	// Dump the arguments that couldn't be parsed as warnings into the system log
+	for(auto p : invalidargs) LogMessage(VirtualMachine::LogLevel::Warning, TEXT("Failed to parse parameter:"), p);
 
-	auto logmessage = std::string("Instance Service started");
-	m_syslog->WriteEntry(0, VirtualMachine::LogLevel::Notice, logmessage.data(), logmessage.size());
+	// Instance service has been started successfully
+	LogMessage(VirtualMachine::LogLevel::Notice, TEXT("Instance"), argv[0], TEXT("started"));
 }
 
 //---------------------------------------------------------------------------
@@ -127,6 +130,24 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 void InstanceService::OnStop(void)
 {
 	m_syslog.release();
+}
+
+//---------------------------------------------------------------------------
+// InstanceService::WriteSystemLogEntry (protected)
+//
+// Writes an entry into the system log
+//
+// Arguments:
+//
+//	facility		- Facility code for the message
+//	level			- LogLevel for the message
+//	message			- ANSI/UTF-8 message to be written
+//	length			- Length of the message, in bytes
+
+void InstanceService::WriteSystemLogEntry(uint8_t facility, VirtualMachine::LogLevel level, char_t const* message, size_t length)
+{
+	if(m_syslog) m_syslog->WriteEntry(facility, level, message, length);
+	else throw SystemLogNotInitializedException();
 }
 
 //---------------------------------------------------------------------------

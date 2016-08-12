@@ -41,7 +41,7 @@ ServiceHarness<InstanceService> g_harness;
 //
 //	NONE
 
-text::tstring GenerateDefaultInstanceName(void)
+std::tstring GenerateDefaultInstanceName(void)
 {
 	uuid_t				uuid;					// Generated UUID
 	rpc_tchar_t*		szuuid = nullptr;		// Converted UUID string
@@ -54,7 +54,7 @@ text::tstring GenerateDefaultInstanceName(void)
 	rpcresult = UuidToString(&uuid, &szuuid);
 	if(rpcresult != RPC_S_OK) throw Win32Exception(rpcresult);
 
-	text::tstring result(reinterpret_cast<tchar_t*>(szuuid));
+	std::tstring result(reinterpret_cast<tchar_t*>(szuuid));
 	RpcStringFree(&szuuid);
 
 	return result;
@@ -124,7 +124,7 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 
 			// Attempt to create a new console for the instance
 			BOOL hasconsole = AllocConsole();
-			if(hasconsole) SetConsoleTitle(text::tstring(TEXT("VM:")).append(instancename).c_str());
+			if(hasconsole) SetConsoleTitle(std::tstring(TEXT("VM:")).append(instancename).c_str());
 
 			// Start the service harness using the specified or generated instance name
 			g_harness.Start(instancename, __argc, __targv);
@@ -149,7 +149,7 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 						DWORD		dw;			// Generic DWORD for character counts and flags
 						tchar_t		ch;			// Character read from the console
 
-						text::tstring msg(TEXT("Press any key to continue . . ."));
+						std::tstring msg(TEXT("Press any key to continue . . ."));
 						WriteConsole(standardout, msg.data(), static_cast<DWORD>(msg.size()), &dw, nullptr);
 
 						// Before reading 'any key' from STDIN, set the console mode and flush it

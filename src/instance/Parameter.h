@@ -53,7 +53,7 @@ public:
 	// Parse
 	//
 	// Parses the specified string into the contained value
-	virtual void Parse(const text::tstring& value) = 0;
+	virtual void Parse(const std::tstring& value) = 0;
 
 	// TryParse
 	//
@@ -63,7 +63,7 @@ public:
 	// TryParse
 	//
 	// Tries to parse the specified string into the contained value
-	virtual bool TryParse(const text::tstring& value) = 0;
+	virtual bool TryParse(const std::tstring& value) = 0;
 
 protected:
 
@@ -114,18 +114,18 @@ public:
 		return *this;
 	}
 
-	// Assignment Operator (text::tstring)
+	// Assignment Operator (std::tstring)
 	//
-	Parameter& operator=(const text::tstring& value)
+	Parameter& operator=(const std::tstring& value)
 	{
 		Parse<_type>(value, m_value);
 		return *this;
 	}
 
-	// Assignment Operator (non-text::tstring)
+	// Assignment Operator (non-std::tstring)
 	//
 	template<typename _t = value_t>
-	typename std::enable_if<!std::is_same<_t, text::tstring>::value, Parameter&>::type operator=(const value_t& value)
+	typename std::enable_if<!std::is_same<_t, std::tstring>::value, Parameter&>::type operator=(const value_t& value)
 	{
 		m_value = value;
 		return *this;
@@ -146,10 +146,10 @@ public:
 		return m_value != 0;
 	}
 
-	// bool Conversion Operator (text::tstring)
+	// bool Conversion Operator (std::tstring)
 	//
 	template<typename _t = value_t>
-	operator typename std::enable_if<std::is_same<_t, text::tstring>::value, bool>::type () const
+	operator typename std::enable_if<std::is_same<_t, std::tstring>::value, bool>::type () const
 	{
 		return m_value.length() > 0;
 	}
@@ -170,10 +170,10 @@ public:
 		return m_value == 0;
 	}
 
-	// Logical Not Operator (text::tstring)
+	// Logical Not Operator (std::tstring)
 	//
 	template<typename _t = value_t>
-	typename std::enable_if<std::is_same<_t, text::tstring>::value, bool>::type operator !() const
+	typename std::enable_if<std::is_same<_t, std::tstring>::value, bool>::type operator !() const
 	{
 		return m_value.length() == 0;
 	}
@@ -186,13 +186,13 @@ public:
 	// Parses the specified string into the contained value
 	virtual void Parse(const tchar_t* value)
 	{
-		Parse(text::tstring(value));
+		Parse(std::tstring(value));
 	}
 
 	// Parse (ParameterBase)
 	//
 	// Parses the specified string into the contained value
-	virtual void Parse(const text::tstring& value)
+	virtual void Parse(const std::tstring& value)
 	{
 		Parse(value, m_value);
 	}
@@ -202,13 +202,13 @@ public:
 	// Tries to parse the specified string into the contained value
 	virtual bool TryParse(const tchar_t* value)
 	{
-		return TryParse(text::tstring(value));
+		return TryParse(std::tstring(value));
 	}
 
 	// TryParse (ParameterBase)
 	//
 	// Tries to parse the specified string into the contained value
-	virtual bool TryParse(const text::tstring& value)
+	virtual bool TryParse(const std::tstring& value)
 	{
 		try { Parse<_type>(value, m_value); }
 		catch(...) { return false; }
@@ -229,7 +229,7 @@ private:
 	//
 	// Parses a string into a signed 64-bit integer
 	template<typename _type>
-	static inline typename std::enable_if<std::is_same<_type, int64_t>::value, int64_t>::type ParseInteger64(const text::tstring& str, size_t* idx, int base)
+	static inline typename std::enable_if<std::is_same<_type, int64_t>::value, int64_t>::type ParseInteger64(const std::tstring& str, size_t* idx, int base)
 	{
 		return std::stoll(str, idx, base);
 	}
@@ -238,7 +238,7 @@ private:
 	//
 	// Parses a string into an unsigned 64-bit integer
 	template<typename _type>
-	static inline typename std::enable_if<std::is_same<_type, uint64_t>::value, uint64_t>::type ParseInteger64(const text::tstring& str, size_t* idx, int base)
+	static inline typename std::enable_if<std::is_same<_type, uint64_t>::value, uint64_t>::type ParseInteger64(const std::tstring& str, size_t* idx, int base)
 	{
 		return std::stoull(str, idx, base);
 	}
@@ -247,7 +247,7 @@ private:
 	//
 	// Parses a string value into an integer value, optionally applying the K/M/G multiplier suffix
 	template<typename _t = _type>
-	static typename std::enable_if<std::is_integral<_t>::value && !std::is_same<_t, bool>::value, void>::type Parse(const text::tstring& str, value_t& val)
+	static typename std::enable_if<std::is_integral<_t>::value && !std::is_same<_t, bool>::value, void>::type Parse(const std::tstring& str, value_t& val)
 	{
 		// interim_t -> interim 64-bit value type used during conversion
 		using interim_t = std::conditional<std::is_signed<_t>::value, int64_t, uint64_t>::type;
@@ -260,7 +260,7 @@ private:
 		auto suffix = str.substr(suffixindex);
 
 		// The suffix must not be more than one character in length
-		if(suffix.length() > 1) throw std::invalid_argument(text::to_string(str));
+		if(suffix.length() > 1) throw std::invalid_argument(std::to_string(str));
 		else if(suffix.length() == 1) {
 
 			switch(suffix.at(0)) {
@@ -268,20 +268,20 @@ private:
 				case 'k': case 'K': multiplier = 1 KiB; break;
 				case 'm': case 'M': multiplier = 1 MiB; break;
 				case 'g': case 'G': multiplier = 1 GiB; break;
-				default: throw std::invalid_argument(text::to_string(str));
+				default: throw std::invalid_argument(std::to_string(str));
 			}
 		}
 
 		// Watch for overflow when applying the multiplier to the interim value
 		if((std::numeric_limits<interim_t>::max() / multiplier) < interim) 
-			throw std::overflow_error(text::to_string(str));
+			throw std::overflow_error(std::to_string(str));
 		
 		// Apply the multiplier value
 		interim *= multiplier;
 
 		// Verify that the final result will not exceed the target type's numeric limits
 		if((interim > std::numeric_limits<_t>::max()) || (interim < std::numeric_limits<_t>::min())) 
-			throw std::overflow_error(text::to_string(str));
+			throw std::overflow_error(std::to_string(str));
 
 		// Value has been successfully converted, set the provided reference
 		val = static_cast<_t>(interim);
@@ -291,7 +291,7 @@ private:
 	//
 	// Parses a string value into an enumeration ordinal value
 	template<typename _t = _type>
-	static typename std::enable_if<std::is_enum<_t>::value, void>::type Parse(const text::tstring& str, value_t& val)
+	static typename std::enable_if<std::is_enum<_t>::value, void>::type Parse(const std::tstring& str, value_t& val)
 	{
 		// interim_t -> interim 64-bit value type used during conversion
 		using interim_t = std::conditional<std::is_signed<std::underlying_type<_t>::type>::value, int64_t, uint64_t>::type;
@@ -301,17 +301,17 @@ private:
 
 		// Verify that the final result will not exceed the underlying type's numeric limits
 		if((interim > std::numeric_limits<std::underlying_type<_t>::type>::max()) || (interim < std::numeric_limits<std::underlying_type<_t>::type>::min())) 
-			throw std::overflow_error(text::to_string(str));
+			throw std::overflow_error(std::to_string(str));
 
 		// Value has been successfully converted, set the provided reference
 		val = static_cast<_t>(interim);
 	}
 
-	// Parse (text::tstring)
+	// Parse (std::tstring)
 	//
 	// Parses a string value
 	template<typename _t = _type> 
-	static typename std::enable_if<std::is_same<_t, text::tstring>::value, void>::type Parse(const text::tstring& str, value_t& val)
+	static typename std::enable_if<std::is_same<_t, std::tstring>::value, void>::type Parse(const std::tstring& str, value_t& val)
 	{
 		val = str;
 	}
@@ -320,9 +320,9 @@ private:
 	//
 	// Parses a boolean value
 	template<typename _t = _type>
-	static typename std::enable_if<std::is_same<_t, bool>::value, void>::type Parse(const text::tstring& str, value_t& val)
+	static typename std::enable_if<std::is_same<_t, bool>::value, void>::type Parse(const std::tstring& str, value_t& val)
 	{
-		auto strlower = text::tolower(str);
+		auto strlower = std::tolower(str);
 
 		// The acceptable strings here are "true", "false", "0" and "1"
 		if((strlower.compare(TEXT("true")) == 0) || (strlower.compare(TEXT("1")) == 0)) val = true;
@@ -334,7 +334,7 @@ private:
 	//
 	// Parses a void value which represents a switch that always evaluates to true
 	template<typename _t = _type>
-	static typename std::enable_if<std::is_void<_t>::value, void>::type Parse(const text::tstring&, value_t& val)
+	static typename std::enable_if<std::is_void<_t>::value, void>::type Parse(const std::tstring&, value_t& val)
 	{
 		val = true;
 	}
