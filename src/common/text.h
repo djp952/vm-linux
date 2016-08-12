@@ -71,8 +71,9 @@ namespace std {
 		auto buffer = std::make_unique<char_t[]>(buffercch);
 		WideCharToMultiByte(CP_UTF8, 0, psz, cch, buffer.get(), buffercch, nullptr, nullptr);
 
-		// Construct an std::string around the converted character data
-		return std::string(buffer.get(), buffercch);
+		// Construct an std::string around the converted character data, watch for the API
+		// returning the length including the NULL character when -1 was provided as length
+		return std::string(buffer.get(), (cch == -1) ? buffercch - 1 : buffercch);
 	}
 
 	// std::to_string overloads
@@ -93,8 +94,9 @@ namespace std {
 		auto buffer = std::make_unique<wchar_t[]>(buffercch);
 		MultiByteToWideChar(CP_UTF8, 0, psz, cch, buffer.get(), buffercch);
 
-		// Construct an std::wstring around the converted character data
-		return std::wstring(buffer.get(), buffercch);
+		// Construct an std::wstring around the converted character data, watch for the API
+		// returning the length including the NULL character when -1 was provided as length
+		return std::wstring(buffer.get(), (cch == -1) ? buffercch - 1 : buffercch);
 	}
 
 	// std::to_wstring overloads
