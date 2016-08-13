@@ -51,6 +51,14 @@ Exception::~Exception()
 }
 
 //-----------------------------------------------------------------------------
+// Exception char const* conversion operator
+
+Exception::operator char const*() const
+{
+	return m_what.c_str();
+}
+
+//-----------------------------------------------------------------------------
 // Exception::operator=
 
 Exception& Exception::operator=(Exception const& rhs)
@@ -84,8 +92,8 @@ tchar_t* Exception::FormatMessage(HRESULT hresult, DWORD langid, HMODULE module,
 	DWORD result;							// Result from ::FormatMessage
 
 	// Generate the flags for ::FormatMessage based on presence of the HMODULE and DWORD_PTR array
-	DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | ((module) ? FORMAT_MESSAGE_FROM_HMODULE : 0) |
-		((args) ? FORMAT_MESSAGE_ARGUMENT_ARRAY : FORMAT_MESSAGE_IGNORE_INSERTS);
+	DWORD flags = FORMAT_MESSAGE_MAX_WIDTH_MASK | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
+		((module) ? FORMAT_MESSAGE_FROM_HMODULE : 0) | ((args) ? FORMAT_MESSAGE_ARGUMENT_ARRAY : FORMAT_MESSAGE_IGNORE_INSERTS);
 
 	__try { 
 		

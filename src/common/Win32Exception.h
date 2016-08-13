@@ -51,6 +51,10 @@ public:
 	//
 	virtual ~Win32Exception();
 
+	// char const* conversion operator
+	//
+	operator char const*() const;
+
 	//-------------------------------------------------------------------------
 	// std::exception implementation
 

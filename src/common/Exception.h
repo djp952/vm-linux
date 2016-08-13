@@ -108,6 +108,10 @@ public:
 	//
 	virtual ~Exception();
 
+	// char const* conversion operator
+	//
+	operator char const*() const;
+
 	// Copy Constructor
 	//
 	Exception(Exception const& rhs);

@@ -64,6 +64,14 @@ Win32Exception::~Win32Exception()
 }
 
 //-----------------------------------------------------------------------------
+// Win32Exception char const* conversion operator
+
+Win32Exception::operator char const*() const
+{
+	return m_what;
+}
+
+//-----------------------------------------------------------------------------
 // Win32Exception::AllocateMessage (private, static)
 //
 // Generates the formatted message string
@@ -77,14 +85,14 @@ char* Win32Exception::AllocateMessage(DWORD result)
 	LPTSTR message = nullptr;					// Allocated string from ::FormatMessage
 
 	// Attempt to format the message from the current module resources
-	DWORD cchmessage = ::FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
-		result, GetThreadUILanguage(), reinterpret_cast<LPTSTR>(&message), 0, nullptr); 
+	DWORD cchmessage = ::FormatMessage(FORMAT_MESSAGE_MAX_WIDTH_MASK | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
+		FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, result, GetThreadUILanguage(), reinterpret_cast<LPTSTR>(&message), 0, nullptr); 
 	if(cchmessage == 0) {
 
 		// The message could not be looked up in the specified module; generate the default message instead
 		if(message) { LocalFree(message); message = nullptr; }
-		cchmessage = ::FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_STRING | FORMAT_MESSAGE_ARGUMENT_ARRAY, 
-			s_defaultformat, 0, 0, reinterpret_cast<LPTSTR>(&message), 0, reinterpret_cast<va_list*>(&result));
+		cchmessage = ::FormatMessage(FORMAT_MESSAGE_MAX_WIDTH_MASK | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_STRING | 
+			FORMAT_MESSAGE_ARGUMENT_ARRAY, s_defaultformat, 0, 0, reinterpret_cast<LPTSTR>(&message), 0, reinterpret_cast<va_list*>(&result));
 		if(cchmessage == 0) {
 
 			// The default message could not be generated; give up
