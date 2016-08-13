@@ -126,14 +126,20 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 			BOOL hasconsole = AllocConsole();
 			if(hasconsole) SetConsoleTitle(std::tstring(TEXT("VM:")).append(instancename).c_str());
 
-			// Start the service harness using the specified or generated instance name
-			g_harness.Start(instancename, __argc, __targv);
+			try {
 
-			// Register a handler to stop the service on any break event
-			if(hasconsole) SetConsoleCtrlHandler([](DWORD) -> BOOL { g_harness.SendControl(ServiceControl::Stop); return TRUE; }, TRUE);
+				// Start the service harness using the specified or generated instance name
+				g_harness.Start(instancename, __argc, __targv);
 
-			// Wait for the service to stop naturally or be broken by a console event
-			g_harness.WaitForStatus(ServiceStatus::Stopped);
+				// Register a handler to stop the service on any break event
+				if(hasconsole) SetConsoleCtrlHandler([](DWORD) -> BOOL { g_harness.SendControl(ServiceControl::Stop); return TRUE; }, TRUE);
+
+				// Wait for the service to stop naturally or be broken by a console event
+				g_harness.WaitForStatus(ServiceStatus::Stopped);
+			}
+
+			// Eat any exceptions thrown from service control actions when in console mode
+			catch(...) { /* DO NOTHING */ }
 
 			// Emit a "Press any key to continue ..." message and wait before releasing the console
 			if(hasconsole) {
@@ -181,6 +187,8 @@ int APIENTRY _tWinMain(HINSTANCE instance, HINSTANCE previnstance, LPTSTR cmdlin
 
 	// On exception, use the HRESULT as the return code from the process
 	catch(Exception& exception) { return static_cast<int>(exception.HResult); }
+	catch(ServiceException& exception) { return static_cast<int>(exception.code()); }
+	catch(std::exception&) { return static_cast<int>(ERROR_UNHANDLED_EXCEPTION); }
 
 	return ERROR_SUCCESS;
 }
