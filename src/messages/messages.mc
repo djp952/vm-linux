@@ -62,11 +62,37 @@ Parameter %1 was out of the range of valid values.
 ;// Instance
 
 MessageId=1
+;//ExceptionName=CreateSystemLogException,errormessage
+Severity=Error
+Facility=Instance
+SymbolicName=E_CREATESYSTEMLOG
+Language=English
+Could not create the system log. %1!S!
+.
+
+MessageId=
 ;//ExceptionName=SystemLogNotInitializedException
 Severity=Error
 Facility=Instance
 SymbolicName=E_SYSTEMLOGNOTINITIALIZED
 Language=English
-System log has not been initialized.
+The system log has not been initialized.
 .
 
+MessageId=
+;//ExceptionName=CreateJobObjectException,errorcode,errormessage
+Severity=Error
+Facility=Instance
+SymbolicName=E_CREATEJOBOBJECT
+Language=English
+Could not create process control job object. Error %1!d! - %2!S!
+.
+
+MessageId=
+;//ExceptionName=PanicDuringInitializationException,errormessage
+Severity=Error
+Facility=Instance
+SymbolicName=E_PANICDURINGINITIALIZATION
+Language=English
+PANIC: An exception occurred during instance initialization.  %1!S!
+.

@@ -106,6 +106,7 @@ private:
 	// Member Variables
 
 	std::unique_ptr<SystemLog>		m_syslog;		// SystemLog instance
+	HANDLE							m_job;			// Process job object
 
 	// Parameters
 	//

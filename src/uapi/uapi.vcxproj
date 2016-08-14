@@ -156,6 +156,11 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)tmp\uapi\uapi-x86.h</Outputs>
     </CustomBuild>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\tmp\uapi\uapi-x32.h" />
+    <ClInclude Include="..\..\tmp\uapi\uapi-x64.h" />
+    <ClInclude Include="..\..\tmp\uapi\uapi-x86.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
