@@ -44,7 +44,8 @@ namespace zuki.vm.linux
 		/// <param name="transunit">TranslationUnit to be converted</param>
 		/// <param name="clangargs">Command line arguments passed into clang</param>
 		/// <param name="outheader">Output header file</param>
-		public static void Generate(TranslationUnit transunit, IEnumerable<string> clangargs, string outheader)
+		/// <param name="prefix">Prefix string for declarations</param>
+		public static void Generate(TranslationUnit transunit, IEnumerable<string> clangargs, string outheader, string prefix)
 		{
 			if (transunit == null) throw new ArgumentNullException("transunit");
 			if (String.IsNullOrEmpty(outheader)) throw new ArgumentNullException("outheader");
@@ -63,7 +64,7 @@ namespace zuki.vm.linux
 			// Create the dictionary of name mappings; when dealing with macro definitions it's easier
 			// to search and replace strings than it is to try and determine if something should be 
 			// renamed during output processing
-			var namemappings = CreateNameMappings(transunit);
+			var namemappings = CreateNameMappings(transunit, prefix);
 
 			// Create an IndentedTextWriter instance to control the output
 			using (IndentedTextWriter writer = new IndentedTextWriter(SysFile.CreateText(outheader)))
@@ -84,10 +85,10 @@ namespace zuki.vm.linux
 						writer.WriteLine("// " + cursor.Location.ToString());
 
 						// Process enumeration, structure, typedef and union declarations
-						if (cursor.Kind == CursorKind.EnumDecl) EmitEnum(writer, cursor);
-						else if (cursor.Kind == CursorKind.StructDecl) EmitStruct(writer, cursor);
-						else if (cursor.Kind == CursorKind.TypedefDecl) EmitTypedef(writer, cursor);
-						else if (cursor.Kind == CursorKind.UnionDecl) EmitUnion(writer, cursor);
+						if (cursor.Kind == CursorKind.EnumDecl) EmitEnum(writer, cursor, prefix);
+						else if (cursor.Kind == CursorKind.StructDecl) EmitStruct(writer, cursor, prefix);
+						else if (cursor.Kind == CursorKind.TypedefDecl) EmitTypedef(writer, cursor, prefix);
+						else if (cursor.Kind == CursorKind.UnionDecl) EmitUnion(writer, cursor, prefix);
 
 						// Apply a static_assert in the output to verify that the compiled size of
 						// structures, typedefs and unions matches what the clang API calculated
@@ -95,10 +96,10 @@ namespace zuki.vm.linux
 						{
 							writer.WriteLine();
 							writer.WriteLine("#if !defined(__midl)");
-							writer.WriteLine("static_assert(alignof(uapi_" + cursor.DisplayName + ") == " + cursor.Type.Alignment.ToString() +
-								", \"uapi_" + cursor.DisplayName + ": incorrect alignment\");");
-							writer.WriteLine("static_assert(sizeof(uapi_" + cursor.DisplayName + ") == " + cursor.Type.Size.ToString() +
-								", \"uapi_" + cursor.DisplayName + ": incorrect size\");");
+							writer.WriteLine("static_assert(alignof(" + prefix.ToLower() + "_" + cursor.DisplayName + ") == " + cursor.Type.Alignment.ToString() +
+								", \"" + prefix.ToLower() + "_" + cursor.DisplayName + ": incorrect alignment\");");
+							writer.WriteLine("static_assert(sizeof(" + prefix.ToLower() + "_" + cursor.DisplayName + ") == " + cursor.Type.Size.ToString() +
+								", \"" + prefix.ToLower() + "_" + cursor.DisplayName + ": incorrect size\");");
 							writer.WriteLine("#endif");
 						}
 
@@ -111,7 +112,7 @@ namespace zuki.vm.linux
 					{
 						// Write the original location of the definition for reference and emit the macro
 						writer.WriteLine("// " + cursor.Location.ToString());
-						EmitMacroDefinition(writer, cursor, namemappings);
+						EmitMacroDefinition(writer, cursor, namemappings, prefix);
 						writer.WriteLine();
 					}
 
@@ -129,7 +130,8 @@ namespace zuki.vm.linux
 		/// expansion tokens separately.  A string search/replace is required instead (slow and ugly)
 		/// </summary>
 		/// <param name="transunit">TranslationUnit instance</param>
-		private static Dictionary<string, string> CreateNameMappings(TranslationUnit transunit)
+		/// <param name="prefix">Prefix string for declarations</param>
+		private static Dictionary<string, string> CreateNameMappings(TranslationUnit transunit, string prefix)
 		{
 			Dictionary<string, string> dictionary = new Dictionary<string, string>();
 
@@ -137,7 +139,7 @@ namespace zuki.vm.linux
 			//
 			foreach (var macrodecl in transunit.Cursor.FindChildren((c, p) => (c.Kind == CursorKind.MacroDefinition) && (!ClangFile.IsNull(c.Location.File))).Select(t => t.Item1))
 			{
-				if(!String.IsNullOrEmpty(macrodecl.DisplayName)) dictionary.Add(macrodecl.DisplayName, "UAPI_" + macrodecl.DisplayName);
+				if(!String.IsNullOrEmpty(macrodecl.DisplayName)) dictionary.Add(macrodecl.DisplayName,  prefix.ToUpper() + "_" + macrodecl.DisplayName);
 			}
 
 			// ENUMERATION CONSTANTS (UAPI_)
@@ -145,7 +147,7 @@ namespace zuki.vm.linux
 			foreach(Cursor enumdecl in transunit.Cursor.FindChildren((c, p) => c.Kind == CursorKind.EnumDecl).Select(t => t.Item1))
 			{
 				var constants = enumdecl.FindChildren((c, p) => c.Kind == CursorKind.EnumConstantDecl).Select(t => t.Item1);
-				foreach(Cursor constant in constants) dictionary.Add(constant.DisplayName, "UAPI_" + constant.DisplayName);
+				foreach(Cursor constant in constants) dictionary.Add(constant.DisplayName,  prefix.ToUpper() + "_" + constant.DisplayName);
 			}
 
 			// DECLARATIONS (uapi_)
@@ -153,7 +155,7 @@ namespace zuki.vm.linux
 			foreach (Cursor decl in transunit.Cursor.FindChildren((c, p) => c.Kind.IsDeclaration).Select(t => t.Item1))
 			{
 				// Declaration names override macro and enumeration constant names
-				if (!String.IsNullOrEmpty(decl.DisplayName)) dictionary[decl.DisplayName] = "uapi_" + decl.DisplayName;
+				if (!String.IsNullOrEmpty(decl.DisplayName)) dictionary[decl.DisplayName] =  prefix.ToLower() + "_" + decl.DisplayName;
 			}
 
 			return dictionary;
@@ -164,7 +166,8 @@ namespace zuki.vm.linux
 		/// </summary>
 		/// <param name="writer">Text writer instance</param>
 		/// <param name="cursor">Enumeration cursor to be emitted</param>
-		private static void EmitEnum(IndentedTextWriter writer, Cursor cursor)
+		/// <param name="prefix">Prefix string for declarations</param>
+		private static void EmitEnum(IndentedTextWriter writer, Cursor cursor, string prefix)
 		{
 			if (writer == null) throw new ArgumentNullException("writer");
 			if (cursor == null) throw new ArgumentNullException("cursor");
@@ -172,13 +175,13 @@ namespace zuki.vm.linux
 
 			// Like structs and unions, enums can be anonymous and not have a display name
 			writer.Write("enum ");
-			if (!String.IsNullOrEmpty(cursor.DisplayName)) writer.Write("uapi_" + cursor.DisplayName + " ");
+			if (!String.IsNullOrEmpty(cursor.DisplayName)) writer.Write(prefix.ToLower() + "_" + cursor.DisplayName + " ");
 			writer.WriteLine("{");
 			writer.WriteLine();
 
 			// The only valid children of a enumeration declaration are enumeration constant declarations
 			writer.Indent++;
-			foreach (Cursor child in cursor.FindChildren((c, p) => c.Kind == CursorKind.EnumConstantDecl).Select(t => t.Item1)) EmitEnumConstant(writer, child);
+			foreach (Cursor child in cursor.FindChildren((c, p) => c.Kind == CursorKind.EnumConstantDecl).Select(t => t.Item1)) EmitEnumConstant(writer, child, prefix);
 			writer.Indent--;
 
 			writer.WriteLine();
@@ -190,14 +193,15 @@ namespace zuki.vm.linux
 		/// </summary>
 		/// <param name="writer">Text writer instance</param>
 		/// <param name="cursor">Enumeration constant cursor to be emitted</param>
-		private static void EmitEnumConstant(IndentedTextWriter writer, Cursor cursor)
+		/// <param name="prefix">Prefix string for declarations</param>
+		private static void EmitEnumConstant(IndentedTextWriter writer, Cursor cursor, string prefix)
 		{
 			if (writer == null) throw new ArgumentNullException("writer");
 			if (cursor == null) throw new ArgumentNullException("cursor");
 			if (cursor.Kind != CursorKind.EnumConstantDecl) throw new Exception("EmitEnumConstant: Unexpected cursor kind");
 
 			// Enumeration constants lie in the global namespace, so they need to be prefixed with UAPI_
-			writer.WriteLine("UAPI_" + cursor.DisplayName + " = " + cursor.EnumConstant.ToString() + ",");
+			writer.WriteLine(prefix.ToUpper() + "_" + cursor.DisplayName + " = " + cursor.EnumConstant.ToString() + ",");
 		}
 
 		/// <summary>
@@ -205,7 +209,8 @@ namespace zuki.vm.linux
 		/// </summary>
 		/// <param name="writer">Text writer instance</param>
 		/// <param name="cursor">Field declaration cursor to be emitted</param>
-		private static void EmitField(IndentedTextWriter writer, Cursor cursor)
+		/// <param name="prefix">Prefix string for declarations</param>
+		private static void EmitField(IndentedTextWriter writer, Cursor cursor, string prefix)
 		{
 			if (writer == null) throw new ArgumentNullException("writer");
 			if (cursor == null) throw new ArgumentNullException("cursor");
@@ -217,13 +222,13 @@ namespace zuki.vm.linux
 			// Check for anonymous struct / union being declared through the field
 			if (String.IsNullOrEmpty(type.DeclarationCursor.DisplayName) && ((type.DeclarationCursor.Kind == CursorKind.StructDecl) || (type.DeclarationCursor.Kind == CursorKind.UnionDecl)))
 			{
-				if (type.DeclarationCursor.Kind == CursorKind.StructDecl) EmitStruct(writer, type.DeclarationCursor);
-				else if (type.DeclarationCursor.Kind == CursorKind.UnionDecl) EmitUnion(writer, type.DeclarationCursor);
+				if (type.DeclarationCursor.Kind == CursorKind.StructDecl) EmitStruct(writer, type.DeclarationCursor, prefix);
+				else if (type.DeclarationCursor.Kind == CursorKind.UnionDecl) EmitUnion(writer, type.DeclarationCursor, prefix);
 				else throw new Exception("Unexpected anonymous type dectected for field " + cursor.DisplayName);
 			}
 
 			// Not an anonymous struct/union, just spit out the data type
-			else EmitType(writer, type);
+			else EmitType(writer, type, prefix);
 			
 			// Field names do not receive a prefix, the display names are preserved
 			writer.Write(" " + cursor.DisplayName);
@@ -245,7 +250,8 @@ namespace zuki.vm.linux
 		/// <param name="writer">Text writer instance</param>
 		/// <param name="cursor">Macro definition cursor to be emitted</param>
 		/// <param name="namemappings">Dictionary of current->new code element names</param>
-		private static void EmitMacroDefinition(IndentedTextWriter writer, Cursor cursor, Dictionary<string, string> namemappings)
+		/// <param name="prefix">Prefix string for declarations</param>
+		private static void EmitMacroDefinition(IndentedTextWriter writer, Cursor cursor, Dictionary<string, string> namemappings, string prefix)
 		{
 			if (writer == null) throw new ArgumentNullException("writer");
 			if (cursor == null) throw new ArgumentNullException("cursor");
@@ -253,7 +259,7 @@ namespace zuki.vm.linux
 			if (cursor.Kind != CursorKind.MacroDefinition) throw new Exception("Unexpected cursor kind");
 
 			// Macro names are prefixed with UAPI_
-			writer.Write("#define UAPI_" + cursor.DisplayName);
+			writer.Write("#define " + prefix.ToUpper() + "_" + cursor.DisplayName);
 
 			// Tokenize the macro so that each token string can be remapped if necessary
 			using (var tokens = cursor.Extent.GetTokens())
@@ -278,7 +284,8 @@ namespace zuki.vm.linux
 		/// </summary>
 		/// <param name="writer">Text writer instance</param>
 		/// <param name="cursor">Structure declaration to be emitted</param>
-		private static void EmitStruct(IndentedTextWriter writer, Cursor cursor)
+		/// <param name="prefix">Prefix string for declarations</param>
+		private static void EmitStruct(IndentedTextWriter writer, Cursor cursor, string prefix)
 		{
 			if (writer == null) throw new ArgumentNullException("writer");
 			if (cursor == null) throw new ArgumentNullException("cursor");
@@ -301,13 +308,13 @@ namespace zuki.vm.linux
 
 			// Named structure declarations receive the lowercase uapi_ prefix
 			writer.Write("struct ");
-			if (!String.IsNullOrEmpty(cursor.DisplayName)) writer.Write("uapi_" + cursor.DisplayName + " ");
+			if (!String.IsNullOrEmpty(cursor.DisplayName)) writer.Write(prefix.ToLower() + "_" + cursor.DisplayName + " ");
 			writer.WriteLine("{");
 			writer.WriteLine();
 
 			// The only valid children of a structure declaration are field declarations
 			writer.Indent++;
-			foreach (Cursor child in cursor.FindChildren((c, p) => c.Kind == CursorKind.FieldDecl).Select(t => t.Item1)) EmitField(writer, child);
+			foreach (Cursor child in cursor.FindChildren((c, p) => c.Kind == CursorKind.FieldDecl).Select(t => t.Item1)) EmitField(writer, child, prefix);
 			writer.Indent--;
 
 			writer.WriteLine();
@@ -325,7 +332,8 @@ namespace zuki.vm.linux
 		/// </summary>
 		/// <param name="writer">Text writer instance</param>
 		/// <param name="type">Type name to be emitted</param>
-		private static void EmitType(IndentedTextWriter writer, ClangType type)
+		/// <param name="prefix">Prefix string for declarations</param>
+		private static void EmitType(IndentedTextWriter writer, ClangType type, string prefix)
 		{
 			if (writer == null) throw new ArgumentNullException("writer");
 			if (type == null) throw new ArgumentNullException("type");
@@ -354,7 +362,7 @@ namespace zuki.vm.linux
 			else if (type.DeclarationCursor.Kind == CursorKind.UnionDecl) writer.Write("union ");
 
 			// Prefix global declarations with uapi_
-			if (type.DeclarationCursor.SemanticParentCursor.Kind == CursorKind.TranslationUnit) writer.Write("uapi_");
+			if (type.DeclarationCursor.SemanticParentCursor.Kind == CursorKind.TranslationUnit) writer.Write(prefix.ToLower() + "_");
 
 			writer.Write(type.DeclarationCursor.Spelling + suffix);
 		}
@@ -364,7 +372,8 @@ namespace zuki.vm.linux
 		/// </summary>
 		/// <param name="writer">Text writer instance</param>
 		/// <param name="cursor">typedef declaration to be emitted</param>
-		private static void EmitTypedef(IndentedTextWriter writer, Cursor cursor)
+		/// <param name="prefix">Prefix string for declarations</param>
+		private static void EmitTypedef(IndentedTextWriter writer, Cursor cursor, string prefix)
 		{
 			if (writer == null) throw new ArgumentNullException("writer");
 			if (cursor == null) throw new ArgumentNullException("cursor");
@@ -378,34 +387,34 @@ namespace zuki.vm.linux
 			//
 			if (String.IsNullOrEmpty(type.DeclarationCursor.DisplayName) && ((type.DeclarationCursor.Kind == CursorKind.StructDecl) || (type.DeclarationCursor.Kind == CursorKind.UnionDecl)))
 			{
-				if (type.DeclarationCursor.Kind == CursorKind.StructDecl) EmitStruct(writer, type.DeclarationCursor);
-				else if (type.DeclarationCursor.Kind == CursorKind.UnionDecl) EmitUnion(writer, type.DeclarationCursor);
-				else throw new Exception("Unexpected anonymous type dectected for typedef uapi_" + cursor.DisplayName);
+				if (type.DeclarationCursor.Kind == CursorKind.StructDecl) EmitStruct(writer, type.DeclarationCursor, prefix);
+				else if (type.DeclarationCursor.Kind == CursorKind.UnionDecl) EmitUnion(writer, type.DeclarationCursor, prefix);
+				else throw new Exception("Unexpected anonymous type dectected for typedef " + prefix.ToLower() + "_" + cursor.DisplayName);
 
-				writer.WriteLine("uapi_" + cursor.DisplayName + ";");
+				writer.WriteLine(prefix.ToLower() + "_" + cursor.DisplayName + ";");
 			}
 
 			// FUNCTION POINTER
 			//
 			else if (type.Spelling.Contains("("))
 			{
-				writer.WriteLine(type.Spelling.Replace("*", "* uapi_" + cursor.DisplayName) + ";");
+				writer.WriteLine(type.Spelling.Replace("*", "* " + prefix.ToLower() + "_" + cursor.DisplayName) + ";");
 			}
 
 			// CONSTANT ARRAY
 			//
 			else if (type.Kind == TypeKind.ConstantArray)
 			{
-				EmitType(writer, type.ArrayElementType);
-				writer.WriteLine(" uapi_" + cursor.DisplayName + "[" + type.ArraySize.ToString() + "];");
+				EmitType(writer, type.ArrayElementType, prefix);
+				writer.WriteLine(" " + prefix.ToLower() + "_" + cursor.DisplayName + "[" + type.ArraySize.ToString() + "];");
 			}
 
 			// ANYTHING ELSE
 			//
 			else
 			{
-				EmitType(writer, type);
-				writer.WriteLine(" uapi_" + cursor.DisplayName + ";");
+				EmitType(writer, type, prefix);
+				writer.WriteLine(" " + prefix.ToLower() + "_" + cursor.DisplayName + ";");
 			}
 		}
 
@@ -414,7 +423,8 @@ namespace zuki.vm.linux
 		/// </summary>
 		/// <param name="writer">Text writer instance</param>
 		/// <param name="cursor">Union declaration to be emitted</param>
-		private static void EmitUnion(IndentedTextWriter writer, Cursor cursor)
+		/// <param name="prefix">Prefix string for declarations</param>
+		private static void EmitUnion(IndentedTextWriter writer, Cursor cursor, string prefix)
 		{
 			if (writer == null) throw new ArgumentNullException("writer");
 			if (cursor == null) throw new ArgumentNullException("cursor");
@@ -437,13 +447,13 @@ namespace zuki.vm.linux
 
 			// Named union declarations receive the lowercase uapi_ prefix
 			writer.Write("union ");
-			if (!String.IsNullOrEmpty(cursor.DisplayName)) writer.Write("uapi_" + cursor.DisplayName + " ");
+			if (!String.IsNullOrEmpty(cursor.DisplayName)) writer.Write(prefix.ToLower() + "_" + cursor.DisplayName + " ");
 			writer.WriteLine("{");
 			writer.WriteLine();
 
 			// The only valid children of a union declaration are field declarations
 			writer.Indent++;
-			foreach (Cursor child in cursor.FindChildren((c, p) => c.Kind == CursorKind.FieldDecl).Select(t => t.Item1)) EmitField(writer, child);
+			foreach (Cursor child in cursor.FindChildren((c, p) => c.Kind == CursorKind.FieldDecl).Select(t => t.Item1)) EmitField(writer, child, prefix);
 			writer.Indent--;
 
 			writer.WriteLine();
