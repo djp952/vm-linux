@@ -25,19 +25,18 @@
 #pragma warning(push, 4)
 
 //-----------------------------------------------------------------------------
-// sys64_attach_process
+// sys_x64_attach_thread
 //
-// Acquires the process context for a 64-bit host
+// Acquires a thread context for a 64-bit host
 //
 // Arguments:
 //
 //	rpchandle		- RPC binding handle
-//	tid				- [in] native thread identifier of the process main thread
-//	threadproc		- [in] address of the thread creation entry point
-//	process			- [out] set to the process startup information
+//	tid				- [in] native thread id within the host process
+//	thread			- [out] set to the thread startup information
 //	context			- [out] set to the newly allocated context handle
 
-HRESULT sys64_attach_process(handle_t rpchandle, /*sys64_uint_t tid, sys64_addr_t threadproc, sys64_process_t* process,*/ sys64_context_exclusive_t* context)
+HRESULT sys_x64_attach_thread(handle_t rpchandle, /*sys_x64_uint_t tid, sys_x64_thread_t* thread,*/ sys_x64_context_exclusive_t* context)
 {
 	(rpchandle);
 	(context);

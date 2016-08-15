@@ -22,7 +22,7 @@
     <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\tmp\syscalls\syscalls32.h">
+    <ClInclude Include="..\..\tmp\syscalls\syscalls-x86.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\tmp\messages\exceptions.h">
@@ -39,22 +39,22 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tmp\syscalls\syscalls32_s.c">
+    <ClCompile Include="..\..\tmp\syscalls\syscalls-x86_s.c">
       <Filter>Generated Files</Filter>
     </ClCompile>
     <ClCompile Include="rpcmem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sys32_attach_process.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="sys32_attach_thread.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="rundown.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sys32_exit.cpp">
+    <ClCompile Include="sys_x86_attach_process.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x86_attach_thread.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x86_exit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

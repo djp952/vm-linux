@@ -25,7 +25,7 @@
 #pragma warning(push, 4)
 
 //-----------------------------------------------------------------------------
-// sys32_context_t_rundown
+// sys_x86_context_t_rundown
 //
 // Releases an allocated context handle that was not released by the client
 //
@@ -33,13 +33,13 @@
 //
 //	context		- RPC context handle to be rundown
 
-void __RPC_USER sys32_context_t_rundown(sys32_context_t context)
+void __RPC_USER sys_x86_context_t_rundown(sys_x86_context_t context)
 {
 	(context);
 }
 
 //-----------------------------------------------------------------------------
-// sys32_context_exclusive_t_rundown
+// sys_x86_context_exclusive_t_rundown
 //
 // Releases an allocated context handle that was not released by the client
 //
@@ -47,7 +47,7 @@ void __RPC_USER sys32_context_t_rundown(sys32_context_t context)
 //
 //	context		- RPC context handle to be rundown
 
-void __RPC_USER sys32_context_exclusive_t_rundown(sys32_context_exclusive_t context)
+void __RPC_USER sys_x86_context_exclusive_t_rundown(sys_x86_context_exclusive_t context)
 {
 	(context);
 }

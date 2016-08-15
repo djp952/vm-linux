@@ -28,7 +28,7 @@
     <ClInclude Include="..\..\tmp\messages\messages.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\tmp\syscalls\syscalls64.h">
+    <ClInclude Include="..\..\tmp\syscalls\syscalls-x64.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -45,16 +45,16 @@
     <ClCompile Include="rundown.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sys64_attach_process.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="sys64_attach_thread.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\tmp\syscalls\syscalls64_s.c">
+    <ClCompile Include="..\..\tmp\syscalls\syscalls-x64_s.c">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="sys64_exit.cpp">
+    <ClCompile Include="sys_x64_attach_process.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x64_attach_thread.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x64_exit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

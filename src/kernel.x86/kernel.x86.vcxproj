@@ -157,11 +157,11 @@
   <ItemGroup>
     <ClInclude Include="..\..\tmp\messages\exceptions.h" />
     <ClInclude Include="..\..\tmp\messages\messages.h" />
-    <ClInclude Include="..\..\tmp\syscalls\syscalls32.h" />
+    <ClInclude Include="..\..\tmp\syscalls\syscalls-x86.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\tmp\syscalls\syscalls32_s.c">
+    <ClCompile Include="..\..\tmp\syscalls\syscalls-x86_s.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -189,9 +189,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="sys32_attach_process.cpp" />
-    <ClCompile Include="sys32_attach_thread.cpp" />
-    <ClCompile Include="sys32_exit.cpp" />
+    <ClCompile Include="sys_x86_attach_process.cpp" />
+    <ClCompile Include="sys_x86_attach_thread.cpp" />
+    <ClCompile Include="sys_x86_exit.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\tmp\messages\messages.rc" />

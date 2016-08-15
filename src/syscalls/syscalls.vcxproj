@@ -141,11 +141,11 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <None Include="syscalls32.acf" />
-    <None Include="syscalls64.acf" />
+    <None Include="syscalls-x86.acf" />
+    <None Include="syscalls-x64.acf" />
   </ItemGroup>
   <ItemGroup>
-    <Midl Include="syscalls32.idl">
+    <Midl Include="syscalls-x86.idl">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)tmp\uapi</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)tmp\uapi</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)tmp\uapi</AdditionalIncludeDirectories>
@@ -191,7 +191,7 @@
       <ClientStubFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename)_c.c</ClientStubFile>
       <ServerStubFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename)_s.c</ServerStubFile>
     </Midl>
-    <Midl Include="syscalls64.idl">
+    <Midl Include="syscalls-x64.idl">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)tmp\uapi</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)tmp\uapi</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)tmp\uapi</AdditionalIncludeDirectories>

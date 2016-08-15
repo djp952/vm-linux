@@ -28,7 +28,7 @@
     <ClInclude Include="..\..\tmp\messages\messages.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\tmp\syscalls\syscalls64.h">
+    <ClInclude Include="..\..\tmp\syscalls\syscalls-x64.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -42,7 +42,7 @@
     <ClCompile Include="rpcmem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tmp\syscalls\syscalls64_c.c">
+    <ClCompile Include="..\..\tmp\syscalls\syscalls-x64_c.c">
       <Filter>Generated Files</Filter>
     </ClCompile>
   </ItemGroup>

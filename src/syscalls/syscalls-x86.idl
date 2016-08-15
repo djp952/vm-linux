@@ -22,49 +22,49 @@
 
 import "wtypes.idl";
 
-// Interface uapi64
+// Interface uapi_x86
 //
-// Includes the 64-bit linux user-mode API declarations
-[local] interface uapi64
+// Includes the 32-bit linux user-mode API declarations
+[local] interface uapi_x86
 {
-	#include "uapi-x64.h"
+	#include "uapi-x86.h"
 }
 
-// Interface syscalls64
+// Interface syscalls_x86
 //
-// Provides the 64-bit system calls interface for the virtual kernel instance
+// Provides the 32-bit system calls interface for the virtual kernel instance
 [
 	version(1.0),
-	uuid(fd08f71e-b768-4b12-b9ca-e8e64e129f15),
+	uuid(a34c31bb-f2b9-4f1f-b6ba-f493d1fef1f0),
 	pointer_default(unique),
 ]
 
-interface syscalls64
+interface syscalls_x86
 {
-	// sys64_context_exclusive_t
+	// sys_x86_context_exclusive_t
 	//
 	// Exclusive (write) access context handle; use when the handle or the data that
 	// the handle points to needs to be changed by an interface method
-	typedef [context_handle] void* sys64_context_exclusive_t;
+	typedef [context_handle] void* sys_x86_context_exclusive_t;
 
-	// sys64_context_t
+	// sys_x86_context_t
 	//
 	// Shared (read) access context handle; use when the handle or the data that
 	// the handle points to does not need to be changed by an interface method
-	typedef [context_handle] sys64_context_exclusive_t sys64_context_t;
+	typedef [context_handle] sys_x86_context_exclusive_t sys_x86_context_t;
 
-	// sys64_attach_process (synchronous)
+	// sys_x86_attach_process (synchronous)
 	//
 	// Allocates a new context handle and startup information for a process
-	HRESULT sys64_attach_process(/*[in] sys64_uint_t tid, [in] sys64_addr_t threadproc, [out, ref] sys64_process_t* process,*/ [out, ref] sys64_context_exclusive_t* context);
+	HRESULT sys_x86_attach_process(/*[in] sys_x86_uint_t tid, [in] sys_x86_addr_t threadproc, [out, ref] sys_x86_process_t* process,*/ [out, ref] sys_x86_context_exclusive_t* context);
 
-	// sys64_attach_thread (synchronous)
+	// sys_x86_attach_thread (synchronous)
 	//
 	// Allocates a new context handle and startup information for a thread
-	HRESULT sys64_attach_thread(/*[in] sys64_uint_t tid, [out, ref] sys64_thread_t* thread,*/ [out, ref] sys64_context_exclusive_t* context);
+	HRESULT sys_x86_attach_thread(/*[in] sys_x86_uint_t tid, [out, ref] sys_x86_thread_t* thread,*/ [out, ref] sys_x86_context_exclusive_t* context);
 
-	// sys64_xxxxx
+	// sys_x86_xxxxx
 	//
 	// Linux kernel system calls
-	/* 001 */ long sys64_exit([in, out, ref] sys64_context_exclusive_t* context, [in] int exitcode);
+	/* 001 */ long sys_x86_exit([in, out, ref] sys_x86_context_exclusive_t* context, [in] int exitcode);
 }

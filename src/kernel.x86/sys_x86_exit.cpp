@@ -25,7 +25,7 @@
 #pragma warning(push, 4)
 
 //-----------------------------------------------------------------------------
-// sys32_exit
+// sys_x86_exit
 //
 // Normal thread termination
 //
@@ -34,7 +34,7 @@
 //	context		- RPC context handle
 //	exitcode	- Exit code to report for the terminating thread
 
-long sys32_exit(sys32_context_exclusive_t* context, int exitcode)
+long sys_x86_exit(sys_x86_context_exclusive_t* context, int exitcode)
 {
 	(context);
 	(exitcode);

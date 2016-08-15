@@ -15,18 +15,18 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="syscalls32.acf">
+    <None Include="syscalls-x86.acf">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="syscalls64.acf">
+    <None Include="syscalls-x64.acf">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Midl Include="syscalls32.idl">
+    <Midl Include="syscalls-x86.idl">
       <Filter>Source Files</Filter>
     </Midl>
-    <Midl Include="syscalls64.idl">
+    <Midl Include="syscalls-x64.idl">
       <Filter>Source Files</Filter>
     </Midl>
   </ItemGroup>

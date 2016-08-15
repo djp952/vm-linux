@@ -20,28 +20,12 @@
 // SOFTWARE.
 //-----------------------------------------------------------------------------
 
-#include "stdafx.h"
-
-#pragma warning(push, 4)
-
-//-----------------------------------------------------------------------------
-// sys64_exit
-//
-// Normal thread termination
-//
-// Arguments:
-//
-//	context		- RPC context handle
-//	exitcode	- Exit code to report for the terminating thread
-
-long sys64_exit(sys64_context_exclusive_t* context, int exitcode)
+[
+	explicit_handle,
+	strict_context_handle
+]
+interface syscalls_x86
 {
-	(context);
-	(exitcode);
-
-	return 0;
+	typedef [context_handle_serialize]		sys_x86_context_exclusive_t;
+	typedef [context_handle_noserialize]	sys_x86_context_t;
 }
-
-//---------------------------------------------------------------------------
-
-#pragma warning(pop)
