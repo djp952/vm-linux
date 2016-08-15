@@ -24,6 +24,7 @@
 #define __VIRTUALMACHINE_H_
 #pragma once
 
+#include <bitmask.h>
 #include <stdint.h>
 #include <text.h>
 
@@ -42,6 +43,54 @@ public:
 	// Destructor
 	//
 	virtual ~VirtualMachine()=default;
+
+	// CloneFlags (bitmask)
+	//
+	// Clone operation flags 
+	class CloneFlags final : public bitmask<CloneFlags, uint32_t>
+	{
+	public:
+
+		using bitmask::bitmask;
+
+		//-------------------------------------------------------------------------
+		// Fields
+
+		// NewControlGroupNamespace (static)
+		//
+		// Creates a new control group namespace during clone operation
+		static const CloneFlags NewControlGroupNamespace;
+
+		// NewIpcNamespace (static)
+		//
+		// Creates a new IPC namespace during clone operation
+		static const CloneFlags NewIpcNamespace;
+
+		// NewMountNamespace (static)
+		//
+		// Creates a new mount namespace during clone operation
+		static const CloneFlags NewMountNamespace;
+
+		// NewNetworkNamespace (static)
+		//
+		// Creates a new network namespace during clone operation
+		static const CloneFlags NewNetworkNamespace;
+
+		// NewPidNamespace (static)
+		//
+		// Creates a new PID namespace during clone operation
+		static const CloneFlags NewPidNamespace;
+
+		// NewUserNamespace (static)
+		//
+		// Creates a new user namespace during clone operation
+		static const CloneFlags NewUserNamespace;
+
+		// NewUtsNamespace (static)
+		//
+		// Creates a new UTS namespace during clone operation
+		static const CloneFlags NewUtsNamespace;
+	};
 
 	// LogLevel
 	//

@@ -67,16 +67,7 @@ Severity=Error
 Facility=Instance
 SymbolicName=E_CREATESYSTEMLOG
 Language=English
-Could not create the system log. %1!S!
-.
-
-MessageId=
-;//ExceptionName=SystemLogNotInitializedException
-Severity=Error
-Facility=Instance
-SymbolicName=E_SYSTEMLOGNOTINITIALIZED
-Language=English
-The system log has not been initialized.
+Could not create the system log instance. %1!S!
 .
 
 MessageId=
@@ -89,10 +80,19 @@ Could not create process control job object. Error %1!d! - %2!S!
 .
 
 MessageId=
+;//ExceptionName=CreateRootNamespaceException,errormessage
+Severity=Error
+Facility=Instance
+SymbolicName=E_CREATEROOTNAMESPACE
+Language=English
+Could not create the root namespace instance. %1!S!
+.
+
+MessageId=
 ;//ExceptionName=PanicDuringInitializationException,errormessage
 Severity=Error
 Facility=Instance
 SymbolicName=E_PANICDURINGINITIALIZATION
 Language=English
-PANIC: An exception occurred during instance initialization.  %1!S!
+PANIC: An exception occurred during instance initialization. %1!S!
 .

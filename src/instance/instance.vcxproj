@@ -162,6 +162,7 @@
     <ClInclude Include="..\..\tmp\messages\exceptions.h" />
     <ClInclude Include="..\..\tmp\messages\messages.h" />
     <ClInclude Include="..\common\align.h" />
+    <ClInclude Include="..\common\bitmask.h" />
     <ClInclude Include="..\common\CommandLine.h" />
     <ClInclude Include="..\common\Exception.h" />
     <ClInclude Include="..\common\MemoryRegion.h" />
@@ -172,6 +173,7 @@
     <ClInclude Include="..\common\StructuredException.h" />
     <ClInclude Include="..\common\VirtualMachine.h" />
     <ClInclude Include="..\common\Win32Exception.h" />
+    <ClInclude Include="Namespace.h" />
     <ClInclude Include="Parameter.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="InstanceService.h" />
@@ -185,8 +187,10 @@
     <ClCompile Include="..\common\NtApi.cpp" />
     <ClCompile Include="..\common\StructuredException.cpp" />
     <ClCompile Include="..\common\SystemInformation.cpp" />
+    <ClCompile Include="..\common\VirtualMachine.cpp" />
     <ClCompile Include="..\common\Win32Exception.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Namespace.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

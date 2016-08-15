@@ -126,6 +126,13 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 
 		m_job = CreateJobObject(nullptr, nullptr);
 		if(m_job == nullptr) throw CreateJobObjectException(GetLastError(), Win32Exception(GetLastError()));
+
+		//
+		// INITIALIZE ROOT NAMESPACE
+		//
+
+		try { m_rootns = std::make_shared<Namespace>(); }
+		catch(std::exception& ex) { throw CreateRootNamespaceException(ex.what()); }
 	}
 
 	catch(std::exception& ex) {
@@ -168,7 +175,6 @@ void InstanceService::OnStop(void)
 void InstanceService::WriteSystemLogEntry(uint8_t facility, VirtualMachine::LogLevel level, char_t const* message, size_t length)
 {
 	if(m_syslog) m_syslog->WriteEntry(facility, level, message, length);
-	else throw SystemLogNotInitializedException();
 }
 
 //---------------------------------------------------------------------------
