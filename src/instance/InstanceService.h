@@ -107,7 +107,7 @@ private:
 	// Member Variables
 
 	std::unique_ptr<SystemLog>		m_syslog;		// SystemLog instance
-	std::shared_ptr<Namespace>		m_rootns;		// Root Namespace instance
+	std::unique_ptr<Namespace>		m_rootns;		// Root Namespace instance
 	HANDLE							m_job;			// Process job object
 
 	// Parameters

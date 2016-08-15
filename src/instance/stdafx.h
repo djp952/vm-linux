@@ -59,6 +59,10 @@
 //
 #include <exceptions.h>
 #include <messages.h>
+#include <syscalls-x86.h>
+#ifdef _M_X64
+#include <syscalls-x64.h>
+#endif
 
 //-----------------------------------------------------------------------------
 

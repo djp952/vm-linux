@@ -96,7 +96,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir)src\common;$(SolutionDir)tmp\messages;$(SolutionDir)..\external-servicelib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\common;$(SolutionDir)tmp\messages;$(SolutionDir)tmp\syscalls;$(SolutionDir)..\external-servicelib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ExceptionHandling>Async</ExceptionHandling>
     </ClCompile>
     <Link>
@@ -111,7 +111,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir)src\common;$(SolutionDir)tmp\messages;$(SolutionDir)..\external-servicelib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\common;$(SolutionDir)tmp\messages;$(SolutionDir)tmp\syscalls;$(SolutionDir)..\external-servicelib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ExceptionHandling>Async</ExceptionHandling>
     </ClCompile>
     <Link>
@@ -128,7 +128,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir)src\common;$(SolutionDir)tmp\messages;$(SolutionDir)..\external-servicelib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\common;$(SolutionDir)tmp\messages;$(SolutionDir)tmp\syscalls;$(SolutionDir)..\external-servicelib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ExceptionHandling>Async</ExceptionHandling>
     </ClCompile>
     <Link>
@@ -147,7 +147,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir)src\common;$(SolutionDir)tmp\messages;$(SolutionDir)..\external-servicelib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\common;$(SolutionDir)tmp\messages;$(SolutionDir)tmp\syscalls;$(SolutionDir)..\external-servicelib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ExceptionHandling>Async</ExceptionHandling>
     </ClCompile>
     <Link>
@@ -161,6 +161,11 @@
     <ClInclude Include="..\..\..\external-servicelib\servicelib.h" />
     <ClInclude Include="..\..\tmp\messages\exceptions.h" />
     <ClInclude Include="..\..\tmp\messages\messages.h" />
+    <ClInclude Include="..\..\tmp\syscalls\syscalls-x64.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="..\..\tmp\syscalls\syscalls-x86.h" />
     <ClInclude Include="..\common\align.h" />
     <ClInclude Include="..\common\bitmask.h" />
     <ClInclude Include="..\common\CommandLine.h" />
@@ -181,10 +186,25 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\external-servicelib\servicelib.cpp" />
+    <ClCompile Include="..\..\tmp\syscalls\syscalls-x64_s.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\tmp\syscalls\syscalls-x86_s.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\common\CommandLine.cpp" />
     <ClCompile Include="..\common\Exception.cpp" />
     <ClCompile Include="..\common\MemoryRegion.cpp" />
     <ClCompile Include="..\common\NtApi.cpp" />
+    <ClCompile Include="..\common\rpcmem.cpp" />
     <ClCompile Include="..\common\StructuredException.cpp" />
     <ClCompile Include="..\common\SystemInformation.cpp" />
     <ClCompile Include="..\common\VirtualMachine.cpp" />
@@ -199,6 +219,26 @@
     </ClCompile>
     <ClCompile Include="InstanceService.cpp" />
     <ClCompile Include="SystemLog.cpp" />
+    <ClCompile Include="sys_x64_attach_process.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="sys_x64_attach_thread.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="sys_x64_exit.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="sys_x64_rundown.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="sys_x86_attach_process.cpp" />
+    <ClCompile Include="sys_x86_attach_thread.cpp" />
+    <ClCompile Include="sys_x86_exit.cpp" />
+    <ClCompile Include="sys_x86_rundown.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\tmp\messages\messages.rc" />

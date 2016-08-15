@@ -131,7 +131,7 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// INITIALIZE ROOT NAMESPACE
 		//
 
-		try { m_rootns = std::make_shared<Namespace>(); }
+		try { m_rootns = std::make_unique<Namespace>(); }
 		catch(std::exception& ex) { throw CreateRootNamespaceException(ex.what()); }
 	}
 

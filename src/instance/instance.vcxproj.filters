@@ -29,6 +29,12 @@
     <Filter Include="Source Files\common">
       <UniqueIdentifier>{a3206af2-7c00-41e5-98c4-5519f1e243ac}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\syscalls-x86">
+      <UniqueIdentifier>{92401282-be30-45ac-bf22-78fc826f830b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\syscalls-x64">
+      <UniqueIdentifier>{2ab3b7d7-f253-40e8-bc2e-111a423c4fbd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -91,6 +97,12 @@
     <ClInclude Include="..\common\bitmask.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\tmp\syscalls\syscalls-x64.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tmp\syscalls\syscalls-x86.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -134,6 +146,39 @@
     </ClCompile>
     <ClCompile Include="Namespace.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tmp\syscalls\syscalls-x64_s.c">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tmp\syscalls\syscalls-x86_s.c">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\rpcmem.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x64_attach_process.cpp">
+      <Filter>Source Files\syscalls-x64</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x64_attach_thread.cpp">
+      <Filter>Source Files\syscalls-x64</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x64_exit.cpp">
+      <Filter>Source Files\syscalls-x64</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x64_rundown.cpp">
+      <Filter>Source Files\syscalls-x64</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x86_attach_process.cpp">
+      <Filter>Source Files\syscalls-x86</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x86_attach_thread.cpp">
+      <Filter>Source Files\syscalls-x86</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x86_exit.cpp">
+      <Filter>Source Files\syscalls-x86</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_x86_rundown.cpp">
+      <Filter>Source Files\syscalls-x86</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
