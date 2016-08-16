@@ -55,7 +55,8 @@
 //
 #include <exceptions.h>
 #include <messages.h>
-#include <syscalls-x64.h>
+
+#include <syscalls_x64.h>
 
 //-----------------------------------------------------------------------------
 

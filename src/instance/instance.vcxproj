@@ -161,16 +161,24 @@
     <ClInclude Include="..\..\..\external-servicelib\servicelib.h" />
     <ClInclude Include="..\..\tmp\messages\exceptions.h" />
     <ClInclude Include="..\..\tmp\messages\messages.h" />
-    <ClInclude Include="..\..\tmp\syscalls\syscalls-x64.h">
+    <ClInclude Include="..\..\tmp\syscalls\syscalls_x64.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="..\..\tmp\syscalls\syscalls-x86.h" />
+    <ClInclude Include="..\..\tmp\syscalls\syscalls_x86.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="..\..\tmp\syscalls\syscalls_x86_64.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="..\common\align.h" />
     <ClInclude Include="..\common\bitmask.h" />
     <ClInclude Include="..\common\CommandLine.h" />
     <ClInclude Include="..\common\Exception.h" />
     <ClInclude Include="..\common\MemoryRegion.h" />
+    <ClInclude Include="..\common\RpcObject.h" />
     <ClInclude Include="..\common\sync.h" />
     <ClInclude Include="..\common\SystemInformation.h" />
     <ClInclude Include="..\common\text.h" />
@@ -186,7 +194,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\external-servicelib\servicelib.cpp" />
-    <ClCompile Include="..\..\tmp\syscalls\syscalls-x64_s.c">
+    <ClCompile Include="..\..\tmp\syscalls\syscalls_x64_s.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
@@ -194,7 +202,17 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\tmp\syscalls\syscalls-x86_s.c">
+    <ClCompile Include="..\..\tmp\syscalls\syscalls_x86_64_s.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\tmp\syscalls\syscalls_x86_s.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -205,6 +223,7 @@
     <ClCompile Include="..\common\MemoryRegion.cpp" />
     <ClCompile Include="..\common\NtApi.cpp" />
     <ClCompile Include="..\common\rpcmem.cpp" />
+    <ClCompile Include="..\common\RpcObject.cpp" />
     <ClCompile Include="..\common\StructuredException.cpp" />
     <ClCompile Include="..\common\SystemInformation.cpp" />
     <ClCompile Include="..\common\VirtualMachine.cpp" />

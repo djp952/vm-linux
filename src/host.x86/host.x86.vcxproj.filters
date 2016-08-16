@@ -27,7 +27,10 @@
     <ClInclude Include="..\..\tmp\messages\messages.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\tmp\syscalls\syscalls-x86.h">
+    <ClInclude Include="..\..\tmp\syscalls\syscalls_x86.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tmp\syscalls\syscalls_x86_64.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -35,14 +38,17 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tmp\syscalls\syscalls-x86_c.c">
-      <Filter>Generated Files</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="rpcmem.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tmp\syscalls\syscalls_x86_64_c.c">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tmp\syscalls\syscalls_x86_c.c">
+      <Filter>Generated Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

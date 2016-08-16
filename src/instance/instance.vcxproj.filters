@@ -97,10 +97,16 @@
     <ClInclude Include="..\common\bitmask.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\tmp\syscalls\syscalls-x64.h">
+    <ClInclude Include="..\common\RpcObject.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tmp\syscalls\syscalls_x64.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\tmp\syscalls\syscalls-x86.h">
+    <ClInclude Include="..\..\tmp\syscalls\syscalls_x86.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tmp\syscalls\syscalls_x86_64.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -147,12 +153,6 @@
     <ClCompile Include="Namespace.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tmp\syscalls\syscalls-x64_s.c">
-      <Filter>Generated Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\tmp\syscalls\syscalls-x86_s.c">
-      <Filter>Generated Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\common\rpcmem.cpp">
       <Filter>Source Files\common</Filter>
     </ClCompile>
@@ -179,6 +179,18 @@
     </ClCompile>
     <ClCompile Include="sys_x86_rundown.cpp">
       <Filter>Source Files\syscalls-x86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\RpcObject.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tmp\syscalls\syscalls_x64_s.c">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tmp\syscalls\syscalls_x86_64_s.c">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tmp\syscalls\syscalls_x86_s.c">
+      <Filter>Generated Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

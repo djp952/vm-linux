@@ -133,6 +133,15 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 
 		try { m_rootns = std::make_unique<Namespace>(); }
 		catch(std::exception& ex) { throw CreateRootNamespaceException(ex.what()); }
+
+		//
+		// REGISTER SYSTEM CALL INTERFACES
+		//
+
+		m_syscalls_x86 = std::make_unique<RpcObject>(syscalls_x86_v1_0_s_ifspec, /*m_instanceid, */RPC_IF_AUTOLISTEN | RPC_IF_ALLOW_SECURE_ONLY);
+#ifdef _M_X64
+		m_syscalls_x64 = std::make_unique<RpcObject>(syscalls_x64_v1_0_s_ifspec, /*m_instanceid, */RPC_IF_AUTOLISTEN | RPC_IF_ALLOW_SECURE_ONLY);
+#endif
 	}
 
 	catch(std::exception& ex) {
@@ -158,6 +167,12 @@ void InstanceService::OnStop(void)
 	// Forcibly terminate any remaining processes created by this instance
 	TerminateJobObject(m_job, ERROR_PROCESS_ABORTED);
 	CloseHandle(m_job);
+
+	// Revoke the system call interfaces
+#ifdef _M_X64
+	m_syscalls_x64.reset();
+#endif
+	m_syscalls_x86.reset();
 }
 
 //---------------------------------------------------------------------------
