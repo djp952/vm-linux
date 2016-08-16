@@ -450,6 +450,66 @@ void NativeProcess::LockMemory(uintptr_t address, size_t length) const
 	});
 }
 
+//-----------------------------------------------------------------------------
+// NativeProcess::MapMemory
+//
+// Maps a virtual memory region into the calling process.  Note that if the operation spans
+// multiple sections the operation may fail fairly easily since each section will be mapped
+// contiguously, after the operating system chooses the address for the first one.  There is
+// no guarantee that the subsequent address space will be available.  For this reason it is
+// recommended to only map known single section ranges and use Read/Write other times
+//
+// Arguments:
+//
+//	address		- Starting address of the region to map (relative to target process)
+//	length		- Length of the region to map
+//	protection	- Protection flags to assign to the region after it's been mapped
+
+void* NativeProcess::MapMemory(uintptr_t address, size_t length, VirtualMachine::ProtectionFlags protection)
+{
+	std::vector<uintptr_t>		mappings;					// Created section mappings
+	void*						nextmapping = nullptr;		// Address of the next mapping
+	void*						returnptr = nullptr;		// Pointer to return to the caller
+
+	// Guard pages cannot be specified as the protection for this function
+	if(protection & VirtualMachine::ProtectionFlags::Guard) throw Exception(E_INVALIDARG);
+
+	sync::reader_writer_lock::scoped_lock_write writer(m_sectionslock);
+
+	try {
+
+		IterateRange(writer, address, length, [&](section_t const& section, uintptr_t address, size_t length) -> void {
+
+			UNREFERENCED_PARAMETER(length);
+
+			SIZE_T mappedlength = 0;								// Length of section mapped by NtMapViewOfSection
+			
+			// NOTE: Removed the check for soft-allocation here, it's unnecessary and counterproductive.  The calling
+			// process owns the target process and the memory is committed by default so let it do what it wants with it
+			//
+			//EnsureSectionAllocation(section, address, length);		// All pages must be marked as allocated
+
+			// Attempt to map the entire section into the current process' address space.  The first iteration will allow the operating
+			// system to select the destination address, subsequent operations are mapped contiguously with the previous one
+			NTSTATUS result = NtApi::NtMapViewOfSection(section.m_section, NtApi::NtCurrentProcess, &nextmapping, 0, 0, nullptr, &mappedlength, NtApi::ViewUnmap, 0, convert<SectionProtection>(protection));
+			if(result != NtApi::STATUS_SUCCESS) throw StructuredException(result);
+
+			// The first time through calculate the pointer to return to the caller, which is an offset into this first mapping
+			if(returnptr == nullptr) returnptr = reinterpret_cast<void*>(uintptr_t(nextmapping) + (address - section.m_baseaddress));
+
+			// Track the base address of the new mapping and determine the address where the next one needs to be placed
+			mappings.emplace_back(uintptr_t(nextmapping));
+			nextmapping = reinterpret_cast<void*>(uintptr_t(nextmapping) + mappedlength);
+		});
+
+		// Track the local mapping via the pointer that the caller will receive and return that pointer
+		m_mappings.emplace(returnptr, std::move(mappings));
+		return returnptr;
+	}
+
+	catch(...) { ReleaseMappings(NtApi::NtCurrentProcess, mappings); throw; }
+}
+
 //---------------------------------------------------------------------------
 // NativeProcess::getProcessId
 //
@@ -566,6 +626,22 @@ void NativeProcess::ReleaseMemory(uintptr_t address, size_t length)
 
 		else ++iterator;
 	}
+}
+
+//-----------------------------------------------------------------------------
+// NativeProcess::ReleaseMappings (private, static)
+//
+// Releases mappings contained in a vector of base addresses
+//
+// Arguments:
+//
+//	process		- Target process handle
+//	mappings	- Vector of mapping base addresses to release
+
+inline void NativeProcess::ReleaseMappings(HANDLE process, std::vector<uintptr_t> const& mappings)
+{
+	_ASSERTE(process == NtApi::NtCurrentProcess);
+	for(auto const& iterator : mappings) NtApi::NtUnmapViewOfSection(process, reinterpret_cast<void*>(iterator));
 }
 
 //-----------------------------------------------------------------------------
@@ -763,6 +839,30 @@ void NativeProcess::UnlockMemory(uintptr_t address, size_t length) const
 		NTSTATUS result = NtApi::NtUnlockVirtualMemory(m_procinfo.hProcess, reinterpret_cast<void**>(&address), reinterpret_cast<PSIZE_T>(&length), NtApi::MAP_PROCESS);
 		if(result != NtApi::STATUS_SUCCESS) throw StructuredException(result);
 	});
+}
+
+//-----------------------------------------------------------------------------
+// NativeProcess::UnmapMemory
+//
+// Unmaps a previously mapped memory region from the calling process
+//
+// Arguments:
+//
+//	mapping		- Address returned from a successful call to Map
+
+void NativeProcess::UnmapMemory(void const* mapping)
+{
+	sync::reader_writer_lock::scoped_lock_write writer(m_sectionslock);
+
+	// Locate the mapping address in the local mappings collection
+	auto item = m_mappings.find(mapping);
+	if(item == m_mappings.end()) throw Win32Exception(ERROR_INVALID_ADDRESS);
+
+	// Iterate over all of the base mapping addresses and release them
+	ReleaseMappings(NtApi::NtCurrentProcess, item->second);
+
+	// Remove the mapping from the collection
+	m_mappings.erase(item);
 }
 
 //-----------------------------------------------------------------------------

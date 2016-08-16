@@ -26,6 +26,7 @@
 
 #include <functional>
 #include <set>
+#include <unordered_map>
 #include <sync.h>
 #include <text.h>
 #include <Bitmap.h>
@@ -89,6 +90,11 @@ public:
 	// Attempts to lock a region into physical memory
 	void LockMemory(uintptr_t address, size_t length) const;
 
+	// MapMemory
+	//
+	// Maps a virtual memory region into the calling process
+	virtual void* MapMemory(uintptr_t address, size_t length, VirtualMachine::ProtectionFlags protection);
+
 	// ProtectMemory
 	//
 	// Sets the memory protection flags for a virtual memory region
@@ -132,6 +138,11 @@ public:
 	// Attempts to unlock a region from physical memory
 	virtual void UnlockMemory(uintptr_t address, size_t length) const;
 
+	// UnmapMemory
+	//
+	// Unmaps a previously mapped memory region from the calling process
+	virtual void UnmapMemory(void const* mapping);
+
 	// WriteMemory
 	//
 	// Writes data into a virtual memory region from the calling process
@@ -162,6 +173,11 @@ private:
 
 	NativeProcess(NativeProcess const&)=delete;
 	NativeProcess& operator=(NativeProcess const&)=delete;
+
+	// mappings_t
+	//
+	// Collection to track process memory mappings
+	using mappings_t = std::unordered_map<void const*, std::vector<uintptr_t>>;
 
 	// section_t
 	//
@@ -217,6 +233,11 @@ private:
 	// Iterates across an address range and invokes the specified operation for each section
 	void IterateRange(sync::reader_writer_lock::scoped_lock& lock, uintptr_t start, size_t length, sectioniterator_t operation) const;
 
+	// ReleaseMappings (static)
+	//
+	// Releases a vector of memory mappings
+	static void ReleaseMappings(HANDLE process, std::vector<uintptr_t> const& mappings);
+
 	// ReleaseSection (static)
 	//
 	// Releases a memory section object created by CreateSection
@@ -233,6 +254,7 @@ private:
 	PROCESS_INFORMATION					m_procinfo;			// Created process information
 	NativeArchitecture					m_architecture;		// Created process architecture
 	sections_t							m_sections;			// Allocated sections
+	mappings_t							m_mappings;			// Memory mappings
 	mutable sync::reader_writer_lock	m_sectionslock;		// Synchronization object
 };
 
