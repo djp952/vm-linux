@@ -109,6 +109,12 @@
     <ClInclude Include="..\..\tmp\syscalls\syscalls_x86_64.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
+    <ClInclude Include="NativeProcess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NativeArchitecture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -191,6 +197,9 @@
     </ClCompile>
     <ClCompile Include="..\..\tmp\syscalls\syscalls_x86_s.c">
       <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NativeProcess.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

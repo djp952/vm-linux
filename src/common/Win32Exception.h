@@ -41,7 +41,7 @@ public:
 	// Instance Constructors
 	//
 	Win32Exception();
-	explicit Win32Exception(DWORD result);
+	Win32Exception(DWORD result);
 
 	// Copy Constructor
 	//
