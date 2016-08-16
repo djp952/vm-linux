@@ -24,7 +24,12 @@
 #define __NATIVEPROCESS_H_
 #pragma once
 
+#include <functional>
+#include <set>
+#include <sync.h>
 #include <text.h>
+#include <Bitmap.h>
+#include <VirtualMachine.h>
 
 #include "NativeArchitecture.h"
 
@@ -72,6 +77,40 @@ public:
 	//-------------------------------------------------------------------------
 	// Member Functions
 
+	// AllocateMemory
+	//
+	// Allocates a region of virtual memory
+	uintptr_t AllocateMemory(size_t length, VirtualMachine::ProtectionFlags protection);
+	uintptr_t AllocateMemory(size_t length, VirtualMachine::ProtectionFlags protection, VirtualMachine::AllocationFlags flags);
+	uintptr_t AllocateMemory(uintptr_t address, size_t length, VirtualMachine::ProtectionFlags protection);
+
+	// LockMemory
+	//
+	// Attempts to lock a region into physical memory
+	void LockMemory(uintptr_t address, size_t length) const;
+
+	// ProtectMemory
+	//
+	// Sets the memory protection flags for a virtual memory region
+	void ProtectMemory(uintptr_t address, size_t length, VirtualMachine::ProtectionFlags protection) const;
+
+	// ReadMemory
+	//
+	// Reads data from a virtual memory region into the calling process
+	size_t ReadMemory(uintptr_t address, void* buffer, size_t length) const;
+
+	// ReleaseMemory
+	//
+	// Releases a virtual memory region
+	void ReleaseMemory(uintptr_t address, size_t length);
+
+	// ReserveMemory
+	//
+	// Reserves a virtual memory region for later allocation
+	uintptr_t ReserveMemory(size_t length);
+	uintptr_t ReserveMemory(size_t length, VirtualMachine::AllocationFlags flags);
+	uintptr_t ReserveMemory(uintptr_t address, size_t length);
+
 	// Resume
 	//
 	// Resumes the process
@@ -88,6 +127,16 @@ public:
 	void Terminate(uint32_t exitcode) const;
 	void Terminate(uint32_t exitcode, bool wait) const;
 	
+	// UnlockMemory
+	//
+	// Attempts to unlock a region from physical memory
+	virtual void UnlockMemory(uintptr_t address, size_t length) const;
+
+	// WriteMemory
+	//
+	// Writes data into a virtual memory region from the calling process
+	virtual size_t WriteMemory(uintptr_t address, void const* buffer, size_t length) const;
+
 	//-------------------------------------------------------------------------
 	// Properties
 
@@ -114,19 +163,77 @@ private:
 	NativeProcess(NativeProcess const&)=delete;
 	NativeProcess& operator=(NativeProcess const&)=delete;
 
+	// section_t
+	//
+	// Structure used to track a section allocation and mapping
+	struct section_t
+	{
+		// Instance Constructor
+		//
+		section_t(HANDLE section, uintptr_t baseaddress, size_t length);
+
+		// Less-than operator
+		//
+		bool operator <(section_t const& rhs) const;
+
+		// Fields
+		//
+		HANDLE const		m_section;
+		uintptr_t const		m_baseaddress;
+		size_t const		m_length;
+		mutable Bitmap		m_allocationmap;
+	};
+
+	// sectioniterator_t
+	//
+	// Callback/lambda function prototype used when iterating over sections
+	using sectioniterator_t = std::function<void(section_t const& section, uintptr_t address, size_t length)>;
+
+	// sections_t
+	//
+	// Collection of section_t instances
+	typedef std::set<section_t> sections_t;
+
 	//-------------------------------------------------------------------------
 	// Private Member Functions
+
+	// CreateSection (static)
+	//
+	// Creates a new memory section object and maps it to the specified address
+	static section_t CreateSection(HANDLE process, uintptr_t address, size_t length, VirtualMachine::AllocationFlags flags);
+
+	// EnsureSectionAllocation (static)
+	//
+	// Verifies that the specified address range is soft-allocated within a section
+	static void EnsureSectionAllocation(section_t const& section, uintptr_t address, size_t length);
 
 	// GetNativeArchitecture (static)
 	//
 	// Determines the NativeArchitecture of a process
 	static NativeArchitecture GetNativeArchitecture(HANDLE process);
 
+	// IterateRange
+	//
+	// Iterates across an address range and invokes the specified operation for each section
+	void IterateRange(sync::reader_writer_lock::scoped_lock& lock, uintptr_t start, size_t length, sectioniterator_t operation) const;
+
+	// ReleaseSection (static)
+	//
+	// Releases a memory section object created by CreateSection
+	static void ReleaseSection(HANDLE process, section_t const& section);
+
+	// ReserveRange
+	//
+	// Ensures that a range of address space is reserved
+	void ReserveRange(sync::reader_writer_lock::scoped_lock_write& writer, uintptr_t start, size_t length);
+	
 	//-------------------------------------------------------------------------
 	// Member Variables
 
-	PROCESS_INFORMATION			m_procinfo;			// Created process information
-	NativeArchitecture			m_architecture;		// Created process architecture
+	PROCESS_INFORMATION					m_procinfo;			// Created process information
+	NativeArchitecture					m_architecture;		// Created process architecture
+	sections_t							m_sections;			// Allocated sections
+	mutable sync::reader_writer_lock	m_sectionslock;		// Synchronization object
 };
 
 //-----------------------------------------------------------------------------

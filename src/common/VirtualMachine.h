@@ -44,6 +44,27 @@ public:
 	//
 	virtual ~VirtualMachine()=default;
 
+	// AllocationFlags (bitmask)
+	//
+	// Flags used with memory allocation and reservation operations
+	struct AllocationFlags final : public bitmask<AllocationFlags, uint8_t, 0x01 /* TopDown */>
+	{
+		using bitmask::bitmask;
+
+		//---------------------------------------------------------------------
+		// Fields
+
+		// None (static)
+		//
+		// Indicates no special allocation flags
+		static AllocationFlags const None;
+
+		// TopDown (static)
+		//
+		// Indicates to use the highest available address
+		static AllocationFlags const TopDown;
+	};
+
 	// CloneFlags (bitmask)
 	//
 	// Clone operation flags 
@@ -56,40 +77,45 @@ public:
 		//-------------------------------------------------------------------------
 		// Fields
 
+		// None (static)
+		//
+		// Indicates no special clone flags
+		static CloneFlags const None;
+
 		// NewControlGroupNamespace (static)
 		//
 		// Creates a new control group namespace during clone operation
-		static const CloneFlags NewControlGroupNamespace;
+		static CloneFlags const NewControlGroupNamespace;
 
 		// NewIpcNamespace (static)
 		//
 		// Creates a new IPC namespace during clone operation
-		static const CloneFlags NewIpcNamespace;
+		static CloneFlags const NewIpcNamespace;
 
 		// NewMountNamespace (static)
 		//
 		// Creates a new mount namespace during clone operation
-		static const CloneFlags NewMountNamespace;
+		static CloneFlags const NewMountNamespace;
 
 		// NewNetworkNamespace (static)
 		//
 		// Creates a new network namespace during clone operation
-		static const CloneFlags NewNetworkNamespace;
+		static CloneFlags const NewNetworkNamespace;
 
 		// NewPidNamespace (static)
 		//
 		// Creates a new PID namespace during clone operation
-		static const CloneFlags NewPidNamespace;
+		static CloneFlags const NewPidNamespace;
 
 		// NewUserNamespace (static)
 		//
 		// Creates a new user namespace during clone operation
-		static const CloneFlags NewUserNamespace;
+		static CloneFlags const NewUserNamespace;
 
 		// NewUtsNamespace (static)
 		//
 		// Creates a new UTS namespace during clone operation
-		static const CloneFlags NewUtsNamespace;
+		static CloneFlags const NewUtsNamespace;
 	};
 
 	// LogLevel
@@ -106,6 +132,42 @@ public:
 		Notice			= 5,	// LOGLEVEL_NOTICE: Normal but significant condition
 		Informational	= 6,	// LOGLEVEL_INFO: Informational
 		Debug			= 7,	// LOGLEVEL_DEBUG: Debug-level messages
+	};
+
+	// ProtectionFlags
+	//
+	// Generalized protection flags used with memory operations
+	struct ProtectionFlags final : public bitmask<ProtectionFlags, uint8_t, 0x01 /* Execute */ | 0x02 /* Read */ | 0x04 /* Write */ | 0x80 /* Guard */>
+	{
+		using bitmask::bitmask;
+
+		//-------------------------------------------------------------------------
+		// Fields
+
+		// Execute (static)
+		//
+		// Indicates that the memory region can be executed
+		static ProtectionFlags const Execute;
+
+		// Guard (static)
+		//
+		// Indicates that the memory region consists of guard pages
+		static ProtectionFlags const Guard;
+
+		// None (static)
+		//
+		// Indicates that the memory region cannot be accessed
+		static ProtectionFlags const None;
+
+		// Read (static)
+		//
+		// Indicates that the memory region can be read
+		static ProtectionFlags const Read;
+
+		// Write (static)
+		//
+		// Indicates that the memory region can be written to
+		static ProtectionFlags const Write;
 	};
 
 	//-------------------------------------------------------------------------

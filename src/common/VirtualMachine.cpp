@@ -25,6 +25,26 @@
 
 #pragma warning(push, 4)
 
+//
+// VIRTUALMACHINE::ALLOCATIONFLAGS
+//
+
+// VirtualMachine::AllocationFlags::None (static)
+//
+VirtualMachine::AllocationFlags const VirtualMachine::AllocationFlags::None { 0x00 };
+
+// VirtualMachine::AllocationFlags::TopDown (static)
+//
+VirtualMachine::AllocationFlags const VirtualMachine::AllocationFlags::TopDown { 0x01 };
+
+//
+// VIRTUALMACHINE::CLONEFLAGS
+//
+
+// VirtualMachine::ProtectionFlags::None (static)
+//
+VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::None { 0x00 };
+
 // VirtualMachine::CloneFlags::NewMountNamespace (static)
 //
 VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewMountNamespace { 0x00020000 };			// CLONE_NEWNS
@@ -52,6 +72,30 @@ VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewPidNamespace { 0
 // VirtualMachine::CloneFlags::NewNetworkNamespace (static)
 //
 VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewNetworkNamespace { 0x40000000 };		// CLONE_NEWNET
+
+//
+// VIRTUALMACHINE::PROTECTIONFLAGS
+//
+
+// VirtualMachine::ProtectionFlags::None (static)
+//
+VirtualMachine::ProtectionFlags const VirtualMachine::ProtectionFlags::None { 0x00 };
+
+// VirtualMachine::ProtectionFlags::Execute (static)
+//
+VirtualMachine::ProtectionFlags const VirtualMachine::ProtectionFlags::Execute { 0x01 };
+
+// VirtualMachine::ProtectionFlags::Read (static)
+//
+VirtualMachine::ProtectionFlags const VirtualMachine::ProtectionFlags::Read { 0x02 };
+
+// VirtualMachine::ProtectionFlags::Write (static)
+//
+VirtualMachine::ProtectionFlags const VirtualMachine::ProtectionFlags::Write { 0x04 };
+
+// VirtualMachine::ProtectionFlags::Guard (static)
+//
+VirtualMachine::ProtectionFlags const VirtualMachine::ProtectionFlags::Guard { 0x80 };
 
 //-----------------------------------------------------------------------------
 

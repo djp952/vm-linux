@@ -115,6 +115,12 @@
     <ClInclude Include="NativeArchitecture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\Bitmap.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\convert.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -200,6 +206,9 @@
     </ClCompile>
     <ClCompile Include="NativeProcess.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\Bitmap.cpp">
+      <Filter>Source Files\common</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
