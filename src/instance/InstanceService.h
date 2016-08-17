@@ -27,9 +27,9 @@
 #include <map>
 #include <memory>
 #include <vector>
-
 #include <Parameter.h>
-#include <VirtualMachine.h>
+
+#include "VirtualMachine.h"
 
 #pragma warning(push, 4)
 

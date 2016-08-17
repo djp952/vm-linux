@@ -47,31 +47,31 @@ VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::None { 0x00 };
 
 // VirtualMachine::CloneFlags::NewMountNamespace (static)
 //
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewMountNamespace { 0x00020000 };			// CLONE_NEWNS
+VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewMountNamespace { UAPI_CLONE_NEWNS };
 
 // VirtualMachine::CloneFlags::NewControlGroupNamespace (static)
 //
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewControlGroupNamespace { 0x02000000 };	// CLONE_NEWCGROUP
+VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewControlGroupNamespace { UAPI_CLONE_NEWCGROUP };
 
 // VirtualMachine::CloneFlags::NewUtsNamespace (static)
 //
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewUtsNamespace { 0x04000000 };			// CLONE_NEWUTS
+VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewUtsNamespace { UAPI_CLONE_NEWUTS };
 
 // VirtualMachine::CloneFlags::NewIpcNamespace (static)
 //
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewIpcNamespace { 0x08000000 };			// CLONE_NEWIPC
+VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewIpcNamespace { UAPI_CLONE_NEWIPC };	
 
 // VirtualMachine::CloneFlags::NewUserNamespace (static)
 //
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewUserNamespace { 0x10000000 };			// CLONE_NEWUSER
+VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewUserNamespace { UAPI_CLONE_NEWUSER };
 
 // VirtualMachine::CloneFlags::NewPidNamespace (static)
 //
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewPidNamespace { 0x20000000 };			// CLONE_NEWPID
+VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewPidNamespace { UAPI_CLONE_NEWPID };	
 
 // VirtualMachine::CloneFlags::NewNetworkNamespace (static)
 //
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewNetworkNamespace { 0x40000000 };		// CLONE_NEWNET
+VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewNetworkNamespace { UAPI_CLONE_NEWNET };
 
 //
 // VIRTUALMACHINE::PROTECTIONFLAGS

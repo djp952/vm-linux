@@ -25,7 +25,8 @@
 #pragma once
 
 #include <memory>
-#include <VirtualMachine.h>
+
+#include "VirtualMachine.h"
 
 #pragma warning(push, 4)
 
