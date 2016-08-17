@@ -134,6 +134,10 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)tmp\uapi\uapi-x32.h</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.builduapi.exe" "%(FullPath)" "$(SolutionDir)tmp\uapi\uapi-x32.h" "-i:$(SolutionDir)..\external-kernel-headers\include" -p:uapi_x32 "-x32"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)tmp\uapi\uapi-x32.h</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
     </CustomBuild>
     <CustomBuild Include="uapi-x64.c">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.builduapi.exe" "%(FullPath)" "$(SolutionDir)tmp\uapi\uapi-x64.h" "-i:$(SolutionDir)..\external-kernel-headers\include" -p:uapi_x64 "-x64"</Command>
@@ -144,6 +148,10 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)tmp\uapi\uapi-x64.h</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.builduapi.exe" "%(FullPath)" "$(SolutionDir)tmp\uapi\uapi-x64.h" "-i:$(SolutionDir)..\external-kernel-headers\include" -p:uapi_x64 "-x64"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)tmp\uapi\uapi-x64.h</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
     </CustomBuild>
     <CustomBuild Include="uapi-x86.c">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.builduapi.exe" "%(FullPath)" "$(SolutionDir)tmp\uapi\uapi-x86.h" "-i:$(SolutionDir)..\external-kernel-headers\include" -p:uapi_x86 "-x86"</Command>
@@ -154,6 +162,10 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)tmp\uapi\uapi-x86.h</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.builduapi.exe" "%(FullPath)" "$(SolutionDir)tmp\uapi\uapi-x86.h" "-i:$(SolutionDir)..\external-kernel-headers\include" -p:uapi_x86 "-x86"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)tmp\uapi\uapi-x86.h</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)uapi-generic.c;%(AdditionalInputs)</AdditionalInputs>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>

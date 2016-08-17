@@ -187,6 +187,7 @@
     <ClInclude Include="..\common\CommandLine.h" />
     <ClInclude Include="..\common\convert.h" />
     <ClInclude Include="..\common\Exception.h" />
+    <ClInclude Include="..\common\LinuxException.h" />
     <ClInclude Include="..\common\MemoryRegion.h" />
     <ClInclude Include="..\common\Parameter.h" />
     <ClInclude Include="..\common\RpcObject.h" />
@@ -236,6 +237,7 @@
     <ClCompile Include="..\common\Bitmap.cpp" />
     <ClCompile Include="..\common\CommandLine.cpp" />
     <ClCompile Include="..\common\Exception.cpp" />
+    <ClCompile Include="..\common\LinuxException.cpp" />
     <ClCompile Include="..\common\MemoryRegion.cpp" />
     <ClCompile Include="..\common\NtApi.cpp" />
     <ClCompile Include="..\common\rpcmem.cpp" />
