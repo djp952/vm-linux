@@ -1,4 +1,4 @@
-//---------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 // Copyright (c) 2016 Michael G. Brehm
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,12 +18,23 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+//-----------------------------------------------------------------------------
+
+#include "stdafx.h"
+#include "Executable.h"
+
+#pragma warning(push, 4)
+
+//---------------------------------------------------------------------------
+// Executable Constructor
+//
+// TODO: TEMPORARY
+
+Executable::Executable(tchar_t const* path)
+{
+	UNREFERENCED_PARAMETER(path);
+}
+
 //---------------------------------------------------------------------------
 
-//
-// uapi-x32.c
-//
-// Translation Unit input file for tools.builduapi to generate uapi-x32.h
-//
-
-#include "uapi-generic.c"
+#pragma warning(pop)

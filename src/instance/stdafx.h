@@ -62,9 +62,11 @@
 
 #ifndef _M_X64
 #include <syscalls_x86.h>
+#include <uapi-generic-x86.h>
 #else
 #include <syscalls_x86_64.h>
 #include <syscalls_x64.h>
+#include <uapi-generic-x64.h>
 #endif
 
 //-----------------------------------------------------------------------------

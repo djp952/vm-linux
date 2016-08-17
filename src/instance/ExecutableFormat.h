@@ -20,54 +20,24 @@
 // SOFTWARE.
 //-----------------------------------------------------------------------------
 
-#ifndef __CONVERT_H_
-#define __CONVERT_H_
+#ifndef __EXECUTABLEFORMAT_H_
+#define __EXECUTABLEFORMAT_H_
 #pragma once
-
-#include <type_traits>
 
 #pragma warning(push, 4)
 
 //-----------------------------------------------------------------------------
-// convert
+// ExecutableFormat Enumeration
 //
-// Template used to define a custom data type conversion.  Include this header
-// file and implement the needed convert<> specializations somewhere
-//
-// Example: datetime --> FILETIME
-//
-//	template<> FILETIME convert<FILETIME>(const datetime& rhs)
-//	{
-//		uint64_t filetime = rhs;
-//		return *reinterpret_cast<FILETIME*>(&filetime);
-//	}
-//
-// auto filetime = convert<FILETIME>(datetimevalue);
+// Defines the file format of an executable image
 
-//-----------------------------------------------------------------------------
-// convert<> (integral type)
-//
-// Parameters:
-//
-//	_to		- Destination data type
-//	_from	- Source data type value
-
-template<typename _to, typename _from> 
-typename std::enable_if<std::is_integral<_from>::value, _to>::type convert(_from rhs);
-
-//-----------------------------------------------------------------------------
-// convert<> (non-integral type)
-//
-// Parameters:
-//
-//	_to		- Destination data type
-//	_from	- Source data type const reference
-
-template<typename _to, typename _from> 
-typename std::enable_if<!std::is_integral<_from>::value, _to>::type convert(const _from& rhs);
+enum class ExecutableFormat
+{
+	ELF			= 0,			// ELF executable format
+};
 
 //-----------------------------------------------------------------------------
 
 #pragma warning(pop)
 
-#endif	// __CONVERT_H_
+#endif	// __EXECUTABLEFORMAT_H_

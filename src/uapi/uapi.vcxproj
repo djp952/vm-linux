@@ -161,6 +161,18 @@
     <ClInclude Include="..\..\tmp\uapi\uapi-x64.h" />
     <ClInclude Include="..\..\tmp\uapi\uapi-x86.h" />
   </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="uapi-generic.c">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.builduapi.exe" "%(FullPath)" "$(SolutionDir)tmp\uapi\uapi-generic-x86.h" "-i:$(SolutionDir)..\external-kernel-headers\include" -p:uapi "-x86"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.builduapi.exe" "%(FullPath)" "$(SolutionDir)tmp\uapi\uapi-generic-x86.h" "-i:$(SolutionDir)..\external-kernel-headers\include" -p:uapi "-x86"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.builduapi.exe" "%(FullPath)" "$(SolutionDir)tmp\uapi\uapi-generic-x64.h" "-i:$(SolutionDir)..\external-kernel-headers\include" -p:uapi "-x64"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.builduapi.exe" "%(FullPath)" "$(SolutionDir)tmp\uapi\uapi-generic-x64.h" "-i:$(SolutionDir)..\external-kernel-headers\include" -p:uapi "-x64"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)tmp\uapi\uapi-generic-x64.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)tmp\uapi\uapi-generic-x64.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)tmp\uapi\uapi-generic-x86.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)tmp\uapi\uapi-generic-x86.h</Outputs>
+    </CustomBuild>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

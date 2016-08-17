@@ -45,7 +45,8 @@ namespace zuki.vm.linux
 		/// <param name="clangargs">Command line arguments passed into clang</param>
 		/// <param name="outheader">Output header file</param>
 		/// <param name="prefix">Prefix string for declarations</param>
-		public static void Generate(TranslationUnit transunit, IEnumerable<string> clangargs, string outheader, string prefix)
+		/// <param name="nodecls">Flag indicating that declarations should not be emitted</param>
+		public static void Generate(TranslationUnit transunit, IEnumerable<string> clangargs, string outheader, string prefix, bool nodecls)
 		{
 			if (transunit == null) throw new ArgumentNullException("transunit");
 			if (String.IsNullOrEmpty(outheader)) throw new ArgumentNullException("outheader");
@@ -79,7 +80,7 @@ namespace zuki.vm.linux
 
 					// DECLARATION
 					//
-					if (cursor.Kind.IsDeclaration)
+					if ((!nodecls) && (cursor.Kind.IsDeclaration))
 					{
 						// Write the original location of the declaration for reference
 						writer.WriteLine("// " + cursor.Location.ToString());

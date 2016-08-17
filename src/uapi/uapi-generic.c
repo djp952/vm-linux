@@ -21,9 +21,12 @@
 //---------------------------------------------------------------------------
 
 //
-// uapi-x32.c
+// uapi-generic.c
 //
-// Translation Unit input file for tools.builduapi to generate uapi-x32.h
+// Translation Unit input file for tools.builduapi to generate uapi-generic.h
 //
 
-#include "uapi-generic.c"
+#include <linux/types.h>
+#include <linux/elf.h>
+#include <linux/elf-em.h>
+#include <linux/sched.h>

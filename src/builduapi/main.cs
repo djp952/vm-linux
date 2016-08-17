@@ -65,6 +65,10 @@ namespace zuki.vm.linux
 				string prefix = "uapi";
 				if (commandline.Switches.ContainsKey("p")) prefix = commandline.Switches["p"];
 
+				// -nodecls --> do not emit declaration types
+				bool nodecls = false;
+				if (commandline.Switches.ContainsKey("nodecls")) nodecls = true;
+
 				// -m64 / -x64 --> x64 build target
 				if (commandline.Switches.ContainsKey("m64") || commandline.Switches.ContainsKey("x64")) clangargs.Add("-m64");
 
@@ -103,7 +107,7 @@ namespace zuki.vm.linux
 					if (hasfatal) throw new Exception("Fatal error occurred processing input translation unit " + infile);
 
 					// Generate the UAPI header
-					UapiHeader.Generate(transunit, clangargs, outfile, prefix);
+					UapiHeader.Generate(transunit, clangargs, outfile, prefix, nodecls);
 				}
 			}
 

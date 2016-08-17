@@ -20,54 +20,26 @@
 // SOFTWARE.
 //-----------------------------------------------------------------------------
 
-#ifndef __CONVERT_H_
-#define __CONVERT_H_
-#pragma once
+#include "stdafx.h"
+#include "Process.h"
 
-#include <type_traits>
+#include "Executable.h"
 
 #pragma warning(push, 4)
 
-//-----------------------------------------------------------------------------
-// convert
+//---------------------------------------------------------------------------
+// Process::Load
 //
-// Template used to define a custom data type conversion.  Include this header
-// file and implement the needed convert<> specializations somewhere
+// Loads an Executable instance into the process
 //
-// Example: datetime --> FILETIME
+// Arguments:
 //
-//	template<> FILETIME convert<FILETIME>(const datetime& rhs)
-//	{
-//		uint64_t filetime = rhs;
-//		return *reinterpret_cast<FILETIME*>(&filetime);
-//	}
-//
-// auto filetime = convert<FILETIME>(datetimevalue);
+//	executable		- The Executable instance to be loaded
 
-//-----------------------------------------------------------------------------
-// convert<> (integral type)
-//
-// Parameters:
-//
-//	_to		- Destination data type
-//	_from	- Source data type value
-
-template<typename _to, typename _from> 
-typename std::enable_if<std::is_integral<_from>::value, _to>::type convert(_from rhs);
-
-//-----------------------------------------------------------------------------
-// convert<> (non-integral type)
-//
-// Parameters:
-//
-//	_to		- Destination data type
-//	_from	- Source data type const reference
-
-template<typename _to, typename _from> 
-typename std::enable_if<!std::is_integral<_from>::value, _to>::type convert(const _from& rhs);
-
-//-----------------------------------------------------------------------------
+void Process::Load(Executable const* executable)
+{
+	UNREFERENCED_PARAMETER(executable);
+}
+//---------------------------------------------------------------------------
 
 #pragma warning(pop)
-
-#endif	// __CONVERT_H_

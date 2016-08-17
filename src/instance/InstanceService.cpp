@@ -25,8 +25,13 @@
 
 #include <algorithm>
 #include <messages.h>
+
+#include "Executable.h"
 #include "Exception.h"
-#include "Parameter.h"
+#include "Namespace.h"
+#include "Process.h"
+#include "RpcObject.h"
+#include "SystemLog.h"
 #include "Win32Exception.h"
 
 #pragma warning(push, 4)
@@ -138,10 +143,18 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// REGISTER SYSTEM CALL INTERFACES
 		//
 
-		m_syscalls_x86 = std::make_unique<RpcObject>(syscalls_x86_v1_0_s_ifspec, /*m_instanceid, */RPC_IF_AUTOLISTEN | RPC_IF_ALLOW_SECURE_ONLY);
+		m_syscalls_x86 = std::make_unique<RpcObject>(syscalls_x86_v1_0_s_ifspec, RPC_IF_AUTOLISTEN | RPC_IF_ALLOW_SECURE_ONLY);
 #ifdef _M_X64
-		m_syscalls_x64 = std::make_unique<RpcObject>(syscalls_x64_v1_0_s_ifspec, /*m_instanceid, */RPC_IF_AUTOLISTEN | RPC_IF_ALLOW_SECURE_ONLY);
+		m_syscalls_x64 = std::make_unique<RpcObject>(syscalls_x64_v1_0_s_ifspec, RPC_IF_AUTOLISTEN | RPC_IF_ALLOW_SECURE_ONLY);
 #endif
+
+		//
+		// LAUNCH INIT PROCESS
+		//
+
+		auto initexe = std::make_unique<Executable>(TEXT("D:\\Linux Stuff\\android-5.0.2_r1-x86\\root\\init"));
+		m_initprocess = std::make_unique<Process>();
+		m_initprocess->Load(initexe.get());
 	}
 
 	catch(std::exception& ex) {

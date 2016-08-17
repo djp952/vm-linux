@@ -20,54 +20,58 @@
 // SOFTWARE.
 //-----------------------------------------------------------------------------
 
-#ifndef __CONVERT_H_
-#define __CONVERT_H_
+#ifndef __PROCESS_H_
+#define __PROCESS_H_
 #pragma once
-
-#include <type_traits>
 
 #pragma warning(push, 4)
 
-//-----------------------------------------------------------------------------
-// convert
+// FORWARD DECLARATIONS
 //
-// Template used to define a custom data type conversion.  Include this header
-// file and implement the needed convert<> specializations somewhere
-//
-// Example: datetime --> FILETIME
-//
-//	template<> FILETIME convert<FILETIME>(const datetime& rhs)
-//	{
-//		uint64_t filetime = rhs;
-//		return *reinterpret_cast<FILETIME*>(&filetime);
-//	}
-//
-// auto filetime = convert<FILETIME>(datetimevalue);
+class Executable;
 
 //-----------------------------------------------------------------------------
-// convert<> (integral type)
+// Class Process
 //
-// Parameters:
-//
-//	_to		- Destination data type
-//	_from	- Source data type value
+// TODO
 
-template<typename _to, typename _from> 
-typename std::enable_if<std::is_integral<_from>::value, _to>::type convert(_from rhs);
+class Process
+{
+public:
 
-//-----------------------------------------------------------------------------
-// convert<> (non-integral type)
-//
-// Parameters:
-//
-//	_to		- Destination data type
-//	_from	- Source data type const reference
+	// Instance Constructors
+	//
+	Process()=default;
 
-template<typename _to, typename _from> 
-typename std::enable_if<!std::is_integral<_from>::value, _to>::type convert(const _from& rhs);
+	// Destructor
+	//
+	~Process()=default;
+
+	//-------------------------------------------------------------------------
+	// Member Functions
+
+	// Load
+	//
+	// Loads an Executable instance into the process
+	void Load(Executable const* executable);
+
+	//-------------------------------------------------------------------------
+	// Properties
+
+private:
+
+	Process(Process const&)=delete;
+	Process& operator=(Process const&)=delete;
+
+	//-------------------------------------------------------------------------
+	// Private Member Functions
+
+	//-------------------------------------------------------------------------
+	// Member Variables
+};
 
 //-----------------------------------------------------------------------------
 
 #pragma warning(pop)
 
-#endif	// __CONVERT_H_
+#endif	// __PROCESS_H_

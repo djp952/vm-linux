@@ -28,6 +28,9 @@
     <CustomBuild Include="uapi-x86.c">
       <Filter>Source Files</Filter>
     </CustomBuild>
+    <CustomBuild Include="uapi-generic.c">
+      <Filter>Source Files</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\tmp\uapi\uapi-x32.h">

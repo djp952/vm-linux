@@ -20,54 +20,51 @@
 // SOFTWARE.
 //-----------------------------------------------------------------------------
 
-#ifndef __CONVERT_H_
-#define __CONVERT_H_
+#ifndef __EXECUTABLE_H_
+#define __EXECUTABLE_H_
 #pragma once
 
-#include <type_traits>
+#include <text.h>
 
 #pragma warning(push, 4)
 
 //-----------------------------------------------------------------------------
-// convert
+// Class Executable
 //
-// Template used to define a custom data type conversion.  Include this header
-// file and implement the needed convert<> specializations somewhere
-//
-// Example: datetime --> FILETIME
-//
-//	template<> FILETIME convert<FILETIME>(const datetime& rhs)
-//	{
-//		uint64_t filetime = rhs;
-//		return *reinterpret_cast<FILETIME*>(&filetime);
-//	}
-//
-// auto filetime = convert<FILETIME>(datetimevalue);
+// TODO
 
-//-----------------------------------------------------------------------------
-// convert<> (integral type)
-//
-// Parameters:
-//
-//	_to		- Destination data type
-//	_from	- Source data type value
+class Executable
+{
+public:
 
-template<typename _to, typename _from> 
-typename std::enable_if<std::is_integral<_from>::value, _to>::type convert(_from rhs);
+	// Instance Constructors
+	//
+	Executable(tchar_t const* path);
 
-//-----------------------------------------------------------------------------
-// convert<> (non-integral type)
-//
-// Parameters:
-//
-//	_to		- Destination data type
-//	_from	- Source data type const reference
+	// Destructor
+	//
+	~Executable()=default;
 
-template<typename _to, typename _from> 
-typename std::enable_if<!std::is_integral<_from>::value, _to>::type convert(const _from& rhs);
+	//-------------------------------------------------------------------------
+	// Member Functions
+
+	//-------------------------------------------------------------------------
+	// Properties
+
+private:
+
+	Executable(Executable const&)=delete;
+	Executable& operator=(Executable const&)=delete;
+
+	//-------------------------------------------------------------------------
+	// Private Member Functions
+
+	//-------------------------------------------------------------------------
+	// Member Variables
+};
 
 //-----------------------------------------------------------------------------
 
 #pragma warning(pop)
 
-#endif	// __CONVERT_H_
+#endif	// __EXECUTABLE_H_

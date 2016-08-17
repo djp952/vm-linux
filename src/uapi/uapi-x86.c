@@ -26,5 +26,4 @@
 // Translation Unit input file for tools.builduapi to generate uapi-x86.h
 //
 
-#include <linux/types.h>
-#include <linux/sched.h>
+#include "uapi-generic.c"
