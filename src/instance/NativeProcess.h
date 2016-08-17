@@ -30,9 +30,9 @@
 #include <sync.h>
 #include <text.h>
 #include <Bitmap.h>
-#include <VirtualMachine.h>
 
 #include "NativeArchitecture.h"
+#include "VirtualMachine.h"
 
 #pragma warning(push, 4)
 

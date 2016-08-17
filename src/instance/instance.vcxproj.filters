@@ -73,9 +73,6 @@
     <ClInclude Include="InstanceService.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\VirtualMachine.h">
-      <Filter>Header Files\common</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\sync.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
@@ -136,6 +133,9 @@
     <ClInclude Include="..\..\tmp\uapi\uapi-generic-x86.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
+    <ClInclude Include="VirtualMachine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -172,9 +172,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\common\SystemInformation.cpp">
-      <Filter>Source Files\common</Filter>
-    </ClCompile>
-    <ClCompile Include="..\common\VirtualMachine.cpp">
       <Filter>Source Files\common</Filter>
     </ClCompile>
     <ClCompile Include="Namespace.cpp">
@@ -229,6 +226,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Executable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VirtualMachine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

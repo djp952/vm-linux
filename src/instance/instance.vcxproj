@@ -195,7 +195,6 @@
     <ClInclude Include="..\common\text.h" />
     <ClInclude Include="..\common\NtApi.h" />
     <ClInclude Include="..\common\StructuredException.h" />
-    <ClInclude Include="..\common\VirtualMachine.h" />
     <ClInclude Include="..\common\Win32Exception.h" />
     <ClInclude Include="Executable.h" />
     <ClInclude Include="ExecutableFormat.h" />
@@ -206,6 +205,7 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="InstanceService.h" />
     <ClInclude Include="SystemLog.h" />
+    <ClInclude Include="VirtualMachine.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\external-servicelib\servicelib.cpp" />
@@ -242,7 +242,6 @@
     <ClCompile Include="..\common\RpcObject.cpp" />
     <ClCompile Include="..\common\StructuredException.cpp" />
     <ClCompile Include="..\common\SystemInformation.cpp" />
-    <ClCompile Include="..\common\VirtualMachine.cpp" />
     <ClCompile Include="..\common\Win32Exception.cpp" />
     <ClCompile Include="Executable.cpp" />
     <ClCompile Include="main.cpp" />
@@ -277,6 +276,7 @@
     <ClCompile Include="sys_x86_attach_thread.cpp" />
     <ClCompile Include="sys_x86_exit.cpp" />
     <ClCompile Include="sys_x86_rundown.cpp" />
+    <ClCompile Include="VirtualMachine.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\tmp\messages\messages.rc" />

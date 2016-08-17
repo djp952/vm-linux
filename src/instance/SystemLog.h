@@ -28,7 +28,8 @@
 #include <sync.h>
 #include <text.h>
 #include <MemoryRegion.h>
-#include <VirtualMachine.h>
+
+#include "VirtualMachine.h"
 
 #pragma warning(push, 4)
 #pragma warning(disable:4200)		// zero-sized array in struct/union
