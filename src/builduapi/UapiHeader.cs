@@ -220,6 +220,10 @@ namespace zuki.vm.linux
 			// Determine the field type and get the declaration cursor for that type
 			ClangType type = (cursor.Type.Kind == TypeKind.ConstantArray) ? cursor.Type.ArrayElementType : cursor.Type;
 
+			// Check for zero-length constant array field declaration, which is commented out as it's not compatible with MIDL
+			bool zerolength = ((cursor.Type.Kind == TypeKind.ConstantArray) && (cursor.Type.ArraySize == 0));
+			if (zerolength) writer.Write("// ");
+
 			// Check for anonymous struct / union being declared through the field
 			if (String.IsNullOrEmpty(type.DeclarationCursor.DisplayName) && ((type.DeclarationCursor.Kind == CursorKind.StructDecl) || (type.DeclarationCursor.Kind == CursorKind.UnionDecl)))
 			{

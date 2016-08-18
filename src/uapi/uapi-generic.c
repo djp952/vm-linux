@@ -30,4 +30,5 @@
 #include <linux/errno.h>
 #include <linux/elf.h>
 #include <linux/elf-em.h>
+#include <linux/fs.h>
 #include <linux/sched.h>

@@ -42,5 +42,11 @@
     <ClInclude Include="..\..\tmp\uapi\uapi-x86.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\tmp\uapi\uapi-generic-x64.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tmp\uapi\uapi-generic-x86.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
