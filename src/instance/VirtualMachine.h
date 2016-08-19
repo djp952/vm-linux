@@ -24,6 +24,7 @@
 #define __VIRTUALMACHINE_H_
 #pragma once
 
+#include <functional>
 #include <bitmask.h>
 #include <stdint.h>
 #include <text.h>
@@ -43,6 +44,10 @@ public:
 	// Destructor
 	//
 	virtual ~VirtualMachine()=default;
+
+	//
+	// TYPES
+	//
 
 	// AllocationFlags (bitmask)
 	//
@@ -134,6 +139,137 @@ public:
 		Debug			= 7,	// LOGLEVEL_DEBUG: Debug-level messages
 	};
 
+	// MountFlags
+	//
+	// Mount operation flags
+	struct MountFlags final : public bitmask<MountFlags, uint32_t>
+	{
+		using bitmask::bitmask;
+
+		//-------------------------------------------------------------------------
+		// Fields
+
+		// Bind (static)
+		//
+		// Perform a bind mount
+		static MountFlags const Bind;
+
+		// IncrementNodeVersions (static)
+		//
+		// Update the node version anytime it is modified
+		static MountFlags const IncrementNodeVersions;
+
+		// KernelMount (static)
+		//
+		// Indicates that this mount was performed by the kernel
+		static MountFlags const KernelMount;
+
+		// LazyTimeStamps (static)
+		//
+		// Reduce on-disk updates of inode timestamps 
+		static MountFlags const LazyTimeStamps;
+
+		// MandatoryLocks (static)
+		//
+		// Permit mandatory locking on files in this filesystem
+		static MountFlags const MandatoryLocks;
+
+		// Move (static)
+		//
+		// Move an existing mount to a new location
+		static MountFlags const Move;
+
+		// NoDevices (static)
+		//
+		// Do not interpret character or block special devices 
+		static MountFlags const NoDevices;
+
+		// NoSetUserId (static)
+		//
+		// Do not honor set-user-ID and set-group-ID bits
+		static MountFlags const NoSetUserId;
+
+		// NoExecute (static)
+		//
+		// Do not allow programs to be executed from this filesystem
+		static MountFlags const NoExecute;
+
+		// NoUpdateAccessTimeStamps (static)
+		//
+		// Do not update access times for (all types of) files  
+		static MountFlags const NoUpdateAccessTimeStamps;
+
+		// NoUpdateDirectoryAccessTimeStamps (static)
+		//
+		// Do not update access times for directories on this filesystem
+		static MountFlags const NoUpdateDirectoryAccessTimeStamps;
+
+		// PosixAccessControlLists (static)
+		//
+		// Support POSIX Access Control Lists 
+		static MountFlags const PosixAccessControlLists;
+
+		// Private (static)
+		//
+		// Make this mount point private
+		static MountFlags const Private;
+
+		// ReadOnly (static)
+		//
+		// Mount the file system as read-only
+		static MountFlags const ReadOnly;
+
+		// RecursiveBind (static)
+		//
+		// Perform a recusrive bind mount
+		static MountFlags const RecursiveBind;
+
+		// RelativeAccessTimeStamps (static)
+		//
+		// Use relative access times
+		static MountFlags const RelativeAccessTimeStamps;
+
+		// Remount (static)
+		//
+		// Remount an existing mount
+		static MountFlags const Remount;
+
+		// Slave (static)
+		//
+		// Convert into a slave mount
+		static MountFlags const Slave;
+
+		// Shared (static)
+		//
+		// Make this mount point shared
+		static MountFlags const Shared;
+
+		// Silent (static)
+		//
+		// Suppress the display of certain warning messages 
+		static MountFlags const Silent;
+
+		// StrictAccessTimeStamps (static)
+		//
+		// Always update the last access time (atime)
+		static MountFlags const StrictAccessTimeStamps;
+
+		// Synchronous (static)
+		//
+		// Make writes on this filesystem synchronous
+		static MountFlags const Synchronous;
+
+		// SynchronousDirectories (static)
+		//
+		// Make directory changes on this filesystem synchronous
+		static MountFlags const SynchronousDirectories;
+
+		// Unbindable (static)
+		//
+		// Make this mount unbindable
+		static MountFlags const Unbindable;
+	};
+
 	// ProtectionFlags
 	//
 	// Generalized protection flags used with memory operations
@@ -169,6 +305,18 @@ public:
 		// Indicates that the memory region can be written to
 		static ProtectionFlags const Write;
 	};
+
+	// FileSystem
+	//
+	// Interface that must be implemented by a file system
+	struct __declspec(novtable) FileSystem
+	{
+	};
+
+	// MountFunction
+	//
+	// Function signature for a file system's Mount() implementation, which must be a public static method
+	using MountFunction = std::function<struct FileSystem*(const char_t* source, uint32_t flags, const void* data, size_t datalength)>;
 
 	//-------------------------------------------------------------------------
 	// Member Functions
