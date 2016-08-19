@@ -24,6 +24,7 @@
 #define __HOSTFILESYSTEM_H_
 #pragma once
 
+#include <text.h>
 #include "VirtualMachine.h"
 
 #pragma warning(push, 4)
@@ -44,6 +45,11 @@ public:
 	// Destructor
 	//
 	~HostFileSystem()=default;
+
+	// Mount (static)
+	//
+	// Creates an instance of the file system
+	static HostFileSystem* Mount(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 private:
 

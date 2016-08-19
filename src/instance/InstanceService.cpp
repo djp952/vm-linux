@@ -28,10 +28,13 @@
 
 #include "Executable.h"
 #include "Exception.h"
+#include "HostFileSystem.h"
 #include "Namespace.h"
 #include "Process.h"
+#include "RootFileSystem.h"
 #include "RpcObject.h"
 #include "SystemLog.h"
+#include "TempFileSystem.h"
 #include "Win32Exception.h"
 
 #pragma warning(push, 4)
@@ -138,6 +141,13 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 
 		try { m_rootns = std::make_unique<Namespace>(); }
 		catch(std::exception& ex) { throw CreateRootNamespaceException(ex.what()); }
+
+		//
+		// INITIALIZE FILE SYSTEMS
+		//
+		m_filesystems.emplace("rootfs", RootFileSystem::Mount);
+		m_filesystems.emplace("tempfs", TempFileSystem::Mount);
+		m_filesystems.emplace("hostfs", HostFileSystem::Mount);
 
 		//
 		// REGISTER SYSTEM CALL INTERFACES

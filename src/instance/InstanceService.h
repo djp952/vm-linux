@@ -26,6 +26,7 @@
 
 #include <map>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include <Parameter.h>
 
@@ -95,6 +96,11 @@ private:
 		PARAMETER_ENTRY(TEXT("loglevel"), param_loglevel)
 	END_PARAMETER_MAP()
 
+	// filesystem_map_t
+	//
+	// Collection of available file systems (name, mount function)
+	using filesystem_map_t = std::unordered_map<std::string, VirtualMachine::MountFunction>;
+
 	//-------------------------------------------------------------------------
 	// Private Member Functions
 
@@ -115,6 +121,7 @@ private:
 	std::unique_ptr<Namespace>		m_rootns;			// Root Namespace instance
 	HANDLE							m_job;				// Process job object
 	std::unique_ptr<Process>		m_initprocess;		// Init process instance
+	filesystem_map_t				m_filesystems;		// Available file systems
 
 	std::unique_ptr<RpcObject>		m_syscalls_x86;		// 32-bit system call interface
 #ifdef _M_X64
@@ -123,8 +130,8 @@ private:
 
 	// Parameters
 	//
-	Parameter<size_t>			param_log_buf_len	= 2 MiB;
-	Parameter<LogLevel>			param_loglevel		= LogLevel::Warning;
+	Parameter<size_t>					param_log_buf_len	= 2 MiB;
+	Parameter<VirtualMachine::LogLevel>	param_loglevel		= VirtualMachine::LogLevel::Warning;
 };
 
 //-----------------------------------------------------------------------------

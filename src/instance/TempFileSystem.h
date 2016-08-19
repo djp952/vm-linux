@@ -45,6 +45,11 @@ public:
 	//
 	~TempFileSystem()=default;
 
+	// Mount (static)
+	//
+	// Creates an instance of the file system
+	static TempFileSystem* Mount(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+
 private:
 
 	TempFileSystem(TempFileSystem const&)=delete;

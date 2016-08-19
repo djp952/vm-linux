@@ -45,6 +45,11 @@ public:
 	//
 	~RootFileSystem()=default;
 
+	// Mount (static)
+	//
+	// Creates an instance of the file system
+	static RootFileSystem* Mount(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+
 private:
 
 	RootFileSystem(RootFileSystem const&)=delete;

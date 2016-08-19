@@ -26,6 +26,26 @@
 #pragma warning(push, 4)
 
 //---------------------------------------------------------------------------
+// TempFileSystem::Mount (static)
+//
+// Creates an instance of the file system
+//
+// Arguments:
+//
+//	source		- Source device string
+//	flags		- Standard mounting option flags
+//	data		- Extended/custom mounting options
+//	datalength	- Length of the extended mounting options data
+
+TempFileSystem* TempFileSystem::Mount(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+{
+	UNREFERENCED_PARAMETER(source);
+	UNREFERENCED_PARAMETER(flags);
+	UNREFERENCED_PARAMETER(data);
+	UNREFERENCED_PARAMETER(datalength);
+
+	return nullptr;
+}
 
 //---------------------------------------------------------------------------
 
