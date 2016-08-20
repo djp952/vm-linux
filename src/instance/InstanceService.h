@@ -94,15 +94,46 @@ private:
 	BEGIN_PARAMETER_MAP(m_params)
 		PARAMETER_ENTRY(TEXT("log_buf_len"), param_log_buf_len)
 		PARAMETER_ENTRY(TEXT("loglevel"), param_loglevel)
+		PARAMETER_ENTRY(TEXT("ro"), param_ro)
+		PARAMETER_ENTRY(TEXT("root"), param_root)
+		PARAMETER_ENTRY(TEXT("rootflags"), param_rootflags)
+		PARAMETER_ENTRY(TEXT("rootfstype"), param_rootfstype)
+		PARAMETER_ENTRY(TEXT("rw"), param_rw)
 	END_PARAMETER_MAP()
 
 	// filesystem_map_t
 	//
 	// Collection of available file systems (name, mount function)
-	using filesystem_map_t = std::unordered_map<std::string, VirtualMachine::MountFunction>;
+	using filesystem_map_t = std::unordered_map<std::tstring, VirtualMachine::MountFunction>;
+
+	// ProcFileSystem
+	//
+	// Implements the procfs file system
+	class ProcFileSystem : public VirtualMachine::FileSystem
+	{
+	public:
+
+		// Instance Constructor
+		//
+		ProcFileSystem()=default;
+
+		// Destructor
+		//
+		~ProcFileSystem()=default;
+
+	private:
+
+		ProcFileSystem(ProcFileSystem const& rhs)=delete;
+		ProcFileSystem& operator=(ProcFileSystem const&)=delete;
+	};
 
 	//-------------------------------------------------------------------------
 	// Private Member Functions
+
+	// MountProcFileSystem (static)
+	//
+	// Creates an instance of the procfs file system for this instance
+	static ProcFileSystem* MountProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 	// OnStart (Service)
 	//
@@ -121,8 +152,14 @@ private:
 	std::unique_ptr<Namespace>		m_rootns;			// Root Namespace instance
 	HANDLE							m_job;				// Process job object
 	std::unique_ptr<Process>		m_initprocess;		// Init process instance
-	filesystem_map_t				m_filesystems;		// Available file systems
+	
+	// File System
+	//
+	filesystem_map_t							m_filesystems;	// Available file systems
+	std::unique_ptr<VirtualMachine::FileSystem>	m_rootfs;		// Root file system
 
+	// RPC System Call Objects
+	//
 	std::unique_ptr<RpcObject>		m_syscalls_x86;		// 32-bit system call interface
 #ifdef _M_X64
 	std::unique_ptr<RpcObject>		m_syscalls_x64;		// 64-bit system call interface
@@ -132,6 +169,11 @@ private:
 	//
 	Parameter<size_t>					param_log_buf_len	= 2 MiB;
 	Parameter<VirtualMachine::LogLevel>	param_loglevel		= VirtualMachine::LogLevel::Warning;
+	Parameter<void>						param_ro;
+	Parameter<std::tstring>				param_root;
+	Parameter<std::tstring>				param_rootflags;
+	Parameter<std::tstring>				param_rootfstype	= TEXT("rootfs");
+	Parameter<void>						param_rw;
 };
 
 //-----------------------------------------------------------------------------

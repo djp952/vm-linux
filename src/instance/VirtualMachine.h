@@ -306,6 +306,37 @@ public:
 		static ProtectionFlags const Write;
 	};
 
+	// UnmountFlags
+	//
+	// Unmount operation flags
+	struct UnmountFlags final : public bitmask<UnmountFlags, uint32_t>
+	{
+		using bitmask::bitmask;
+
+		//-------------------------------------------------------------------------
+		// Fields
+
+		// Detach
+		//
+		// Perform a lazy unmount -- see umount2(2)
+		static UnmountFlags const Detach;
+
+		// Expire
+		//
+		// Mark the mount point as expired -- see umount2(2)
+		static UnmountFlags const Expire;
+
+		// Force
+		//
+		// Forces an unmount even if the file system is busy
+		static UnmountFlags const Force;
+		
+		// NoFollow
+		//
+		// Indicates that if the target is symbolic link it is not to be followed
+		static UnmountFlags const NoFollow;
+	};
+
 	// FileSystem
 	//
 	// Interface that must be implemented by a file system

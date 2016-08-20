@@ -77,123 +77,100 @@ VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewNetworkNamespace
 // VIRTUALMACHINE::MOUNTFLAGS
 //
 
-// VirtualMachine::CloneFlags::ReadOnly (static)
+// VirtualMachine::MountFlags::ReadOnly (static)
 //
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::ReadOnly { UAPI_MS_RDONLY };
 
-// VirtualMachine::CloneFlags::NoSetUserId (static)
+// VirtualMachine::MountFlags::NoSetUserId (static)
 //
-// Do not honor set-user-ID and set-group-ID bits
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::NoSetUserId { UAPI_MS_NOSUID };
 
-// VirtualMachine::CloneFlags::NoDevices (static)
+// VirtualMachine::MountFlags::NoDevices (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::NoDevices { UAPI_MS_NODEV };
 
-// VirtualMachine::CloneFlags::NoExecute (static)
+// VirtualMachine::MountFlags::NoExecute (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::NoExecute { UAPI_MS_NOEXEC };
 
-// VirtualMachine::CloneFlags::Synchronous (static)
+// VirtualMachine::MountFlags::Synchronous (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::Synchronous { UAPI_MS_SYNCHRONOUS };
 
-// VirtualMachine::CloneFlags::Remount (static)
+// VirtualMachine::MountFlags::Remount (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::Remount { UAPI_MS_REMOUNT };
 
-// VirtualMachine::CloneFlags::MandatoryLocks (static)
+// VirtualMachine::MountFlags::MandatoryLocks (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::MandatoryLocks { UAPI_MS_MANDLOCK };
 
-// VirtualMachine::CloneFlags::SynchronousDirectories (static)
+// VirtualMachine::MountFlags::SynchronousDirectories (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::SynchronousDirectories { UAPI_MS_DIRSYNC };
 
-// VirtualMachine::CloneFlags::NoUpdateAccessTimeStamps (static)
+// VirtualMachine::MountFlags::NoUpdateAccessTimeStamps (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::NoUpdateAccessTimeStamps { UAPI_MS_NOATIME };
 
-// VirtualMachine::CloneFlags::NoUpdateDirectoryAccessTimeStampls(static)
+// VirtualMachine::MountFlags::NoUpdateDirectoryAccessTimeStampls(static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::NoUpdateDirectoryAccessTimeStamps { UAPI_MS_NODIRATIME };
 
-// VirtualMachine::CloneFlags::Bind (static)
+// VirtualMachine::MountFlags::Bind (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::Bind { UAPI_MS_BIND };
 
-// VirtualMachine::CloneFlags::Move (static)
+// VirtualMachine::MountFlags::Move (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::Move { UAPI_MS_MOVE };
 
-// VirtualMachine::CloneFlags::RecursiveBind (static)
+// VirtualMachine::MountFlags::RecursiveBind (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::RecursiveBind { UAPI_MS_REC };
 
-// VirtualMachine::CloneFlags::Silent (static)
+// VirtualMachine::MountFlags::Silent (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::Silent { UAPI_MS_SILENT };
 
-// VirtualMachine::CloneFlags::PosixAccessControlLists (static)
+// VirtualMachine::MountFlags::PosixAccessControlLists (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::PosixAccessControlLists { UAPI_MS_POSIXACL };
 
-// VirtualMachine::CloneFlags::Unbindable (static)
+// VirtualMachine::MountFlags::Unbindable (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::Unbindable { UAPI_MS_UNBINDABLE };
 
-// VirtualMachine::CloneFlags::Private (static)
+// VirtualMachine::ClonMountFlagseFlags::Private (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::Private { UAPI_MS_PRIVATE };
 
-// VirtualMachine::CloneFlags::Slave (static)
+// VirtualMachine::MountFlags::Slave (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::Slave { UAPI_MS_SLAVE };
 
-// VirtualMachine::CloneFlags::Shared (static)
+// VirtualMachine::MountFlags::Shared (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::Shared { UAPI_MS_SHARED };
 
-// VirtualMachine::CloneFlags::RelativeAccessTimeStamps (static)
+// VirtualMachine::MountFlags::RelativeAccessTimeStamps (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::RelativeAccessTimeStamps { UAPI_MS_RELATIME };
 
-// VirtualMachine::CloneFlags::KernelMount (static)
-//
+// VirtualMachine::MountFlags::KernelMount (static)
 // 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::KernelMount { UAPI_MS_KERNMOUNT };
 
-// VirtualMachine::CloneFlags::IncrementNodeVersions (static)
-//
+// VirtualMachine::MountFlags::IncrementNodeVersions (static)
 // 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::IncrementNodeVersions { UAPI_MS_I_VERSION };
 
-// VirtualMachine::CloneFlags::StrictAccessTimeStamps (static)
+// VirtualMachine::MountFlags::StrictAccessTimeStamps (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::StrictAccessTimeStamps { UAPI_MS_STRICTATIME };
 
-// VirtualMachine::CloneFlags::LasyTimeStamps (static)
+// VirtualMachine::MountFlags::LasyTimeStamps (static)
 //
-// 
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::LazyTimeStamps { UAPI_MS_LAZYTIME };
 
 //
@@ -219,6 +196,26 @@ VirtualMachine::ProtectionFlags const VirtualMachine::ProtectionFlags::Write { 0
 // VirtualMachine::ProtectionFlags::Guard (static)
 //
 VirtualMachine::ProtectionFlags const VirtualMachine::ProtectionFlags::Guard { 0x80 };
+
+//
+// VIRTUALMACHINE::UNMOUNTFLAGS
+//
+
+// VirtualMachine::UnmountFlags::Force (static)
+//
+VirtualMachine::UnmountFlags const VirtualMachine::UnmountFlags::Force { 0x00000001 };		// MNT_FORCE
+
+// VirtualMachine::UnmountFlags::Detach (static)
+//
+VirtualMachine::UnmountFlags const VirtualMachine::UnmountFlags::Detach { 0x00000002 };		// MNT_DETACH
+
+// VirtualMachine::UnmountFlags::Expire (static)
+//
+VirtualMachine::UnmountFlags const VirtualMachine::UnmountFlags::Expire { 0x00000004 };		// MNT_EXPIRE
+
+// VirtualMachine::UnmountFlags::NoFollow (static)
+//
+VirtualMachine::UnmountFlags const VirtualMachine::UnmountFlags::NoFollow { 0x00000008 };	// UMOUNT_NOFOLLOW
 
 //-----------------------------------------------------------------------------
 

@@ -51,6 +51,28 @@ InstanceService::InstanceService()
 }
 
 //---------------------------------------------------------------------------
+// InstanceService::Mount (static)
+//
+// Creates an instance of the file system
+//
+// Arguments:
+//
+//	source		- Source device string
+//	flags		- Standard mounting option flags
+//	data		- Extended/custom mounting options
+//	datalength	- Length of the extended mounting options data
+
+InstanceService::ProcFileSystem* InstanceService::MountProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+{
+	UNREFERENCED_PARAMETER(source);
+	UNREFERENCED_PARAMETER(flags);
+	UNREFERENCED_PARAMETER(data);
+	UNREFERENCED_PARAMETER(datalength);
+
+	return nullptr;
+}
+
+//---------------------------------------------------------------------------
 // InstanceService::OnStart (private)
 //
 // Invoked when the service is started
@@ -145,9 +167,11 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		//
 		// INITIALIZE FILE SYSTEMS
 		//
-		m_filesystems.emplace("rootfs", RootFileSystem::Mount);
-		m_filesystems.emplace("tempfs", TempFileSystem::Mount);
-		m_filesystems.emplace("hostfs", HostFileSystem::Mount);
+
+		m_filesystems.emplace(TEXT("hostfs"), HostFileSystem::Mount);
+		m_filesystems.emplace(TEXT("procfs"), MountProcFileSystem);
+		m_filesystems.emplace(TEXT("rootfs"), RootFileSystem::Mount);
+		m_filesystems.emplace(TEXT("tempfs"), TempFileSystem::Mount);
 
 		//
 		// REGISTER SYSTEM CALL INTERFACES
@@ -157,6 +181,20 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 #ifdef _M_X64
 		m_syscalls_x64 = std::make_unique<RpcObject>(syscalls_x64_v1_0_s_ifspec, RPC_IF_AUTOLISTEN | RPC_IF_ALLOW_SECURE_ONLY);
 #endif
+
+		//
+		// MOUNT ROOT FILE SYSTEM
+		//
+
+		// Find the file system mount function in the collection
+		auto const& rootfsentry = m_filesystems.find(param_rootfstype);
+		if(rootfsentry == m_filesystems.end()) throw FileSystemTypeNotFoundException(static_cast<std::tstring>(param_rootfstype).c_str());
+
+		// Generate/convert the file system flags and attempt to mount the root file system
+		auto rootflags = VirtualMachine::MountFlags::KernelMount | ((param_ro) ? VirtualMachine::MountFlags::ReadOnly : 0);
+		std::string rootflagsstr = std::to_string(param_rootflags);
+		try { m_rootfs.reset(rootfsentry->second(std::to_string(param_root).c_str(), rootflags, rootflagsstr.data(), rootflagsstr.length())); }
+		catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }
 
 		//
 		// LAUNCH INIT PROCESS

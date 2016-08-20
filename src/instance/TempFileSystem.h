@@ -45,6 +45,9 @@ public:
 	//
 	~TempFileSystem()=default;
 
+	//-----------------------------------------------------------------------------
+	// Member Functions
+
 	// Mount (static)
 	//
 	// Creates an instance of the file system

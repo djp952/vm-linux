@@ -74,7 +74,6 @@ Could not create the system log instance. %1!S!
 MessageId=
 ;//ExceptionName=CreateJobObjectException,errorcode,errormessage
 Severity=Error
-Facility=Instance
 SymbolicName=E_CREATEJOBOBJECT
 Language=English
 Could not create process control job object. Error %1!d! - %2!S!
@@ -83,16 +82,30 @@ Could not create process control job object. Error %1!d! - %2!S!
 MessageId=
 ;//ExceptionName=CreateRootNamespaceException,errormessage
 Severity=Error
-Facility=Instance
 SymbolicName=E_CREATEROOTNAMESPACE
 Language=English
 Could not create the root namespace instance. %1!S!
 .
 
 MessageId=
+;//ExceptionName=FileSystemTypeNotFoundException,fstype
+Severity=Error
+SymbolicName=E_FILESYSTEMTYPENOTFOUND
+Language=English
+The specified file system type %1!s! does not exist.
+.
+
+MessageId=
+;//ExceptionName=MountRootFileSystemException,errormessage
+Severity=Error
+SymbolicName=E_MOUNTROOTFILESYSTEM
+Language=English
+Could not mount the root filesystem. %1!S!
+.
+
+MessageId=
 ;//ExceptionName=PanicDuringInitializationException,errormessage
 Severity=Error
-Facility=Instance
 SymbolicName=E_PANICDURINGINITIALIZATION
 Language=English
 PANIC: An exception occurred during instance initialization. %1!S!
