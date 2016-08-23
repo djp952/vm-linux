@@ -46,6 +46,24 @@ public:
 	virtual ~VirtualMachine()=default;
 
 	//
+	// FORWARD DECLARATIONS
+	//
+
+	struct __declspec(novtable) FileSystem;
+	struct __declspec(novtable) Handle;
+	struct __declspec(novtable) Mount;
+	struct __declspec(novtable) Node;
+
+	//
+	// CONSTANTS
+	//
+
+	// MaxSymbolicLinks
+	//
+	// Constant indicating the maximum recursion depth of a path lookup
+	static const int MaxSymbolicLinks = 40;
+
+	//
 	// TYPES
 	//
 
@@ -270,6 +288,25 @@ public:
 		static MountFlags const Unbindable;
 	};
 
+	// MountFunction
+	//
+	// Function signature for a file system's Mount() implementation, which must be a public static method
+	using MountFunction = std::function<struct FileSystem*(const char_t* source, uint32_t flags, const void* data, size_t datalength)>;
+
+	// NodeType
+	//
+	// Strogly typed enumeration for the S_IFxxx inode type constants
+	enum class NodeType
+	{
+		BlockDevice			= UAPI_S_IFBLK,
+		CharacterDevice		= UAPI_S_IFCHR,
+		Directory			= UAPI_S_IFDIR,
+		File				= UAPI_S_IFREG,
+		Pipe				= UAPI_S_IFIFO,
+		Socket				= UAPI_S_IFSOCK,
+		SymbolicLink		= UAPI_S_IFLNK,
+	};
+
 	// ProtectionFlags
 	//
 	// Generalized protection flags used with memory operations
@@ -337,6 +374,10 @@ public:
 		static UnmountFlags const NoFollow;
 	};
 
+	//
+	// INTERFACES
+	//
+
 	// FileSystem
 	//
 	// Interface that must be implemented by a file system
@@ -344,10 +385,26 @@ public:
 	{
 	};
 
-	// MountFunction
+	// Mount
 	//
-	// Function signature for a file system's Mount() implementation, which must be a public static method
-	using MountFunction = std::function<struct FileSystem*(const char_t* source, uint32_t flags, const void* data, size_t datalength)>;
+	// Interface that must be implemented by a file system mount
+	struct __declspec(novtable) Mount
+	{
+	};
+
+	// Handle
+	//
+	// Interface that must be implemented by a file system handle
+	struct __declspec(novtable) Handle
+	{
+	};
+
+	// Node
+	//
+	// Interface that must be implemented by a file system node
+	struct __declspec(novtable) Node
+	{
+	};
 
 	//-------------------------------------------------------------------------
 	// Member Functions

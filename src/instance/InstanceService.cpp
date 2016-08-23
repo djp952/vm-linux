@@ -51,7 +51,7 @@ InstanceService::InstanceService()
 }
 
 //---------------------------------------------------------------------------
-// InstanceService::Mount (static)
+// InstanceService::MountProcFileSystem (static)
 //
 // Creates an instance of the file system
 //
@@ -193,8 +193,10 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// Generate/convert the file system flags and attempt to mount the root file system
 		auto rootflags = VirtualMachine::MountFlags::KernelMount | ((param_ro) ? VirtualMachine::MountFlags::ReadOnly : 0);
 		std::string rootflagsstr = std::to_string(param_rootflags);
-		try { m_rootfs.reset(rootfsentry->second(std::to_string(param_root).c_str(), rootflags, rootflagsstr.data(), rootflagsstr.length())); }
-		catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }
+
+		// Attempt to mount the filesystem in the root namespace
+		//try { m_rootns->MountFileSystem(rootfsentry->second, std::to_string(param_root).c_str(), rootflags, rootflagsstr.data(), rootflagsstr.length()); }
+		//catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }
 
 		//
 		// LAUNCH INIT PROCESS

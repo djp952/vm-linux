@@ -25,6 +25,8 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
+#include <sync.h>
 
 #include "VirtualMachine.h"
 

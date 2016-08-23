@@ -32,7 +32,7 @@
 //-----------------------------------------------------------------------------
 // Class HostFileSystem
 //
-// TODO
+// TODO - IN PROGRESS
 
 class HostFileSystem : public VirtualMachine::FileSystem
 {

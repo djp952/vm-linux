@@ -32,3 +32,4 @@
 #include <linux/elf-em.h>
 #include <linux/fs.h>
 #include <linux/sched.h>
+#include <linux/stat.h>
