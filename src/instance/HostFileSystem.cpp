@@ -26,9 +26,9 @@
 #pragma warning(push, 4)
 
 //---------------------------------------------------------------------------
-// HostFileSystem::Mount (static)
+// MountHostFileSystem
 //
-// Creates an instance of the file system
+// Creates an instance of the HostFileSystem file system
 //
 // Arguments:
 //
@@ -37,14 +37,14 @@
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-HostFileSystem* HostFileSystem::Mount(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+std::unique_ptr<VirtualMachine::FileSystem> MountHostFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
 {
 	UNREFERENCED_PARAMETER(source);
 	UNREFERENCED_PARAMETER(flags);
 	UNREFERENCED_PARAMETER(data);
 	UNREFERENCED_PARAMETER(datalength);
 
-	return nullptr;
+	return std::make_unique<HostFileSystem>();
 }
 
 //---------------------------------------------------------------------------

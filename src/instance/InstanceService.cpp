@@ -53,7 +53,7 @@ InstanceService::InstanceService()
 //---------------------------------------------------------------------------
 // InstanceService::MountProcFileSystem (static)
 //
-// Creates an instance of the file system
+// Creates an instance of the ProcFileSystem file system
 //
 // Arguments:
 //
@@ -62,7 +62,7 @@ InstanceService::InstanceService()
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-InstanceService::ProcFileSystem* InstanceService::MountProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+std::unique_ptr<VirtualMachine::FileSystem> InstanceService::MountProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
 {
 	UNREFERENCED_PARAMETER(source);
 	UNREFERENCED_PARAMETER(flags);
@@ -168,10 +168,10 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// INITIALIZE FILE SYSTEMS
 		//
 
-		m_filesystems.emplace(TEXT("hostfs"), HostFileSystem::Mount);
+		m_filesystems.emplace(TEXT("hostfs"), MountHostFileSystem);
 		m_filesystems.emplace(TEXT("procfs"), MountProcFileSystem);
-		m_filesystems.emplace(TEXT("rootfs"), RootFileSystem::Mount);
-		m_filesystems.emplace(TEXT("tempfs"), TempFileSystem::Mount);
+		m_filesystems.emplace(TEXT("rootfs"), MountRootFileSystem);
+		m_filesystems.emplace(TEXT("tempfs"), MountTempFileSystem);
 
 		//
 		// REGISTER SYSTEM CALL INTERFACES
@@ -194,9 +194,14 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		auto rootflags = VirtualMachine::MountFlags::KernelMount | ((param_ro) ? VirtualMachine::MountFlags::ReadOnly : 0);
 		std::string rootflagsstr = std::to_string(param_rootflags);
 
-		// Attempt to mount the filesystem in the root namespace
-		//try { m_rootns->MountFileSystem(rootfsentry->second, std::to_string(param_root).c_str(), rootflags, rootflagsstr.data(), rootflagsstr.length()); }
-		//catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }
+		try {
+			
+			// Attempt to create the root file system and assign a root namespace mountpoint for it
+			m_rootfs = rootfsentry->second(std::to_string(param_root).c_str(), rootflags, rootflagsstr.data(), rootflagsstr.length());
+			m_rootns->AddMount(m_rootfs.get());
+		}
+		
+		catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }
 
 		//
 		// LAUNCH INIT PROCESS
@@ -230,6 +235,8 @@ void InstanceService::OnStop(void)
 	// Forcibly terminate any remaining processes created by this instance
 	TerminateJobObject(m_job, ERROR_PROCESS_ABORTED);
 	CloseHandle(m_job);
+
+	m_rootfs.reset();
 
 	// Revoke the system call interfaces
 #ifdef _M_X64

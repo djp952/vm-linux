@@ -49,10 +49,13 @@ public:
 	// FORWARD DECLARATIONS
 	//
 
-	struct __declspec(novtable) FileSystem;
-	struct __declspec(novtable) Handle;
-	struct __declspec(novtable) Mount;
-	struct __declspec(novtable) Node;
+	struct Directory;
+	struct File;
+	struct FileSystem;
+	struct Handle;
+	struct Mount;
+	struct Node;
+	struct SymbolicLink;
 
 	//
 	// CONSTANTS
@@ -222,6 +225,11 @@ public:
 		// Do not update access times for directories on this filesystem
 		static MountFlags const NoUpdateDirectoryAccessTimeStamps;
 
+		// PerMountMask (static)
+		//
+		// Mount options that are per-mount rather than applicable to an entire file system
+		static MountFlags const PerMountMask;
+
 		// PosixAccessControlLists (static)
 		//
 		// Support POSIX Access Control Lists 
@@ -251,6 +259,11 @@ public:
 		//
 		// Remount an existing mount
 		static MountFlags const Remount;
+
+		// RemountMask (static)
+		//
+		// Mount options that are applicable to a remount operation
+		static MountFlags const RemountMask;
 
 		// Slave (static)
 		//
@@ -291,7 +304,7 @@ public:
 	// MountFunction
 	//
 	// Function signature for a file system's Mount() implementation, which must be a public static method
-	using MountFunction = std::function<struct FileSystem*(const char_t* source, uint32_t flags, const void* data, size_t datalength)>;
+	using MountFunction = std::function<std::unique_ptr<FileSystem>(const char_t* source, uint32_t flags, const void* data, size_t datalength)>;
 
 	// NodeType
 	//
@@ -381,29 +394,89 @@ public:
 	// FileSystem
 	//
 	// Interface that must be implemented by a file system
-	struct __declspec(novtable) FileSystem
+	struct FileSystem
 	{
+		// Destructor
+		//
+		virtual ~FileSystem()=default;
 	};
 
 	// Mount
 	//
 	// Interface that must be implemented by a file system mount
-	struct __declspec(novtable) Mount
+	struct Mount
 	{
+		// Destructor
+		//
+		virtual ~Mount()=default;
 	};
 
 	// Handle
 	//
 	// Interface that must be implemented by a file system handle
-	struct __declspec(novtable) Handle
+	struct Handle
 	{
+		// Destructor
+		//
+		virtual ~Handle()=default;
 	};
 
 	// Node
 	//
 	// Interface that must be implemented by a file system node
-	struct __declspec(novtable) Node
+	struct Node
 	{
+		// Destructor
+		//
+		virtual ~Node()=default;
+
+		// OwnerGroupId
+		//
+		// Gets the node owner group identifier
+		__declspec(property(get=getOwnerGroupId)) uapi_gid_t OwnerGroupId;
+		virtual uapi_gid_t getOwnerGroupId(void) const = 0;
+
+		// OwnerUserId
+		//
+		// Gets the node owner user identifier 
+		__declspec(property(get=getOwnerUserId)) uapi_uid_t OwnerUserId;
+		virtual uapi_uid_t getOwnerUserId(void) const = 0;
+
+		// Permissions
+		//
+		// Gets the node permissions mask
+		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
+		virtual uapi_mode_t getPermissions(void) const = 0;
+	};
+
+	// Directory
+	//
+	// Interface that must be implemented by a directory object
+	struct Directory : public Node
+	{
+		// Destructor
+		//
+		virtual ~Directory()=default;
+	};
+
+	// File
+	//
+	// Interface that must be implemented by a file object
+	struct File : public Node
+	{
+		// Destructor
+		//
+		virtual ~File()=default;
+	};
+
+	// SymbolicLink
+	//
+	// Interface that must be implemented by a symbolic link object
+	struct SymbolicLink : public Node
+	{
+		// Destructor
+		//
+		virtual ~SymbolicLink()=default;
 	};
 
 	//-------------------------------------------------------------------------

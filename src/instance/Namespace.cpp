@@ -82,5 +82,20 @@ Namespace::Namespace(Namespace const* rhs, VirtualMachine::CloneFlags flags)
 }
 
 //---------------------------------------------------------------------------
+// Namespace::AddMount
+//
+// Adds a mount for a file system to this namespace
+//
+// Arguments:
+//
+//	fs		- VirtualMachine::FileSystem instance to add as a mount
+
+void Namespace::AddMount(VirtualMachine::FileSystem const* fs)
+{
+	UNREFERENCED_PARAMETER(fs);
+}
+
+
+//---------------------------------------------------------------------------
 
 #pragma warning(pop)

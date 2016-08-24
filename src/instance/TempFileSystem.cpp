@@ -26,9 +26,9 @@
 #pragma warning(push, 4)
 
 //---------------------------------------------------------------------------
-// TempFileSystem::Mount (static)
+// MountTempFileSystem
 //
-// Creates an instance of the file system
+// Creates an instance of the TempFileSystem file system
 //
 // Arguments:
 //
@@ -37,14 +37,14 @@
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-TempFileSystem* TempFileSystem::Mount(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+std::unique_ptr<VirtualMachine::FileSystem> MountTempFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
 {
 	UNREFERENCED_PARAMETER(source);
 	UNREFERENCED_PARAMETER(flags);
 	UNREFERENCED_PARAMETER(data);
 	UNREFERENCED_PARAMETER(datalength);
 
-	return nullptr;
+	return std::make_unique<TempFileSystem>();
 }
 
 //---------------------------------------------------------------------------

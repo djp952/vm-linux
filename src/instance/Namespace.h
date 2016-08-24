@@ -63,6 +63,11 @@ public:
 	//-------------------------------------------------------------------------
 	// Member Functions
 
+	// AddMount
+	//
+	// Adds a mount for a file system to this namespace
+	void AddMount(/*mountpoint,*/ VirtualMachine::FileSystem const* fs);
+
 	//-------------------------------------------------------------------------
 	// Properties
 

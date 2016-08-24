@@ -133,7 +133,7 @@ private:
 	// MountProcFileSystem (static)
 	//
 	// Creates an instance of the procfs file system for this instance
-	static ProcFileSystem* MountProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+	static std::unique_ptr<VirtualMachine::FileSystem> MountProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 	// OnStart (Service)
 	//

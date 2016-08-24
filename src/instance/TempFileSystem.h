@@ -24,9 +24,17 @@
 #define __TEMPFILESYSTEM_H_
 #pragma once
 
+#include <memory>
+#include <text.h>
+
 #include "VirtualMachine.h"
 
 #pragma warning(push, 4)
+
+// MountTempFileSystem
+//
+// VirtualMachine::MountFunction for TempFileSystem
+std::unique_ptr<VirtualMachine::FileSystem> MountTempFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 //-----------------------------------------------------------------------------
 // Class TempFileSystem

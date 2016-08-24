@@ -24,14 +24,47 @@
 #define __ROOTFILESYSTEM_H_
 #pragma once
 
+#include <atomic>
+#include <memory>
+#include <text.h>
+
 #include "VirtualMachine.h"
 
 #pragma warning(push, 4)
 
+// FORWARD DECLARATIONS
+//
+class MountOptions;
+
+// MountRootFileSystem
+//
+// VirtualMachine::MountFunction for RootFileSystem
+std::unique_ptr<VirtualMachine::FileSystem> MountRootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+
 //-----------------------------------------------------------------------------
 // Class RootFileSystem
 //
-// TODO - IN PROGRESS
+// RootFileSystem implements a virtual single directory node file system in which
+// no child nodes can be created
+//
+// Supported mount options:
+//
+//	MS_KERNMOUNT
+//	MS_NOATIME
+//	MS_NODIRATIME
+//	MS_RDONLY
+//	MS_RELATIME
+//	MS_STRICTATIME
+//
+//	mode=nnn	- Sets the permissions of the directory node
+//	uid=nnn		- Sets the owner user id of the directory node
+//	gid=nnn		- Sets the owner group id of the directory node
+//	
+//	(MS_NODEV, MS_NOEXEC and MS_NOSUID are always set)
+//
+// Supported remount options:
+//
+//	MS_RDONLY
 
 class RootFileSystem : public VirtualMachine::FileSystem
 {
@@ -39,24 +72,70 @@ public:
 
 	// Instance Constructor
 	//
-	RootFileSystem()=default;
+	RootFileSystem(MountOptions const& options);
 
 	// Destructor
 	//
-	~RootFileSystem()=default;
+	virtual ~RootFileSystem()=default;
 
 	//-----------------------------------------------------------------------------
 	// Member Functions
-
-	// Mount (static)
-	//
-	// Creates an instance of the file system
-	static RootFileSystem* Mount(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 private:
 
 	RootFileSystem(RootFileSystem const&)=delete;
 	RootFileSystem& operator=(RootFileSystem const&)=delete;
+
+	// DirectoryNode
+	//
+	// Implements a directory node for this file system
+	class DirectoryNode : public VirtualMachine::Directory
+	{
+	public:
+
+		// Instance Constructor
+		//
+		DirectoryNode(uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid);
+
+		// Destructor
+		//
+		virtual ~DirectoryNode()=default;
+
+		// OwnerGroupId (VirtualMachine::Node)
+		//
+		// Gets the node owner group identifier
+		__declspec(property(get=getOwnerGroupId)) uapi_gid_t OwnerGroupId;
+		virtual uapi_gid_t getOwnerGroupId(void) const override;
+
+		// OwnerUserId (VirtualMachine::Node)
+		//
+		// Gets the node owner user identifier 
+		__declspec(property(get=getOwnerUserId)) uapi_uid_t OwnerUserId;
+		virtual uapi_uid_t getOwnerUserId(void) const override;
+
+		// Permissions (VirtualMachine::Node)
+		//
+		// Gets the node permissions mask
+		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
+		virtual uapi_mode_t getPermissions(void) const override;
+
+	private:
+
+		DirectoryNode(DirectoryNode const&)=delete;
+		DirectoryNode& operator=(DirectoryNode const&)=delete;
+
+		//---------------------------------------------------------------------
+		// Member Variables
+
+		std::atomic<uapi_mode_t>		m_mode;		// Permission mask
+		std::atomic<uapi_uid_t>			m_uid;		// Owner id
+		std::atomic<uapi_gid_t>			m_gid;		// Owner group id
+	};
+
+	//-------------------------------------------------------------------------
+	// Member Variables
+
+	std::unique_ptr<DirectoryNode>		m_node;		// The root directory node
 };
 
 //-----------------------------------------------------------------------------

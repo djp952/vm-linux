@@ -24,10 +24,17 @@
 #define __HOSTFILESYSTEM_H_
 #pragma once
 
+#include <memory>
 #include <text.h>
+
 #include "VirtualMachine.h"
 
 #pragma warning(push, 4)
+
+// MountHostFileSystem
+//
+// VirtualMachine::MountFunction for HostFileSystem
+std::unique_ptr<VirtualMachine::FileSystem> MountHostFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 //-----------------------------------------------------------------------------
 // Class HostFileSystem
@@ -48,11 +55,6 @@ public:
 
 	//-----------------------------------------------------------------------------
 	// Member Functions
-
-	// Mount (static)
-	//
-	// Creates an instance of the file system
-	static HostFileSystem* Mount(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 private:
 

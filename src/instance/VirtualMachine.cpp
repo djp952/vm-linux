@@ -173,6 +173,14 @@ VirtualMachine::MountFlags const VirtualMachine::MountFlags::StrictAccessTimeSta
 //
 VirtualMachine::MountFlags const VirtualMachine::MountFlags::LazyTimeStamps { UAPI_MS_LAZYTIME };
 
+// VirtualMachine::MountFlags::RemountMask (static)
+//
+VirtualMachine::MountFlags const VirtualMachine::MountFlags::RemountMask { UAPI_MS_RMT_MASK };
+
+// VirtualMachine::MountFlags::PerMountMask (static)
+//
+VirtualMachine::MountFlags const VirtualMachine::MountFlags::PerMountMask { UAPI_MS_NODEV | UAPI_MS_NOEXEC | UAPI_MS_NOSUID | UAPI_MS_NOATIME | UAPI_MS_NODIRATIME | UAPI_MS_RELATIME };
+
 //
 // VIRTUALMACHINE::PROTECTIONFLAGS
 //
