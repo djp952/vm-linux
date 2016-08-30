@@ -144,6 +144,11 @@ public:
 		static CloneFlags const NewUtsNamespace;
 	};
 
+	// CreateFileSystem
+	//
+	// Function signature for a file system's Create() implementation
+	using CreateFileSystem = std::function<std::unique_ptr<FileSystem>(const char_t* source, uint32_t flags, const void* data, size_t datalength)>;
+
 	// LogLevel
 	//
 	// Strongly typed enumeration defining the level of a log entry
@@ -300,11 +305,6 @@ public:
 		// Make this mount unbindable
 		static MountFlags const Unbindable;
 	};
-
-	// MountFunction
-	//
-	// Function signature for a file system's Mount() implementation, which must be a public static method
-	using MountFunction = std::function<std::unique_ptr<FileSystem>(const char_t* source, uint32_t flags, const void* data, size_t datalength)>;
 
 	// NodeType
 	//

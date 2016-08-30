@@ -27,19 +27,43 @@
 #include <memory>
 #include <text.h>
 
+#include "IndexPool.h"
 #include "VirtualMachine.h"
 
 #pragma warning(push, 4)
 
-// MountTempFileSystem
+// FORWARD DECLARATIONS
 //
-// VirtualMachine::MountFunction for TempFileSystem
-std::unique_ptr<VirtualMachine::FileSystem> MountTempFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+class MountOptions;
+
+// CreateTempFileSystem
+//
+// VirtualMachine::CreateFileSystem function for TempFileSystem
+std::unique_ptr<VirtualMachine::FileSystem> CreateTempFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 //-----------------------------------------------------------------------------
 // Class TempFileSystem
 //
-// TODO - IN PROGRESS
+// TempFileSystem implements an in-memory file system.  Rather than using a virtual 
+// block device constructed on raw virtual memory, this uses a private Windows heap 
+// to store the file system data.  There are a number of challenges with the virtual 
+// block device method that can be easily overcome by doing it this way; let the 
+// operating system do the heavy lifting
+//
+// Supported mount options:
+//
+//	TODO
+//
+//	size=nnn[K|k|M|m|G|g|%]			- Defines the maximum file system size
+//	nr_blocks=nnn[K|k|M|m|G|g|%]	- Defines the maximum number of blocks
+//	nr_inodes=nnn[K|k|M|m|G|g|%]	- Defines the maximum number of inodes
+//	mode=nnn						- Defines the permissions of the root directory
+//	uid=nnn							- Defines the owner user id of the root directory
+//	gid=nnn							- Defines the owner group id of the root directory
+//	
+// Supported remount options:
+//
+//	TODO
 
 class TempFileSystem : public VirtualMachine::FileSystem
 {
@@ -47,24 +71,39 @@ public:
 
 	// Instance Constructor
 	//
-	TempFileSystem()=default;
+	TempFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 	// Destructor
 	//
-	~TempFileSystem()=default;
+	~TempFileSystem();
 
 	//-----------------------------------------------------------------------------
 	// Member Functions
-
-	// Mount (static)
-	//
-	// Creates an instance of the file system
-	static TempFileSystem* Mount(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 private:
 
 	TempFileSystem(TempFileSystem const&)=delete;
 	TempFileSystem& operator=(TempFileSystem const&)=delete;
+
+	//-------------------------------------------------------------------------
+	// Private Member Functions
+
+	// ParseScaledInteger (static)
+	//
+	// Parses a scaled integer value (K/M/G)
+	static size_t ParseScaledInteger(std::string const& str);
+
+	//-------------------------------------------------------------------------
+	// Member Variables
+
+	HANDLE						m_heap;				// Private heap handle
+	size_t						m_size;				// Current file system size
+	size_t						m_maxsize;			// Maximum file system size
+	size_t						m_nodes;			// Current number of nodes
+	size_t						m_maxnodes;			// Maximum number of nodes
+	IndexPool<intptr_t>			m_indexpool;		// Pool of node index numbers
+
+	static size_t				s_maxmemory;		// Maximum available memory
 };
 
 //-----------------------------------------------------------------------------

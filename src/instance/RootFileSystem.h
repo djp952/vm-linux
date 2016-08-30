@@ -36,10 +36,10 @@
 //
 class MountOptions;
 
-// MountRootFileSystem
+// CreateRootFileSystem
 //
-// VirtualMachine::MountFunction for RootFileSystem
-std::unique_ptr<VirtualMachine::FileSystem> MountRootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+// VirtualMachine::CreateFileSystem function for RootFileSystem
+std::unique_ptr<VirtualMachine::FileSystem> CreateRootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 //-----------------------------------------------------------------------------
 // Class RootFileSystem
@@ -72,7 +72,7 @@ public:
 
 	// Instance Constructor
 	//
-	RootFileSystem(MountOptions const& options);
+	RootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 	// Destructor
 	//

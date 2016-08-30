@@ -201,6 +201,7 @@
     <ClInclude Include="Executable.h" />
     <ClInclude Include="ExecutableFormat.h" />
     <ClInclude Include="HostFileSystem.h" />
+    <ClInclude Include="IndexPool.h" />
     <ClInclude Include="MountOptions.h" />
     <ClInclude Include="Namespace.h" />
     <ClInclude Include="NativeProcess.h" />

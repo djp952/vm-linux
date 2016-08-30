@@ -31,6 +31,7 @@
 #include <linux/elf.h>
 #include <linux/elf-em.h>
 #include <linux/fs.h>
+#include <linux/magic.h>
 #include <linux/sched.h>
 #include <linux/stat.h>
 

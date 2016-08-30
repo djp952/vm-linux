@@ -29,7 +29,7 @@
 #pragma warning(push, 4)
 
 //---------------------------------------------------------------------------
-// MountRootFileSystem
+// CreateRootFileSystem
 //
 // Creates an instance of the RootFileSystem file system
 //
@@ -40,13 +40,9 @@
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-std::unique_ptr<VirtualMachine::FileSystem> MountRootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+std::unique_ptr<VirtualMachine::FileSystem> CreateRootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
 {
-	// Source is ignored, but has to be specified by contract
-	if(source == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Parse the provided mounting options and construct the file system
-	return std::make_unique<RootFileSystem>(MountOptions(flags, data, datalength));
+	return std::make_unique<RootFileSystem>(source, flags, data, datalength);
 }
 
 //---------------------------------------------------------------------------
@@ -54,20 +50,23 @@ std::unique_ptr<VirtualMachine::FileSystem> MountRootFileSystem(char_t const* so
 //
 // Arguments:
 //
-//	options		- Mounting options
+//	source		- Source device string
+//	flags		- Standard mounting option flags
+//	data		- Extended/custom mounting options
+//	datalength	- Length of the extended mounting options data
 
-RootFileSystem::RootFileSystem(MountOptions const& options)
+RootFileSystem::RootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
 {
-	using MountFlags = VirtualMachine::MountFlags;
+	// Source is ignored but must be specified by contract
+	if(source == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Convert the arguments into MountOptions, stripping out unsupported flags
+	MountOptions options(flags & (VirtualMachine::MountFlags(UAPI_MS_RDONLY | UAPI_MS_KERNMOUNT | UAPI_MS_STRICTATIME)), data, datalength);
 
 	// Default mode, uid and gid for the root directory node
 	uapi_mode_t mode = UAPI_S_IRWXU | UAPI_S_IRWXG | UAPI_S_IROTH | UAPI_S_IXOTH;	// 0775
 	uapi_uid_t uid = 0;
 	uapi_gid_t gid = 0;
-
-	// Break up the standard mounting options bitmask into file system and mount specific masks
-	auto fsflags = options.Flags & (MountFlags(UAPI_MS_RDONLY | UAPI_MS_KERNMOUNT | UAPI_MS_STRICTATIME));
-	auto mountflags = (options.Flags & MountFlags::PerMountMask) | MountFlags(UAPI_MS_NOEXEC | UAPI_MS_NODEV | UAPI_MS_NOSUID);
 
 	try {
 

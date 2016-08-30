@@ -31,10 +31,10 @@
 
 #pragma warning(push, 4)
 
-// MountHostFileSystem
+// CreateHostFileSystem
 //
-// VirtualMachine::MountFunction for HostFileSystem
-std::unique_ptr<VirtualMachine::FileSystem> MountHostFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+// VirtualMachine::CreateFileSystem function for HostFileSystem
+std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 //-----------------------------------------------------------------------------
 // Class HostFileSystem

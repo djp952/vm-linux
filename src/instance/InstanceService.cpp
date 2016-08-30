@@ -51,7 +51,7 @@ InstanceService::InstanceService()
 }
 
 //---------------------------------------------------------------------------
-// InstanceService::MountProcFileSystem (static)
+// InstanceService::CreateProcFileSystem (static)
 //
 // Creates an instance of the ProcFileSystem file system
 //
@@ -62,7 +62,7 @@ InstanceService::InstanceService()
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-std::unique_ptr<VirtualMachine::FileSystem> InstanceService::MountProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+std::unique_ptr<VirtualMachine::FileSystem> InstanceService::CreateProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
 {
 	UNREFERENCED_PARAMETER(source);
 	UNREFERENCED_PARAMETER(flags);
@@ -168,10 +168,10 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// INITIALIZE FILE SYSTEMS
 		//
 
-		m_filesystems.emplace(TEXT("hostfs"), MountHostFileSystem);
-		m_filesystems.emplace(TEXT("procfs"), MountProcFileSystem);
-		m_filesystems.emplace(TEXT("rootfs"), MountRootFileSystem);
-		m_filesystems.emplace(TEXT("tempfs"), MountTempFileSystem);
+		m_filesystems.emplace(TEXT("hostfs"), CreateHostFileSystem);
+		m_filesystems.emplace(TEXT("procfs"), CreateProcFileSystem);
+		m_filesystems.emplace(TEXT("rootfs"), CreateRootFileSystem);
+		m_filesystems.emplace(TEXT("tempfs"), CreateTempFileSystem);
 
 		//
 		// REGISTER SYSTEM CALL INTERFACES

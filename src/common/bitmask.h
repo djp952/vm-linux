@@ -114,18 +114,24 @@ public:
 		return m_value != rhs.m_value;
 	}
 
+	// bitwise or-equals operator
+	//
 	bitmask& operator|=(_derived const& rhs)
 	{
 		m_value |= rhs.m_value;
 		return *this;
 	}
 
+	// bitwise and-equals operator
+	//
 	bitmask& operator&=(_derived const& rhs)
 	{
 		m_value &= rhs.m_value;
 		return *this;
 	}
 
+	// bitwise xor-equals operator
+	//
 	bitmask& operator^=(_derived const& rhs)
 	{
 		m_value ^= rhs.m_value;
@@ -139,10 +145,23 @@ public:
 		return m_value != 0;
 	}
 
-private:
+	// assignment operator
+	//
+	bitmask& operator=(bitmask const& rhs)
+	{
+		m_value = (rhs.m_value & _allowed);
+		return *this;
+	}
 
-	bitmask& operator=(bitmask const&)=delete;
-	_derived& operator=(_derived const&)=delete;
+	// assignment operator
+	//
+	_derived& operator=(_derived const& rhs)
+	{
+		m_value = (rhs.m_value & _allowed);
+		return *this;
+	}
+
+private:
 
 	_basetype			m_value;			// Contained value
 };

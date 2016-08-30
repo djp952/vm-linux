@@ -104,7 +104,7 @@ private:
 	// filesystem_map_t
 	//
 	// Collection of available file systems (name, mount function)
-	using filesystem_map_t = std::unordered_map<std::tstring, VirtualMachine::MountFunction>;
+	using filesystem_map_t = std::unordered_map<std::tstring, VirtualMachine::CreateFileSystem>;
 
 	// ProcFileSystem
 	//
@@ -130,10 +130,10 @@ private:
 	//-------------------------------------------------------------------------
 	// Private Member Functions
 
-	// MountProcFileSystem (static)
+	// CreateProcFileSystem (static)
 	//
 	// Creates an instance of the procfs file system for this instance
-	static std::unique_ptr<VirtualMachine::FileSystem> MountProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+	static std::unique_ptr<VirtualMachine::FileSystem> CreateProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
 
 	// OnStart (Service)
 	//
