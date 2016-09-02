@@ -54,31 +54,18 @@ Namespace::Namespace()
 //	rhs			- Source namespace from which to clone internals
 //	flags		- Flags defining which internals to clone
 
-Namespace::Namespace(Namespace const* rhs, VirtualMachine::CloneFlags flags)
+Namespace::Namespace(Namespace const* rhs, uint32_t flags)
 {
 	// Cloned namespace instances can either get a shared reference to the source
 	// namespace isolation points or get new ones, depending on the clone flags
-
-	m_cgroupns = ((flags & VirtualMachine::CloneFlags::NewControlGroupNamespace) == VirtualMachine::CloneFlags::NewControlGroupNamespace) ?
-		std::make_shared<ControlGroupNamespace>() : rhs->m_cgroupns;
-
-	m_ipcns = ((flags & VirtualMachine::CloneFlags::NewIpcNamespace) == VirtualMachine::CloneFlags::NewIpcNamespace) ?
-		std::make_shared<IpcNamespace>() : rhs->m_ipcns;
-
-	m_mountns = ((flags & VirtualMachine::CloneFlags::NewMountNamespace) == VirtualMachine::CloneFlags::NewMountNamespace) ?
-		std::make_shared<MountNamespace>() : rhs->m_mountns;
-
-	m_netns = ((flags & VirtualMachine::CloneFlags::NewNetworkNamespace) == VirtualMachine::CloneFlags::NewNetworkNamespace) ?
-		std::make_shared<NetworkNamespace>() : rhs->m_netns;
-
-	m_pidns = ((flags & VirtualMachine::CloneFlags::NewPidNamespace) == VirtualMachine::CloneFlags::NewPidNamespace) ?
-		std::make_shared<PidNamespace>() : rhs->m_pidns;
-
-	m_userns = ((flags & VirtualMachine::CloneFlags::NewUserNamespace) == VirtualMachine::CloneFlags::NewUserNamespace) ?
-		std::make_shared<UserNamespace>() : rhs->m_userns;
-
-	m_utsns = ((flags & VirtualMachine::CloneFlags::NewUtsNamespace) == VirtualMachine::CloneFlags::NewUtsNamespace) ?
-		std::make_shared<UtsNamespace>() : rhs->m_utsns;
+	//
+	m_cgroupns = ((flags & UAPI_CLONE_NEWCGROUP) == UAPI_CLONE_NEWCGROUP) ? std::make_shared<ControlGroupNamespace>() : rhs->m_cgroupns;
+	m_ipcns = ((flags & UAPI_CLONE_NEWIPC) == UAPI_CLONE_NEWIPC) ? std::make_shared<IpcNamespace>() : rhs->m_ipcns;
+	m_mountns = ((flags & UAPI_CLONE_NEWNS) == UAPI_CLONE_NEWNS) ? std::make_shared<MountNamespace>() : rhs->m_mountns;
+	m_netns = ((flags & UAPI_CLONE_NEWNET) == UAPI_CLONE_NEWNET) ? std::make_shared<NetworkNamespace>() : rhs->m_netns;
+	m_pidns = ((flags & UAPI_CLONE_NEWPID) == UAPI_CLONE_NEWPID) ? std::make_shared<PidNamespace>() : rhs->m_pidns;
+	m_userns = ((flags & UAPI_CLONE_NEWUSER) == UAPI_CLONE_NEWUSER) ? std::make_shared<UserNamespace>() : rhs->m_userns;
+	m_utsns = ((flags & UAPI_CLONE_NEWUTS) == UAPI_CLONE_NEWUTS) ? std::make_shared<UtsNamespace>() : rhs->m_utsns;
 }
 
 //---------------------------------------------------------------------------

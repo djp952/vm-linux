@@ -38,42 +38,6 @@ VirtualMachine::AllocationFlags const VirtualMachine::AllocationFlags::None { 0x
 VirtualMachine::AllocationFlags const VirtualMachine::AllocationFlags::TopDown { 0x01 };
 
 //
-// VIRTUALMACHINE::CLONEFLAGS
-//
-
-// VirtualMachine::ProtectionFlags::None (static)
-//
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::None { 0x00 };
-
-// VirtualMachine::CloneFlags::NewMountNamespace (static)
-//
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewMountNamespace { UAPI_CLONE_NEWNS };
-
-// VirtualMachine::CloneFlags::NewControlGroupNamespace (static)
-//
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewControlGroupNamespace { UAPI_CLONE_NEWCGROUP };
-
-// VirtualMachine::CloneFlags::NewUtsNamespace (static)
-//
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewUtsNamespace { UAPI_CLONE_NEWUTS };
-
-// VirtualMachine::CloneFlags::NewIpcNamespace (static)
-//
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewIpcNamespace { UAPI_CLONE_NEWIPC };	
-
-// VirtualMachine::CloneFlags::NewUserNamespace (static)
-//
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewUserNamespace { UAPI_CLONE_NEWUSER };
-
-// VirtualMachine::CloneFlags::NewPidNamespace (static)
-//
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewPidNamespace { UAPI_CLONE_NEWPID };	
-
-// VirtualMachine::CloneFlags::NewNetworkNamespace (static)
-//
-VirtualMachine::CloneFlags const VirtualMachine::CloneFlags::NewNetworkNamespace { UAPI_CLONE_NEWNET };
-
-//
 // VIRTUALMACHINE::PROTECTIONFLAGS
 //
 

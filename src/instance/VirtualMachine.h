@@ -91,59 +91,6 @@ public:
 		static AllocationFlags const TopDown;
 	};
 
-	// CloneFlags (bitmask)
-	//
-	// Clone operation flags 
-	class CloneFlags final : public bitmask<CloneFlags, uint32_t>
-	{
-	public:
-
-		using bitmask::bitmask;
-
-		//-------------------------------------------------------------------------
-		// Fields
-
-		// None (static)
-		//
-		// Indicates no special clone flags
-		static CloneFlags const None;
-
-		// NewControlGroupNamespace (static)
-		//
-		// Creates a new control group namespace during clone operation
-		static CloneFlags const NewControlGroupNamespace;
-
-		// NewIpcNamespace (static)
-		//
-		// Creates a new IPC namespace during clone operation
-		static CloneFlags const NewIpcNamespace;
-
-		// NewMountNamespace (static)
-		//
-		// Creates a new mount namespace during clone operation
-		static CloneFlags const NewMountNamespace;
-
-		// NewNetworkNamespace (static)
-		//
-		// Creates a new network namespace during clone operation
-		static CloneFlags const NewNetworkNamespace;
-
-		// NewPidNamespace (static)
-		//
-		// Creates a new PID namespace during clone operation
-		static CloneFlags const NewPidNamespace;
-
-		// NewUserNamespace (static)
-		//
-		// Creates a new user namespace during clone operation
-		static CloneFlags const NewUserNamespace;
-
-		// NewUtsNamespace (static)
-		//
-		// Creates a new UTS namespace during clone operation
-		static CloneFlags const NewUtsNamespace;
-	};
-
 	// CreateFileSystem
 	//
 	// Function signature for a file system's Create() implementation

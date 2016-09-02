@@ -54,7 +54,7 @@ public:
 	// Instance Constructors
 	//
 	Namespace();
-	Namespace(Namespace const* rhs, VirtualMachine::CloneFlags flags);
+	Namespace(Namespace const* rhs, uint32_t flags);
 
 	// Destructor
 	//
