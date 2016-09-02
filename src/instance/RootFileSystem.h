@@ -39,7 +39,7 @@ class MountOptions;
 // CreateRootFileSystem
 //
 // VirtualMachine::CreateFileSystem function for RootFileSystem
-std::unique_ptr<VirtualMachine::FileSystem> CreateRootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+std::unique_ptr<VirtualMachine::FileSystem> CreateRootFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
 
 //-----------------------------------------------------------------------------
 // Class RootFileSystem
@@ -68,11 +68,21 @@ std::unique_ptr<VirtualMachine::FileSystem> CreateRootFileSystem(char_t const* s
 
 class RootFileSystem : public VirtualMachine::FileSystem
 {
+	// MOUNT_FLAGS
+	//
+	// Supported creation/mount operation flags
+	static const uint32_t MOUNT_FLAGS = UAPI_MS_KERNMOUNT | UAPI_MS_NOATIME | UAPI_MS_NODIRATIME | UAPI_MS_RDONLY | UAPI_MS_RELATIME | UAPI_MS_STRICTATIME;
+	
+	// REMOUNT_FLAGS
+	//
+	// Supported remount operation flags
+	static const uint32_t REMOUNT_FLAGS = UAPI_MS_RDONLY;
+
 public:
 
 	// Instance Constructor
 	//
-	RootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+	RootFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
 
 	// Destructor
 	//
@@ -81,25 +91,46 @@ public:
 	//-----------------------------------------------------------------------------
 	// Member Functions
 
+	// Mount (FileSystem)
+	//
+	// Mounts the file system
+	virtual std::unique_ptr<VirtualMachine::Mount> Mount(uint32_t flags, void const* data, size_t datalength);
+
 private:
 
 	RootFileSystem(RootFileSystem const&)=delete;
 	RootFileSystem& operator=(RootFileSystem const&)=delete;
 
-	// DirectoryNode
+	// rootfs_t
+	//
+	// Internal shared file system state
+	struct rootfs_t
+	{
+		// flags
+		//
+		// Filesystem-level flags
+		std::atomic<uint32_t> flags;
+
+		// rootnode
+		//
+		// Root node instance of the file system
+		std::unique_ptr<VirtualMachine::Node> rootnode;
+	};
+
+	// Directory
 	//
 	// Implements a directory node for this file system
-	class DirectoryNode : public VirtualMachine::Directory
+	class Directory : public VirtualMachine::Directory
 	{
 	public:
 
 		// Instance Constructor
 		//
-		DirectoryNode(uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid);
+		Directory(std::shared_ptr<rootfs_t> const& fs, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid);
 
 		// Destructor
 		//
-		virtual ~DirectoryNode()=default;
+		virtual ~Directory()=default;
 
 		// OwnerGroupId (VirtualMachine::Node)
 		//
@@ -121,21 +152,43 @@ private:
 
 	private:
 
-		DirectoryNode(DirectoryNode const&)=delete;
-		DirectoryNode& operator=(DirectoryNode const&)=delete;
+		Directory(Directory const&)=delete;
+		Directory& operator=(Directory const&)=delete;
 
 		//---------------------------------------------------------------------
 		// Member Variables
 
+		std::shared_ptr<rootfs_t>		m_fs;		// Shared file system state
 		std::atomic<uapi_mode_t>		m_mode;		// Permission mask
 		std::atomic<uapi_uid_t>			m_uid;		// Owner id
 		std::atomic<uapi_gid_t>			m_gid;		// Owner group id
 	};
 
+	// Mount
+	//
+	// Implements VirtualMachine::Mount
+	class Mount : public VirtualMachine::Mount
+	{
+	public:
+
+		// Instance Constructor
+		//
+		Mount(std::shared_ptr<rootfs_t> const& fs, uint32_t flags);
+
+		// Destructor
+		//
+		~Mount()=default;
+
+	private:
+
+		std::shared_ptr<rootfs_t>		m_fs;		// Shared file system state
+		uint32_t						m_flags;	// Mount-level flags
+	};
+
 	//-------------------------------------------------------------------------
 	// Member Variables
 
-	std::unique_ptr<DirectoryNode>		m_node;		// The root directory node
+	std::shared_ptr<rootfs_t>			m_fs;		// Shared file system state
 };
 
 //-----------------------------------------------------------------------------

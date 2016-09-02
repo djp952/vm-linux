@@ -52,7 +52,7 @@ size_t TempFileSystem::s_maxmemory = []() -> size_t {
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-std::unique_ptr<VirtualMachine::FileSystem> CreateTempFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+std::unique_ptr<VirtualMachine::FileSystem> CreateTempFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
 	return std::make_unique<TempFileSystem>(source, flags, data, datalength);
 }
@@ -67,8 +67,7 @@ std::unique_ptr<VirtualMachine::FileSystem> CreateTempFileSystem(char_t const* s
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-TempFileSystem::TempFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength) :
-	m_heap(nullptr), m_size(0), m_maxsize(0), m_nodes(0), m_maxnodes(0)
+TempFileSystem::TempFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
 	size_t				maxsize = 0;			// Maximum file system size in bytes
 	size_t				maxnodes = 0;			// Maximum number of file system nodes
@@ -83,11 +82,6 @@ TempFileSystem::TempFileSystem(char_t const* source, VirtualMachine::MountFlags 
 	uapi_mode_t mode = UAPI_S_IRWXU | UAPI_S_IRWXG | UAPI_S_IROTH | UAPI_S_IXOTH;	// 0775
 	uapi_uid_t uid = 0;
 	uapi_gid_t gid = 0;
-
-	// Create a private heap to contain the file system data.  Do not specify a maximum
-	// size here, it limits what can be allocated and cannot be changed after the fact
-	m_heap = HeapCreate(0, 0, 0);
-	if(m_heap == nullptr) throw LinuxException(UAPI_ENOMEM, Win32Exception());
 
 	try {
 
@@ -138,25 +132,35 @@ TempFileSystem::TempFileSystem(char_t const* source, VirtualMachine::MountFlags 
 		if(options.Arguments.Contains("gid")) gid = static_cast<uapi_gid_t>(std::stoul(options.Arguments["gid"], 0, 0));
 	}
 
-	catch(...) { 
-	
-		HeapDestroy(m_heap);
-		throw LinuxException(UAPI_EINVAL); 
-	}
+	catch(...) { throw LinuxException(UAPI_EINVAL); }
 
 	// If no specific maximum size was specified, default to 50% of the available system memory
-	m_maxsize = (maxsize == 0) ? s_maxmemory >> 1 : maxsize;
+	if(maxsize == 0) maxsize = s_maxmemory >> 1;
 
 	// If no specific maximum node count was specified, allow as many as possible
-	m_maxnodes = (maxnodes == 0) ? std::numeric_limits<size_t>::max() : maxnodes;
+	if(maxnodes == 0) maxnodes = std::numeric_limits<size_t>::max();
+
+	// Create the underlying shared file system instance
+	m_fs = std::make_shared<tempfs_t>(flags & UAPI_MS_PERMOUNT_MASK, maxsize, maxnodes, mode, uid, gid);
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem Destructor
+// TempFileSystem::Mount
+//
+// Mounts the file system
+//
+// Arguments:
+//
+//	flags		- Standard mounting option flags
+//	data		- Extended/custom mounting options
+//	datalength	- Length of the extended mounting options data
 
-TempFileSystem::~TempFileSystem()
+std::unique_ptr<VirtualMachine::Mount> TempFileSystem::Mount(uint32_t flags, void const* data, size_t datalength)
 {
-	if(m_heap) HeapDestroy(m_heap);
+	UNREFERENCED_PARAMETER(data);
+	UNREFERENCED_PARAMETER(datalength);
+
+	return std::make_unique<MountPoint>(m_fs, flags & UAPI_MS_PERMOUNT_MASK);
 }
 
 //---------------------------------------------------------------------------
@@ -200,6 +204,114 @@ size_t TempFileSystem::ParseScaledInteger(std::string const& str)
 	if((interim > std::numeric_limits<size_t>::max()) || (interim < std::numeric_limits<size_t>::min())) throw std::overflow_error(str);
 
 	return static_cast<size_t>(interim);
+}
+
+//
+// TEMPFILESYSTEM::TEMPFS_T IMPLEMENTATION
+//
+
+//-----------------------------------------------------------------------------
+// TempFileSystem::tempfs_t Constructor
+//
+// Arguments:
+//
+//	flags		- File system specific flags
+//	maxsize		- Maximum file system size in bytes
+//	maxnodes	- Maximum number of allowed node objects
+//	mode		- Initial permissions to assign to the root directory
+//	uid			- Initial owner to assign to the root directory
+//	gid			- Initial group to assign to the root directory
+
+TempFileSystem::tempfs_t::tempfs_t(uint32_t flags, size_t maxsize, size_t maxnodes, uapi_mode_t mode, uapi_uid_t uid, 
+	uapi_gid_t gid) : m_flags(flags), m_heap(nullptr), m_size(0), m_maxsize(maxsize), m_nodes(0), m_maxnodes(maxnodes)
+{
+	_ASSERTE(maxsize > 0);				// Maximum size must be non-zero
+	_ASSERTE(maxnodes > 0);				// Maximum node count must be non-zero
+
+	// The mount-specific flags should have been filtered out from the bitmask prior to creation
+	_ASSERTE((flags & UAPI_MS_PERMOUNT_MASK) == 0);
+	if((flags & UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
+
+	// Create a private heap to contain the file system data.  Do not specify a maximum
+	// size here, it limits what can be allocated and cannot be changed after the fact
+	m_heap = HeapCreate(0, 0, 0);
+	if(m_heap == nullptr) throw LinuxException(UAPI_ENOMEM, Win32Exception());
+}
+
+//-----------------------------------------------------------------------------
+// TempFileSystem::tempfs_t Destructor
+
+TempFileSystem::tempfs_t::~tempfs_t()
+{
+	if(m_heap) HeapDestroy(m_heap);
+}
+
+//
+// TEMPFILESYSTEM::DIRECTORYNODE IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// TempFileSystem::DirectoryNode Constructor
+//
+// Arguments:
+//
+//	mode		- Permission flags to assign to the directory node
+//	uid			- Owner UID of the directory node
+//	gid			- Owner GID of the directory node
+
+TempFileSystem::DirectoryNode::DirectoryNode(uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) : m_mode(mode), m_uid(uid), m_gid(gid)
+{
+}
+
+//-----------------------------------------------------------------------------
+// TempFileSystem::DirectoryNode::getOwnerGroupId
+//
+// Gets the currently set owner group identifier for the directory
+
+uapi_gid_t TempFileSystem::DirectoryNode::getOwnerGroupId(void) const
+{
+	return m_gid;
+}
+
+//-----------------------------------------------------------------------------
+// TempFileSystem::DirectoryNode::getOwnerUserId
+//
+// Gets the currently set owner user identifier for the directory
+
+uapi_uid_t TempFileSystem::DirectoryNode::getOwnerUserId(void) const
+{
+	return m_uid;
+}
+
+//-----------------------------------------------------------------------------
+// TempFileSystem::DirectoryNode::getPermissions
+//
+// Gets the currently set permissions mask for the directory
+
+uapi_mode_t TempFileSystem::DirectoryNode::getPermissions(void) const
+{
+	return m_mode;
+}
+
+//
+// TEMPFILESYSTEM::MOUNTPOINT IMPLEMENTATION
+//
+
+//-----------------------------------------------------------------------------
+// TempFileSystem::MountPoint Constructor
+//
+// Arguments:
+//
+//	fs		- Reference to the shared file system implementation
+//	flags	- Mount-specific flags to apply to this mount instance
+
+TempFileSystem::MountPoint::MountPoint(std::shared_ptr<tempfs_t> const& fs, uint32_t flags) : m_fs(fs), m_flags(flags)
+{
+	_ASSERTE(fs);							// Should never be NULL on entry
+
+	// The file system level flags should have been filtered out from the bitmask prior to creation
+	_ASSERTE((flags & ~UAPI_MS_PERMOUNT_MASK) == 0);
+	if((flags & ~UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
 }
 
 //---------------------------------------------------------------------------

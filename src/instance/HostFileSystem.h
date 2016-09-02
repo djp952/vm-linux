@@ -34,7 +34,7 @@
 // CreateHostFileSystem
 //
 // VirtualMachine::CreateFileSystem function for HostFileSystem
-std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
 
 //-----------------------------------------------------------------------------
 // Class HostFileSystem
@@ -55,6 +55,11 @@ public:
 
 	//-----------------------------------------------------------------------------
 	// Member Functions
+
+	// Mount (FileSystem)
+	//
+	// Mounts the file system
+	virtual std::unique_ptr<VirtualMachine::Mount> Mount(uint32_t flags, void const* data, size_t datalength);
 
 private:
 

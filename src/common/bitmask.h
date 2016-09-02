@@ -62,6 +62,10 @@ public:
 
 	// Instance Constructor
 	//
+	bitmask() : m_value(0) {}
+
+	// Instance Constructor
+	//
 	bitmask(_basetype value) : m_value(value & _allowed) {}
 
 	// Copy Constructor

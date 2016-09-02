@@ -40,7 +40,7 @@
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-std::unique_ptr<VirtualMachine::FileSystem> CreateRootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+std::unique_ptr<VirtualMachine::FileSystem> CreateRootFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
 	return std::make_unique<RootFileSystem>(source, flags, data, datalength);
 }
@@ -55,13 +55,16 @@ std::unique_ptr<VirtualMachine::FileSystem> CreateRootFileSystem(char_t const* s
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-RootFileSystem::RootFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+RootFileSystem::RootFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
 	// Source is ignored but must be specified by contract
 	if(source == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	// Convert the arguments into MountOptions, stripping out unsupported flags
-	MountOptions options(flags & (VirtualMachine::MountFlags(UAPI_MS_RDONLY | UAPI_MS_KERNMOUNT | UAPI_MS_STRICTATIME)), data, datalength);
+	// Verify that the specified flags are supported for a creation operation
+	if(flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
+
+	// Convert the specified options into MountOptions to process the custom parameters
+	MountOptions options(flags, data, datalength);
 
 	// Default mode, uid and gid for the root directory node
 	uapi_mode_t mode = UAPI_S_IRWXU | UAPI_S_IRWXG | UAPI_S_IROTH | UAPI_S_IXOTH;	// 0775
@@ -88,55 +91,112 @@ RootFileSystem::RootFileSystem(char_t const* source, VirtualMachine::MountFlags 
 
 	catch(...) { throw LinuxException(UAPI_EINVAL); }
 
-	// Construct the root directory node
-	m_node = std::make_unique<DirectoryNode>(mode, uid, gid);
+	// Create the shared file system state and assign the file system level flags
+	m_fs = std::make_shared<rootfs_t>();
+	m_fs->flags = flags & ~UAPI_MS_PERMOUNT_MASK;
+
+	// Construct the root directory node instance
+	m_fs->rootnode = std::make_unique<Directory>(m_fs, mode, uid, gid);
 }
 
-//
-// ROOTFILESYSTEM::DIRECTORYNODE
-//
-
 //---------------------------------------------------------------------------
-// RootFileSystem::DirectoryNode Constructor
+// RootFileSystem::Mount
+//
+// Mounts the file system
 //
 // Arguments:
 //
+//	flags		- Standard mounting option flags
+//	data		- Extended/custom mounting options
+//	datalength	- Length of the extended mounting options data
+
+std::unique_ptr<VirtualMachine::Mount> RootFileSystem::Mount(uint32_t flags, void const* data, size_t datalength)
+{
+	// This operation does not support any custom parameters, ignore them
+	UNREFERENCED_PARAMETER(data);
+	UNREFERENCED_PARAMETER(datalength);
+
+	// Verify that the specified flags are supported for a mount operation
+	if(flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
+
+	// Construct the mount instance, passing only the mount specific flags
+	std::unique_ptr<VirtualMachine::Mount> mount = std::make_unique<class Mount>(m_fs, flags & UAPI_MS_PERMOUNT_MASK);
+
+	// Reapply the file system level flags to the shared state instance after the mount operation
+	m_fs->flags = flags & ~UAPI_MS_PERMOUNT_MASK;
+
+	return mount;
+}
+
+//
+// ROOTFILESYSTEM::DIRECTORY IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory Constructor
+//
+// Arguments:
+//
+//	fs			- Shared file system state instance
 //	mode		- Permission flags to assign to the directory node
 //	uid			- Owner UID of the directory node
 //	gid			- Owner GID of the directory node
 
-RootFileSystem::DirectoryNode::DirectoryNode(uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) : m_mode(mode), m_uid(uid), m_gid(gid)
+RootFileSystem::Directory::Directory(std::shared_ptr<rootfs_t> const& fs, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) 
+	: m_fs(fs), m_mode(mode), m_uid(uid), m_gid(gid)
 {
+	_ASSERTE(fs);
 }
 
 //-----------------------------------------------------------------------------
-// RootFileSystem::DirectoryNode::getOwnerGroupId
+// RootFileSystem::Directory::getOwnerGroupId
 //
 // Gets the currently set owner group identifier for the directory
 
-uapi_gid_t RootFileSystem::DirectoryNode::getOwnerGroupId(void) const
+uapi_gid_t RootFileSystem::Directory::getOwnerGroupId(void) const
 {
 	return m_gid;
 }
 
 //-----------------------------------------------------------------------------
-// RootFileSystem::DirectoryNode::getOwnerUserId
+// RootFileSystem::Directory::getOwnerUserId
 //
 // Gets the currently set owner user identifier for the directory
 
-uapi_uid_t RootFileSystem::DirectoryNode::getOwnerUserId(void) const
+uapi_uid_t RootFileSystem::Directory::getOwnerUserId(void) const
 {
 	return m_uid;
 }
 
 //-----------------------------------------------------------------------------
-// RootFileSystem::DirectoryNode::getPermissions
+// RootFileSystem::Directory::getPermissions
 //
 // Gets the currently set permissions mask for the directory
 
-uapi_mode_t RootFileSystem::DirectoryNode::getPermissions(void) const
+uapi_mode_t RootFileSystem::Directory::getPermissions(void) const
 {
 	return m_mode;
+}
+
+//
+// ROOTFILESYSTEM::MOUNT IMPLEMENTATION
+//
+
+//-----------------------------------------------------------------------------
+// RootFileSystem::Mount Constructor
+//
+// Arguments:
+//
+//	fs			- Shared file system state instance
+//	flags		- Mount-specific flags
+
+RootFileSystem::Mount::Mount(std::shared_ptr<rootfs_t> const& fs, uint32_t flags) : m_fs(fs), m_flags(flags)
+{
+	_ASSERTE(fs);
+
+	// The specified flags should not include any that apply to the file system
+	_ASSERTE((flags & ~UAPI_MS_PERMOUNT_MASK) == 0);
+	if((flags & ~UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
 }
 
 //---------------------------------------------------------------------------

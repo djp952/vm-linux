@@ -147,7 +147,7 @@ public:
 	// CreateFileSystem
 	//
 	// Function signature for a file system's Create() implementation
-	using CreateFileSystem = std::function<std::unique_ptr<FileSystem>(const char_t* source, uint32_t flags, const void* data, size_t datalength)>;
+	using CreateFileSystem = std::function<std::unique_ptr<FileSystem>(char_t const* source, uint32_t flags, void const* data, size_t datalength)>;
 
 	// LogLevel
 	//
@@ -163,147 +163,6 @@ public:
 		Notice			= 5,	// LOGLEVEL_NOTICE: Normal but significant condition
 		Informational	= 6,	// LOGLEVEL_INFO: Informational
 		Debug			= 7,	// LOGLEVEL_DEBUG: Debug-level messages
-	};
-
-	// MountFlags
-	//
-	// Mount operation flags
-	struct MountFlags final : public bitmask<MountFlags, uint32_t>
-	{
-		using bitmask::bitmask;
-
-		//-------------------------------------------------------------------------
-		// Fields
-
-		// Bind (static)
-		//
-		// Perform a bind mount
-		static MountFlags const Bind;
-
-		// IncrementNodeVersions (static)
-		//
-		// Update the node version anytime it is modified
-		static MountFlags const IncrementNodeVersions;
-
-		// KernelMount (static)
-		//
-		// Indicates that this mount was performed by the kernel
-		static MountFlags const KernelMount;
-
-		// LazyTimeStamps (static)
-		//
-		// Reduce on-disk updates of inode timestamps 
-		static MountFlags const LazyTimeStamps;
-
-		// MandatoryLocks (static)
-		//
-		// Permit mandatory locking on files in this filesystem
-		static MountFlags const MandatoryLocks;
-
-		// Move (static)
-		//
-		// Move an existing mount to a new location
-		static MountFlags const Move;
-
-		// NoDevices (static)
-		//
-		// Do not interpret character or block special devices 
-		static MountFlags const NoDevices;
-
-		// NoSetUserId (static)
-		//
-		// Do not honor set-user-ID and set-group-ID bits
-		static MountFlags const NoSetUserId;
-
-		// NoExecute (static)
-		//
-		// Do not allow programs to be executed from this filesystem
-		static MountFlags const NoExecute;
-
-		// NoUpdateAccessTimeStamps (static)
-		//
-		// Do not update access times for (all types of) files  
-		static MountFlags const NoUpdateAccessTimeStamps;
-
-		// NoUpdateDirectoryAccessTimeStamps (static)
-		//
-		// Do not update access times for directories on this filesystem
-		static MountFlags const NoUpdateDirectoryAccessTimeStamps;
-
-		// PerMountMask (static)
-		//
-		// Mount options that are per-mount rather than applicable to an entire file system
-		static MountFlags const PerMountMask;
-
-		// PosixAccessControlLists (static)
-		//
-		// Support POSIX Access Control Lists 
-		static MountFlags const PosixAccessControlLists;
-
-		// Private (static)
-		//
-		// Make this mount point private
-		static MountFlags const Private;
-
-		// ReadOnly (static)
-		//
-		// Mount the file system as read-only
-		static MountFlags const ReadOnly;
-
-		// RecursiveBind (static)
-		//
-		// Perform a recusrive bind mount
-		static MountFlags const RecursiveBind;
-
-		// RelativeAccessTimeStamps (static)
-		//
-		// Use relative access times
-		static MountFlags const RelativeAccessTimeStamps;
-
-		// Remount (static)
-		//
-		// Remount an existing mount
-		static MountFlags const Remount;
-
-		// RemountMask (static)
-		//
-		// Mount options that are applicable to a remount operation
-		static MountFlags const RemountMask;
-
-		// Slave (static)
-		//
-		// Convert into a slave mount
-		static MountFlags const Slave;
-
-		// Shared (static)
-		//
-		// Make this mount point shared
-		static MountFlags const Shared;
-
-		// Silent (static)
-		//
-		// Suppress the display of certain warning messages 
-		static MountFlags const Silent;
-
-		// StrictAccessTimeStamps (static)
-		//
-		// Always update the last access time (atime)
-		static MountFlags const StrictAccessTimeStamps;
-
-		// Synchronous (static)
-		//
-		// Make writes on this filesystem synchronous
-		static MountFlags const Synchronous;
-
-		// SynchronousDirectories (static)
-		//
-		// Make directory changes on this filesystem synchronous
-		static MountFlags const SynchronousDirectories;
-
-		// Unbindable (static)
-		//
-		// Make this mount unbindable
-		static MountFlags const Unbindable;
 	};
 
 	// NodeType
@@ -356,37 +215,6 @@ public:
 		static ProtectionFlags const Write;
 	};
 
-	// UnmountFlags
-	//
-	// Unmount operation flags
-	struct UnmountFlags final : public bitmask<UnmountFlags, uint32_t>
-	{
-		using bitmask::bitmask;
-
-		//-------------------------------------------------------------------------
-		// Fields
-
-		// Detach
-		//
-		// Perform a lazy unmount -- see umount2(2)
-		static UnmountFlags const Detach;
-
-		// Expire
-		//
-		// Mark the mount point as expired -- see umount2(2)
-		static UnmountFlags const Expire;
-
-		// Force
-		//
-		// Forces an unmount even if the file system is busy
-		static UnmountFlags const Force;
-		
-		// NoFollow
-		//
-		// Indicates that if the target is symbolic link it is not to be followed
-		static UnmountFlags const NoFollow;
-	};
-
 	//
 	// INTERFACES
 	//
@@ -399,6 +227,11 @@ public:
 		// Destructor
 		//
 		virtual ~FileSystem()=default;
+
+		// Mount
+		//
+		// Mounts the file system
+		virtual std::unique_ptr<Mount> Mount(uint32_t flags, void const* data, size_t datalength) = 0;
 	};
 
 	// Mount

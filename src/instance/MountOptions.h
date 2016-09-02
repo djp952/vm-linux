@@ -50,10 +50,10 @@ public:
 
 	// Instance Constructors
 	//
-	MountOptions(VirtualMachine::MountFlags flags);
+	MountOptions(uint32_t flags);
 	MountOptions(char_t const* options);
-	MountOptions(VirtualMachine::MountFlags flags, char_t const* options);
-	MountOptions(VirtualMachine::MountFlags flags, void const* data, size_t datalen);
+	MountOptions(uint32_t flags, char_t const* options);
+	MountOptions(uint32_t flags, void const* data, size_t datalen);
 
 	// Destructor
 	//
@@ -61,7 +61,7 @@ public:
 
 	// Array subscript operators
 	//
-	VirtualMachine::MountFlags operator[](VirtualMachine::MountFlags flag) const;
+	uint32_t operator[](uint32_t flag) const;
 	std::string operator[](std::string const& key) const;
 
 	//-------------------------------------------------------------------------
@@ -76,8 +76,8 @@ public:
 	// Flags
 	//
 	// Gets the standard mounting flags
-	__declspec(property(get=getFlags)) VirtualMachine::MountFlags Flags;
-	VirtualMachine::MountFlags getFlags(void) const;
+	__declspec(property(get=getFlags)) uint32_t Flags;
+	uint32_t getFlags(void) const;
 
 private:
 
@@ -161,12 +161,12 @@ private:
 	// ParseToken (static)
 	//
 	// Parses a single options string token into either a flag or a key/value pair
-	static void ParseToken(std::string&& token, VirtualMachine::MountFlags& flags, MountArguments& arguments);
+	static void ParseToken(std::string&& token, uint32_t& flags, MountArguments& arguments);
 
 	//-------------------------------------------------------------------------
 	// Member Variables
 
-	VirtualMachine::MountFlags	m_flags;			// Standard mounting flags
+	uint32_t	m_flags;			// Standard mounting flags
 	MountArguments				m_arguments;		// Non-standard arguments
 };
 

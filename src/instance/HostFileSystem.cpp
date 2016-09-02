@@ -37,7 +37,7 @@
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength)
+std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
 	UNREFERENCED_PARAMETER(source);
 	UNREFERENCED_PARAMETER(flags);
@@ -45,6 +45,26 @@ std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* s
 	UNREFERENCED_PARAMETER(datalength);
 
 	return std::make_unique<HostFileSystem>();
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Mount
+//
+// Mounts the file system
+//
+// Arguments:
+//
+//	flags		- Standard mounting option flags
+//	data		- Extended/custom mounting options
+//	datalength	- Length of the extended mounting options data
+
+std::unique_ptr<VirtualMachine::Mount> HostFileSystem::Mount(uint32_t flags, void const* data, size_t datalength)
+{
+	UNREFERENCED_PARAMETER(flags);
+	UNREFERENCED_PARAMETER(data);
+	UNREFERENCED_PARAMETER(datalength);
+
+	return nullptr;
 }
 
 //---------------------------------------------------------------------------

@@ -32,7 +32,7 @@
 //
 //	flags		- Standard mounting option flags
 
-MountOptions::MountOptions(VirtualMachine::MountFlags flags) : m_flags(flags) {}
+MountOptions::MountOptions(uint32_t flags) : m_flags(flags) {}
 
 //-----------------------------------------------------------------------------
 // MountOptions Constructor
@@ -42,7 +42,7 @@ MountOptions::MountOptions(VirtualMachine::MountFlags flags) : m_flags(flags) {}
 //	flags			- Initial set of mounting flags to apply before parsing
 //	options			- String containing the mounting options to parse
 
-MountOptions::MountOptions(VirtualMachine::MountFlags flags, char_t const* options) : m_flags(flags)
+MountOptions::MountOptions(uint32_t flags, char_t const* options) : m_flags(flags)
 {
 	// Process all of the string-based options provided, either modifying the
 	// standard flags or collecting them as extra/custom option strings
@@ -94,7 +94,7 @@ MountOptions::MountOptions(char_t const* options) : MountOptions(0, options)
 //	data		- Optional pointer to extra parameter data
 //	datalen		- Length, in bytes, of the extra parameter data
 
-MountOptions::MountOptions(VirtualMachine::MountFlags flags, void const* data, size_t datalen) : MountOptions(flags, std::string(reinterpret_cast<char_t const*>(data), datalen).c_str()) 
+MountOptions::MountOptions(uint32_t flags, void const* data, size_t datalen) : MountOptions(flags, std::string(reinterpret_cast<char_t const*>(data), datalen).c_str()) 
 {
 }
 
@@ -105,7 +105,7 @@ MountOptions::MountOptions(VirtualMachine::MountFlags flags, void const* data, s
 //
 //	flag	- Standard mounting option flag to return set or clear
 
-VirtualMachine::MountFlags MountOptions::operator[](VirtualMachine::MountFlags flag) const
+uint32_t MountOptions::operator[](uint32_t flag) const
 {
 	return (m_flags & flag);
 }
@@ -137,7 +137,7 @@ MountOptions::MountArguments const& MountOptions::getArguments(void) const
 //
 // Accesses the contained standard mounting options flags
 
-VirtualMachine::MountFlags MountOptions::getFlags(void) const
+uint32_t MountOptions::getFlags(void) const
 {
 	return m_flags;
 }
@@ -153,7 +153,7 @@ VirtualMachine::MountFlags MountOptions::getFlags(void) const
 //	flags		- Reference to the working set of standard mount flags
 //	arguments	- Reference to the working set of non-standard arguments
 
-void MountOptions::ParseToken(std::string&& token, VirtualMachine::MountFlags& flags, MountArguments& arguments)
+void MountOptions::ParseToken(std::string&& token, uint32_t& flags, MountArguments& arguments)
 {
 	if(token.length() == 0) return;
 
@@ -161,47 +161,47 @@ void MountOptions::ParseToken(std::string&& token, VirtualMachine::MountFlags& f
 	// STANDARD OPTIONS --> FLAGS
 	//
 
-	else if(token == "ro")			flags |= VirtualMachine::MountFlags::ReadOnly;
-	else if(token == "rw")			flags &= ~VirtualMachine::MountFlags::ReadOnly;
+	else if(token == "ro")			flags |= UAPI_MS_RDONLY;
+	else if(token == "rw")			flags &= ~UAPI_MS_RDONLY;
 
-	else if(token == "suid")		flags &= ~VirtualMachine::MountFlags::NoSetUserId;
-	else if(token == "nosuid")		flags |= VirtualMachine::MountFlags::NoSetUserId;
+	else if(token == "suid")		flags &= ~UAPI_MS_NOSUID;
+	else if(token == "nosuid")		flags |= UAPI_MS_NOSUID;
 
-	else if(token == "dev")			flags &= ~VirtualMachine::MountFlags::NoDevices;
-	else if(token == "nodev")		flags |= VirtualMachine::MountFlags::NoDevices;
+	else if(token == "dev")			flags &= ~UAPI_MS_NODEV;
+	else if(token == "nodev")		flags |= UAPI_MS_NODEV;
 
-	else if(token == "exec")		flags &= ~VirtualMachine::MountFlags::NoExecute;
-	else if(token == "noexec")		flags |= VirtualMachine::MountFlags::NoExecute;
+	else if(token == "exec")		flags &= ~UAPI_MS_NOEXEC;
+	else if(token == "noexec")		flags |= UAPI_MS_NOEXEC;
 
-	else if(token == "async")		flags &= ~VirtualMachine::MountFlags::Synchronous;
-	else if(token == "sync")		flags |= VirtualMachine::MountFlags::Synchronous;
+	else if(token == "async")		flags &= ~UAPI_MS_SYNCHRONOUS;
+	else if(token == "sync")		flags |= UAPI_MS_SYNCHRONOUS;
 
-	else if(token == "remount")		flags |= VirtualMachine::MountFlags::Remount;
+	else if(token == "remount")		flags |= UAPI_MS_REMOUNT;
 	
-	else if(token == "mand")		flags |= VirtualMachine::MountFlags::MandatoryLocks;
-	else if(token == "nomand")		flags &= ~VirtualMachine::MountFlags::MandatoryLocks;
+	else if(token == "mand")		flags |= UAPI_MS_MANDLOCK;
+	else if(token == "nomand")		flags &= ~UAPI_MS_MANDLOCK;
 
-	else if(token == "dirsync")		flags |= VirtualMachine::MountFlags::SynchronousDirectories;
+	else if(token == "dirsync")		flags |= UAPI_MS_DIRSYNC;
 
-	else if(token == "atime")		flags &= ~VirtualMachine::MountFlags::NoUpdateAccessTimeStamps;
-	else if(token == "noatime")		flags |= VirtualMachine::MountFlags::NoUpdateAccessTimeStamps;
+	else if(token == "atime")		flags &= ~UAPI_MS_NOATIME;
+	else if(token == "noatime")		flags |= UAPI_MS_NOATIME;
 
-	else if(token == "diratime")	flags &= ~VirtualMachine::MountFlags::NoUpdateDirectoryAccessTimeStamps;
-	else if(token == "nodiratime")	flags |= VirtualMachine::MountFlags::NoUpdateDirectoryAccessTimeStamps;
+	else if(token == "diratime")	flags &= ~UAPI_MS_NODIRATIME;
+	else if(token == "nodiratime")	flags |= UAPI_MS_NODIRATIME;
 
-	else if(token == "relatime")	flags |= VirtualMachine::MountFlags::RelativeAccessTimeStamps;
-	else if(token == "norelatime")	flags &= ~VirtualMachine::MountFlags::RelativeAccessTimeStamps;
+	else if(token == "relatime")	flags |= UAPI_MS_RELATIME;
+	else if(token == "norelatime")	flags &= ~UAPI_MS_RELATIME;
 
-	else if(token == "silent")		flags |= VirtualMachine::MountFlags::Silent;
-	else if(token == "loud")		flags &= ~VirtualMachine::MountFlags::Silent;
+	else if(token == "silent")		flags |= UAPI_MS_SILENT;
+	else if(token == "loud")		flags &= ~UAPI_MS_SILENT;
 
-	else if(token == "strictatime")	flags |= VirtualMachine::MountFlags::StrictAccessTimeStamps;
+	else if(token == "strictatime")	flags |= UAPI_MS_STRICTATIME;
 	
-	else if(token == "lazytime")	flags |= VirtualMachine::MountFlags::LazyTimeStamps;
-	else if(token == "nolazytime")	flags &= ~VirtualMachine::MountFlags::LazyTimeStamps;
+	else if(token == "lazytime")	flags |= UAPI_MS_LAZYTIME;
+	else if(token == "nolazytime")	flags &= ~UAPI_MS_LAZYTIME;
 
-	else if(token == "iversion")	flags |= VirtualMachine::MountFlags::IncrementNodeVersions;
-	else if(token == "noiversion")	flags &= ~VirtualMachine::MountFlags::IncrementNodeVersions;
+	else if(token == "iversion")	flags |= UAPI_MS_I_VERSION;
+	else if(token == "noiversion")	flags &= ~UAPI_MS_I_VERSION;
 
 	//
 	// NON-STANDARD OPTIONS --> ARGUMENTS

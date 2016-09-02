@@ -27,6 +27,7 @@
 //
 
 #include <linux/types.h>
+#include <linux/capability.h>
 #include <linux/errno.h>
 #include <linux/elf.h>
 #include <linux/elf-em.h>
@@ -34,6 +35,13 @@
 #include <linux/magic.h>
 #include <linux/sched.h>
 #include <linux/stat.h>
+#include <asm/stat.h>
+#include <asm/statfs.h>
+
+// MS_PERMOUNT_MASK
+//
+// MS_XXXXX flags that apply to a mount rather than an entire file system
+#define MS_PERMOUNT_MASK (MS_NODEV | MS_NOEXEC | MS_NOSUID | MS_NOATIME | MS_NODIRATIME | MS_RELATIME)
 
 // include/linux/stat.h
 //
@@ -48,3 +56,4 @@
 typedef __kernel_gid_t		gid_t;
 typedef __kernel_mode_t		mode_t;
 typedef __kernel_uid_t		uid_t;
+typedef __kernel_fsid_t		fsid_t;

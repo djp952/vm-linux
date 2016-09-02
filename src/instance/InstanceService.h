@@ -103,8 +103,13 @@ private:
 
 	// filesystem_map_t
 	//
-	// Collection of available file systems (name, mount function)
-	using filesystem_map_t = std::unordered_map<std::tstring, VirtualMachine::CreateFileSystem>;
+	// Collection of active file systems (source, FileSystem*)
+	using filesystem_map_t = std::map<std::string, std::unique_ptr<VirtualMachine::FileSystem>>;
+
+	// filesystemtype_map_t
+	//
+	// Collection of available file systems (name, create function)
+	using filesystemtype_map_t = std::unordered_map<std::tstring, VirtualMachine::CreateFileSystem>;
 
 	// ProcFileSystem
 	//
@@ -133,7 +138,7 @@ private:
 	// CreateProcFileSystem (static)
 	//
 	// Creates an instance of the procfs file system for this instance
-	static std::unique_ptr<VirtualMachine::FileSystem> CreateProcFileSystem(char_t const* source, VirtualMachine::MountFlags flags, void const* data, size_t datalength);
+	static std::unique_ptr<VirtualMachine::FileSystem> CreateProcFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
 
 	// OnStart (Service)
 	//
@@ -155,8 +160,8 @@ private:
 	
 	// File System
 	//
-	filesystem_map_t							m_filesystems;	// Available file systems
-	std::unique_ptr<VirtualMachine::FileSystem>	m_rootfs;		// Root file system
+	filesystemtype_map_t			m_fstypes;			// Available file systems
+	filesystem_map_t				m_filesystems;		// Created file systems
 
 	// RPC System Call Objects
 	//
