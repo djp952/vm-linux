@@ -30,7 +30,7 @@
 #pragma once
 
 //
-// AUTO-GENERATED FILE - DO NOT EDIT MANUALY
+// AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
 //
 // clang <#= String.Join(" ", ClangArguments) #>
 //

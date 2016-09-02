@@ -467,7 +467,7 @@ namespace zuki.vm.linux
 			if (anonymous) writer.Write("} ");
 			else writer.WriteLine("};");
 
-			// Close out the #pragma pack for non-anonymous structures
+			// Close out the #pragma pack for non-anonymous unions
 			if (!anonymous) writer.WriteLine("#pragma pack(pop)");
 		}
 	}

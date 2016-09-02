@@ -64,8 +64,8 @@ namespace zuki.vm.linux
             
             #line default
             #line hidden
-            this.Write("_\r\n#pragma once\r\n\r\n//\r\n// AUTO-GENERATED FILE - DO NOT EDIT MANUALY\r\n//\r\n// clang" +
-                    " ");
+            this.Write("_\r\n#pragma once\r\n\r\n//\r\n// AUTO-GENERATED FILE - DO NOT EDIT MANUALLY\r\n//\r\n// clan" +
+                    "g ");
             
             #line 35 "D:\GitHub\vm-linux\src\builduapi\UapiHeaderPreamble.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(String.Join(" ", ClangArguments)));
