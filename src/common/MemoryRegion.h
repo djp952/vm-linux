@@ -41,14 +41,14 @@ public:
 
 	// Instance Constructors
 	//
-	MemoryRegion::MemoryRegion(size_t length);
-	MemoryRegion::MemoryRegion(size_t length, uint32_t flags);
-	MemoryRegion::MemoryRegion(size_t length, void* address);
-	MemoryRegion::MemoryRegion(size_t length, void* address, uint32_t flags);
-	MemoryRegion::MemoryRegion(HANDLE process, size_t length);
-	MemoryRegion::MemoryRegion(HANDLE process, size_t length, uint32_t flags);
-	MemoryRegion::MemoryRegion(HANDLE process, size_t length, void* address);
-	MemoryRegion::MemoryRegion(HANDLE process, size_t length, void* address, uint32_t flags);
+	MemoryRegion(size_t length);
+	MemoryRegion(size_t length, uint32_t flags);
+	MemoryRegion(size_t length, void* address);
+	MemoryRegion(size_t length, void* address, uint32_t flags);
+	MemoryRegion(HANDLE process, size_t length);
+	MemoryRegion(HANDLE process, size_t length, uint32_t flags);
+	MemoryRegion(HANDLE process, size_t length, void* address);
+	MemoryRegion(HANDLE process, size_t length, void* address, uint32_t flags);
 
 	// Destructor
 	//

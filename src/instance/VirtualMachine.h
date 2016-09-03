@@ -181,16 +181,6 @@ public:
 		virtual std::unique_ptr<Mount> Mount(uint32_t flags, void const* data, size_t datalength) = 0;
 	};
 
-	// Mount
-	//
-	// Interface that must be implemented by a file system mount
-	struct Mount
-	{
-		// Destructor
-		//
-		virtual ~Mount()=default;
-	};
-
 	// Handle
 	//
 	// Interface that must be implemented by a file system handle
@@ -199,6 +189,16 @@ public:
 		// Destructor
 		//
 		virtual ~Handle()=default;
+	};
+
+	// Mount
+	//
+	// Interface that must be implemented by a file system mount
+	struct Mount
+	{
+		// Destructor
+		//
+		virtual ~Mount()=default;
 	};
 
 	// Node

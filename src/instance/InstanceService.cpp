@@ -171,7 +171,7 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		m_fstypes.emplace(TEXT("hostfs"), CreateHostFileSystem);
 		m_fstypes.emplace(TEXT("procfs"), CreateProcFileSystem);
 		m_fstypes.emplace(TEXT("rootfs"), CreateRootFileSystem);
-		m_fstypes.emplace(TEXT("tempfs"), CreateTempFileSystem);
+		m_fstypes.emplace(TEXT("tmpfs"), CreateTempFileSystem);
 
 		//
 		// REGISTER SYSTEM CALL INTERFACES

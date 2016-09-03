@@ -198,6 +198,7 @@
     <ClInclude Include="..\common\NtApi.h" />
     <ClInclude Include="..\common\StructuredException.h" />
     <ClInclude Include="..\common\Win32Exception.h" />
+    <ClInclude Include="Capability.h" />
     <ClInclude Include="Executable.h" />
     <ClInclude Include="ExecutableFormat.h" />
     <ClInclude Include="HostFileSystem.h" />
@@ -251,6 +252,7 @@
     <ClCompile Include="..\common\StructuredException.cpp" />
     <ClCompile Include="..\common\SystemInformation.cpp" />
     <ClCompile Include="..\common\Win32Exception.cpp" />
+    <ClCompile Include="Capability.cpp" />
     <ClCompile Include="Executable.cpp" />
     <ClCompile Include="HostFileSystem.cpp" />
     <ClCompile Include="main.cpp" />

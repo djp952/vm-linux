@@ -109,12 +109,7 @@ private:
 		// flags
 		//
 		// Filesystem-level flags
-		std::atomic<uint32_t> flags;
-
-		// rootnode
-		//
-		// Root node instance of the file system
-		std::unique_ptr<VirtualMachine::Node> rootnode;
+		std::atomic<uint32_t> flags = 0;
 	};
 
 	// Directory
@@ -131,6 +126,9 @@ private:
 		// Destructor
 		//
 		virtual ~Directory()=default;
+
+		//---------------------------------------------------------------------
+		// Member Functions
 
 		// OwnerGroupId (VirtualMachine::Node)
 		//
@@ -179,7 +177,13 @@ private:
 		//
 		~Mount()=default;
 
+		//---------------------------------------------------------------------
+		// Member Functions
+
 	private:
+
+		//---------------------------------------------------------------------
+		// Member Variables
 
 		std::shared_ptr<rootfs_t>		m_fs;		// Shared file system state
 		uint32_t						m_flags;	// Mount-level flags
@@ -188,7 +192,8 @@ private:
 	//-------------------------------------------------------------------------
 	// Member Variables
 
-	std::shared_ptr<rootfs_t>			m_fs;		// Shared file system state
+	std::shared_ptr<rootfs_t>		m_fs;			// Shared file system state
+	std::unique_ptr<Directory>		m_rootnode;		// Root directory node
 };
 
 //-----------------------------------------------------------------------------

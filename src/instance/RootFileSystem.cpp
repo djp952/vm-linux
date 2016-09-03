@@ -23,6 +23,7 @@
 #include "stdafx.h"
 #include "RootFileSystem.h"
 
+#include "Capability.h"
 #include "LinuxException.h"
 #include "MountOptions.h"
 
@@ -57,6 +58,8 @@ std::unique_ptr<VirtualMachine::FileSystem> CreateRootFileSystem(char_t const* s
 
 RootFileSystem::RootFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
+	Capability::Demand(UAPI_CAP_SYS_ADMIN);
+
 	// Source is ignored but must be specified by contract
 	if(source == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -96,7 +99,7 @@ RootFileSystem::RootFileSystem(char_t const* source, uint32_t flags, void const*
 	m_fs->flags = flags & ~UAPI_MS_PERMOUNT_MASK;
 
 	// Construct the root directory node instance
-	m_fs->rootnode = std::make_unique<Directory>(m_fs, mode, uid, gid);
+	m_rootnode = std::make_unique<Directory>(m_fs, mode, uid, gid);
 }
 
 //---------------------------------------------------------------------------
@@ -112,9 +115,10 @@ RootFileSystem::RootFileSystem(char_t const* source, uint32_t flags, void const*
 
 std::unique_ptr<VirtualMachine::Mount> RootFileSystem::Mount(uint32_t flags, void const* data, size_t datalength)
 {
-	// This operation does not support any custom parameters, ignore them
 	UNREFERENCED_PARAMETER(data);
 	UNREFERENCED_PARAMETER(datalength);
+
+	Capability::Demand(UAPI_CAP_SYS_ADMIN);
 
 	// Verify that the specified flags are supported for a mount operation
 	if(flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
