@@ -54,6 +54,7 @@ std::unique_ptr<VirtualMachine::FileSystem> CreateRootFileSystem(char_t const* s
 //	MS_NODIRATIME
 //	MS_RDONLY
 //	MS_RELATIME
+//	MS_SILENT
 //	MS_STRICTATIME
 //
 //	mode=nnn	- Sets the permissions of the directory node
@@ -71,12 +72,13 @@ class RootFileSystem : public VirtualMachine::FileSystem
 	// MOUNT_FLAGS
 	//
 	// Supported creation/mount operation flags
-	static const uint32_t MOUNT_FLAGS = UAPI_MS_KERNMOUNT | UAPI_MS_NOATIME | UAPI_MS_NODIRATIME | UAPI_MS_RDONLY | UAPI_MS_RELATIME | UAPI_MS_STRICTATIME;
+	static const uint32_t MOUNT_FLAGS = UAPI_MS_KERNMOUNT | UAPI_MS_NOATIME | UAPI_MS_NODIRATIME | UAPI_MS_RDONLY | UAPI_MS_RELATIME | 
+		UAPI_MS_SILENT | UAPI_MS_STRICTATIME;
 	
 	// REMOUNT_FLAGS
 	//
 	// Supported remount operation flags
-	static const uint32_t REMOUNT_FLAGS = UAPI_MS_RDONLY;
+	static const uint32_t REMOUNT_FLAGS = UAPI_MS_REMOUNT | UAPI_MS_RDONLY;
 
 public:
 

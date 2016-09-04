@@ -57,3 +57,22 @@ typedef __kernel_gid_t		gid_t;
 typedef __kernel_mode_t		mode_t;
 typedef __kernel_uid_t		uid_t;
 typedef __kernel_fsid_t		fsid_t;
+
+// todo: verify size, alignment and packing within Linux kernel
+struct linux_dirent {
+
+	unsigned long	d_ino;
+	unsigned long	d_off;
+	unsigned short	d_reclen;
+	char			d_name[1];
+};
+
+// todo: verify size, alignment and packing within Linux kernel
+struct linux_dirent64 {
+
+	__u64			d_ino;
+	__s64			d_off;
+	unsigned short	d_reclen;
+	unsigned char	d_type;
+	char			d_name[0];
+};

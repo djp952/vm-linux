@@ -23,7 +23,17 @@
 #include "stdafx.h"
 #include "HostFileSystem.h"
 
+#include "Capability.h"
+#include "LinuxException.h"
+#include "MountOptions.h"
+
 #pragma warning(push, 4)
+
+// Invariants
+//
+static_assert(FILE_BEGIN == UAPI_SEEK_SET, "FILE_BEGIN must be the same value as UAPI_SEEK_SET");
+static_assert(FILE_CURRENT == UAPI_SEEK_CUR, "FILE_CURRENT must be the same value as UAPI_SEEK_CUR");
+static_assert(FILE_END == UAPI_SEEK_END, "FILE_END must be the same value as UAPI_SEEK_END");
 
 //---------------------------------------------------------------------------
 // CreateHostFileSystem
@@ -39,12 +49,52 @@
 
 std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
-	UNREFERENCED_PARAMETER(source);
-	UNREFERENCED_PARAMETER(flags);
-	UNREFERENCED_PARAMETER(data);
-	UNREFERENCED_PARAMETER(datalength);
+	return std::make_unique<HostFileSystem>(source, flags, data, datalength);
+}
 
-	return std::make_unique<HostFileSystem>();
+//---------------------------------------------------------------------------
+// HostFileSystem Constructor
+//
+// Arguments:
+//
+//	source		- Source device string
+//	flags		- Standard mounting option flags
+//	data		- Extended/custom mounting options
+//	datalength	- Length of the extended mounting options data
+
+HostFileSystem::HostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
+{
+	bool sandbox = true;						// Flag to sandbox the virtual file system
+
+	Capability::Demand(UAPI_CAP_SYS_ADMIN);
+
+	// Source is ignored, but has to be specified by contract
+	if(source == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Convert the specified options into MountOptions to process the custom parameters
+	MountOptions options(flags, data, datalength);
+
+	// Verify that the specified flags are supported for a creation operation
+	if(options.Flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
+
+	try {
+
+		// sandbox
+		//
+		// Sets the option to check all nodes are within the base mounting path
+		if(options.Arguments.Contains("sandbox")) sandbox = true;
+
+		// nosandbox
+		//
+		// Clears the option to check all nodes are within the base mounting path
+		if(options.Arguments.Contains("nosandbox")) sandbox = false;
+	}
+
+	catch(...) { throw LinuxException(UAPI_EINVAL); }
+
+	// Create the shared file system state and assign the file system level flags
+	m_fs = std::make_shared<hostfs_t>(); 
+	m_fs->flags = options.Flags & ~UAPI_MS_PERMOUNT_MASK;
 }
 
 //---------------------------------------------------------------------------
@@ -60,11 +110,43 @@ std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* s
 
 std::unique_ptr<VirtualMachine::Mount> HostFileSystem::Mount(uint32_t flags, void const* data, size_t datalength)
 {
-	UNREFERENCED_PARAMETER(flags);
-	UNREFERENCED_PARAMETER(data);
-	UNREFERENCED_PARAMETER(datalength);
+	Capability::Demand(UAPI_CAP_SYS_ADMIN);
 
-	return nullptr;
+	// Convert the flags and data parameters into a MountOptions
+	MountOptions options(flags, data, datalength);
+
+	// MS_NODEV and MS_NOSUID are applied to all HostFileSystem mounts and cannot be cleared
+	flags = options.Flags | (UAPI_MS_NODEV | UAPI_MS_NOSUID);
+	if(flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
+
+	// Construct the mount instance, passing only the mount specific flags
+	std::unique_ptr<VirtualMachine::Mount> mount = std::make_unique<class Mount>(m_fs, flags & UAPI_MS_PERMOUNT_MASK);
+
+	// Reapply the file system level flags to the shared state instance after the mount operation
+	m_fs->flags = options.Flags & ~UAPI_MS_PERMOUNT_MASK;
+
+	return mount;
+}
+
+//
+// HOSTFILESYSTEM::MOUNT IMPLEMENTATION
+//
+
+//-----------------------------------------------------------------------------
+// HostFileSystem::Mount Constructor
+//
+// Arguments:
+//
+//	fs			- Shared file system state instance
+//	flags		- Mount-specific flags
+
+HostFileSystem::Mount::Mount(std::shared_ptr<hostfs_t> const& fs, uint32_t flags) : m_fs(fs), m_flags(flags)
+{
+	_ASSERTE(fs);
+
+	// The specified flags should not include any that apply to the file system
+	_ASSERTE((flags & ~UAPI_MS_PERMOUNT_MASK) == 0);
+	if((flags & ~UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
 }
 
 //---------------------------------------------------------------------------

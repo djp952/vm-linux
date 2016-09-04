@@ -63,11 +63,11 @@ RootFileSystem::RootFileSystem(char_t const* source, uint32_t flags, void const*
 	// Source is ignored but must be specified by contract
 	if(source == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	// Verify that the specified flags are supported for a creation operation
-	if(flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
-
 	// Convert the specified options into MountOptions to process the custom parameters
 	MountOptions options(flags, data, datalength);
+
+	// Verify that the specified flags are supported for a creation operation
+	if(options.Flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
 
 	// Default mode, uid and gid for the root directory node
 	uapi_mode_t mode = UAPI_S_IRWXU | UAPI_S_IRWXG | UAPI_S_IROTH | UAPI_S_IXOTH;	// 0775
@@ -96,7 +96,7 @@ RootFileSystem::RootFileSystem(char_t const* source, uint32_t flags, void const*
 
 	// Create the shared file system state and assign the file system level flags
 	m_fs = std::make_shared<rootfs_t>();
-	m_fs->flags = flags & ~UAPI_MS_PERMOUNT_MASK;
+	m_fs->flags = options.Flags & ~UAPI_MS_PERMOUNT_MASK;
 
 	// Construct the root directory node instance
 	m_rootnode = std::make_unique<Directory>(m_fs, mode, uid, gid);
@@ -115,19 +115,17 @@ RootFileSystem::RootFileSystem(char_t const* source, uint32_t flags, void const*
 
 std::unique_ptr<VirtualMachine::Mount> RootFileSystem::Mount(uint32_t flags, void const* data, size_t datalength)
 {
-	UNREFERENCED_PARAMETER(data);
-	UNREFERENCED_PARAMETER(datalength);
-
 	Capability::Demand(UAPI_CAP_SYS_ADMIN);
 
-	// Verify that the specified flags are supported for a mount operation
-	if(flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
+	// Convert the flags and data parameters into a MountOptions and check for invalid flags
+	MountOptions options(flags, data, datalength);
+	if(options.Flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
 
 	// Construct the mount instance, passing only the mount specific flags
-	std::unique_ptr<VirtualMachine::Mount> mount = std::make_unique<class Mount>(m_fs, flags & UAPI_MS_PERMOUNT_MASK);
+	std::unique_ptr<VirtualMachine::Mount> mount = std::make_unique<class Mount>(m_fs, options.Flags & UAPI_MS_PERMOUNT_MASK);
 
 	// Reapply the file system level flags to the shared state instance after the mount operation
-	m_fs->flags = flags & ~UAPI_MS_PERMOUNT_MASK;
+	m_fs->flags = options.Flags & ~UAPI_MS_PERMOUNT_MASK;
 
 	return mount;
 }
