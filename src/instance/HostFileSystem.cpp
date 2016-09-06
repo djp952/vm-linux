@@ -112,15 +112,13 @@ std::unique_ptr<VirtualMachine::Mount> HostFileSystem::Mount(uint32_t flags, voi
 {
 	Capability::Demand(UAPI_CAP_SYS_ADMIN);
 
-	// Convert the flags and data parameters into a MountOptions
+	// Convert the flags and data parameters into a MountOptions and check for invalid flags
 	MountOptions options(flags, data, datalength);
+	if(options.Flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
 
-	// MS_NODEV and MS_NOSUID are applied to all HostFileSystem mounts and cannot be cleared
-	flags = options.Flags | (UAPI_MS_NODEV | UAPI_MS_NOSUID);
-	if(flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
-
-	// Construct the mount instance, passing only the mount specific flags
-	std::unique_ptr<VirtualMachine::Mount> mount = std::make_unique<class Mount>(m_fs, flags & UAPI_MS_PERMOUNT_MASK);
+	// Construct the mount instance, passing only the mount specific flags (MS_NODEV and MS_NOSUID are always set)
+	std::unique_ptr<VirtualMachine::Mount> mount = 
+		std::make_unique<class Mount>(m_fs, (options.Flags & UAPI_MS_PERMOUNT_MASK) | (UAPI_MS_NODEV | UAPI_MS_NOSUID));
 
 	// Reapply the file system level flags to the shared state instance after the mount operation
 	m_fs->flags = options.Flags & ~UAPI_MS_PERMOUNT_MASK;

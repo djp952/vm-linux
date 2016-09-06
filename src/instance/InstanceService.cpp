@@ -84,9 +84,10 @@ std::unique_ptr<VirtualMachine::FileSystem> InstanceService::CreateProcFileSyste
 
 void InstanceService::OnStart(int argc, LPTSTR* argv)
 {
-	std::vector<tchar_t const*>		initargs;		// Arguments passed to init
-	std::vector<tchar_t const*>		initenv;		// Environment variables passed to init
-	std::vector<tchar_t const*>		invalidargs;	// Invalid parameter arguments
+	std::vector<tchar_t const*>				initargs;		// Arguments passed to init
+	std::vector<tchar_t const*>				initenv;		// Environment variables passed to init
+	std::vector<tchar_t const*>				invalidargs;	// Invalid parameter arguments
+	std::unique_ptr<VirtualMachine::Path>	rootpath;		// Root Path instance
 
 	try {
 
@@ -190,18 +191,19 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		auto const& rootfsentry = m_fstypes.find(param_rootfstype);
 		if(rootfsentry == m_fstypes.end()) throw FileSystemTypeNotFoundException(static_cast<std::tstring>(param_rootfstype).c_str());
 
-		// Generate/convert the file system flags and attempt to mount the root file system
+		// Generate/convert the root file system flags
 		uint32_t rootfsflags = UAPI_MS_KERNMOUNT | ((param_ro) ? UAPI_MS_RDONLY : 0);
 		std::string rootflagsstr = std::to_string(param_rootflags);
 
 		try {
 			
-			// Attempt to create the root file system and add it as an active file system instance
+			// Attempt to create the root file system instance using the specified parameters
 			auto rootsource = std::to_string(param_root);
-			m_filesystems.emplace(rootsource, rootfsentry->second(rootsource.c_str(), rootfsflags, rootflagsstr.data(), rootflagsstr.length()));
+			auto rootfs = rootfsentry->second(rootsource.c_str(), rootfsflags, rootflagsstr.data(), rootflagsstr.length());
 
-			// Mount the root file system and assign it to the root namespace
-			auto rootmount = m_filesystems.at(rootsource)->Mount(rootfsflags, rootflagsstr.data(), rootflagsstr.length());
+			// Mount the file system within the root namespace and set as an active file system if successful
+			rootpath = m_rootns->MountFileSystem(nullptr, rootfs.get(), rootfsflags, rootflagsstr.data(), rootflagsstr.length());
+			m_filesystems.emplace(rootsource, std::move(rootfs));
 		}
 		
 		catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }
@@ -210,9 +212,9 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// LAUNCH INIT PROCESS
 		//
 
-		auto initexe = std::make_unique<Executable>(TEXT("D:\\Linux Stuff\\android-5.0.2_r1-x86\\root\\init"));
-		m_initprocess = std::make_unique<Process>();
-		m_initprocess->Load(initexe.get());
+		//auto initexe = std::make_unique<Executable>(TEXT("D:\\Linux Stuff\\android-5.0.2_r1-x86\\root\\init"));
+		//m_initprocess = std::make_unique<Process>();
+		//m_initprocess->Load(initexe.get());
 	}
 
 	catch(std::exception& ex) {

@@ -63,10 +63,15 @@ public:
 	//-------------------------------------------------------------------------
 	// Member Functions
 
-	// AddMount
+	// LookupPath
 	//
-	// Adds a mount for a file system to this namespace
-	void AddMount(/*mountpoint,*/ VirtualMachine::FileSystem const* fs);
+	// Performs a path name lookup operation
+	std::unique_ptr<VirtualMachine::Path> LookupPath(void) const;
+
+	// MountFileSystem
+	//
+	// Mounts a file system within this namespace at the specified location
+	std::unique_ptr<VirtualMachine::Path> MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength);
 
 	//-------------------------------------------------------------------------
 	// Properties
@@ -75,6 +80,37 @@ private:
 
 	Namespace(Namespace const&)=delete;
 	Namespace& operator=(Namespace const&)=delete;
+
+	// path_t
+	//
+	// Internal shared representation of a Path instance
+	struct path_t
+	{
+		// canonicalparent
+		//
+		// Pointer to the canonical path_t, or nullptr if root
+		std::shared_ptr<path_t> canonicalparent;
+
+		// hides
+		//
+		// Pointer to the path_t hidden by a mount point
+		std::shared_ptr<path_t> hides;
+
+		// mount
+		//
+		// Pointer to the VirtualMachine::Mount if this path is a mount point
+		std::unique_ptr<VirtualMachine::Mount> mount;
+
+		// name
+		//
+		// Name of the node pointed to by this path
+		std::string	name;
+
+		// parent
+		//
+		// Pointer to the parent path_t, or nullptr if root
+		std::shared_ptr<path_t> parent;
+	};
 
 	// ControlGroupNamespace
 	//
@@ -115,13 +151,56 @@ private:
 	{
 	public:
 
-		MountNamespace()=default;
+		// Instance Constructor
+		//
+		MountNamespace();
+
+		// Destructor
+		//
 		~MountNamespace()=default;
+
+		//---------------------------------------------------------------------
+		// Member Functions
+
+		// MountFileSystem
+		//
+		// Mounts a file system at the specified location in the namespace
+		std::unique_ptr<VirtualMachine::Path> MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength);
 
 	private:
 
 		MountNamespace(MountNamespace const&)=delete;
 		MountNamespace& operator=(MountNamespace const&)=delete;
+
+		// mount_map_t
+		//
+		// Collection of mounted path_t instances, which keeps them as well as any
+		// parent path_t instances alive until it's unmounted/removed from the namespace
+		using mount_map_t = std::unordered_map<std::string, std::shared_ptr<path_t>>;
+
+		//---------------------------------------------------------------------
+		// Private Member Functions
+
+		// GetCanonicalPathString (static)
+		//
+		// Gets the canonical path string of a path_t instance
+		static std::string GetCanonicalPathString(std::shared_ptr<path_t> const& path);
+		
+		// GetPath
+		//
+		// Converts a string-based path into a path_t instance
+		std::shared_ptr<path_t> GetPath(char_t const* path) const;
+
+		// GetPathString (static)
+		//
+		// Gets the path string of a path_t instance
+		static std::string GetPathString(std::shared_ptr<path_t> const& path);
+
+		//---------------------------------------------------------------------
+		// Member Variables
+
+		mount_map_t					m_mounts;			// Collection of mount points
+		sync::reader_writer_lock	m_mountslock;		// Synchronization object
 	};
 
 	// NetworkNamespace
@@ -138,6 +217,32 @@ private:
 
 		NetworkNamespace(NetworkNamespace const&)=delete;
 		NetworkNamespace& operator=(NetworkNamespace const&)=delete;
+	};
+
+	// Path
+	//
+	// Implements VirtualMachine::Path
+	class Path : public VirtualMachine::Path
+	{
+	public:
+
+		// Instance Constructor
+		//
+		Path(std::shared_ptr<path_t> const& path);
+
+		// Destructor
+		//
+		~Path()=default;
+
+	private:
+
+		Path(Path const&)=delete;
+		Path& operator=(Path const&)=delete;
+
+		//---------------------------------------------------------------------
+		// Member Variables
+
+		std::shared_ptr<path_t>		m_path;			// Internal shared state
 	};
 
 	// PidNamespace

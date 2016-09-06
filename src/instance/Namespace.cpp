@@ -23,6 +23,9 @@
 #include "stdafx.h"
 #include "Namespace.h"
 
+#include <vector>
+#include "LinuxException.h"
+
 #pragma warning(push, 4)
 
 //---------------------------------------------------------------------------
@@ -69,19 +72,190 @@ Namespace::Namespace(Namespace const* rhs, uint32_t flags)
 }
 
 //---------------------------------------------------------------------------
-// Namespace::AddMount
+// Namespace::LookupPath
 //
-// Adds a mount for a file system to this namespace
+// Performs a path name lookup operation
 //
 // Arguments:
 //
-//	fs		- VirtualMachine::FileSystem instance to add as a mount
+//	NONE
 
-void Namespace::AddMount(VirtualMachine::FileSystem const* fs)
+std::unique_ptr<VirtualMachine::Path> Namespace::LookupPath(void) const
 {
-	UNREFERENCED_PARAMETER(fs);
+	_ASSERTE(m_mountns);
+	return nullptr;
 }
 
+//---------------------------------------------------------------------------
+// Namespace::MountFileSystem
+//
+// Mounts a file system within this namespace at the specified location
+//
+// Arguments:
+//
+//	path		- Path within the namespace on which to mount the file system
+//	fs			- File system to be mounted
+//	flags		- Standard mounting option flags
+//	data		- Extended/custom mounting options
+//	datalength	- Length of the extended mounting options data
+
+std::unique_ptr<VirtualMachine::Path> Namespace::MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength)
+{
+	_ASSERTE(m_mountns);
+	return m_mountns->MountFileSystem(path, fs, flags, data, datalength);
+}
+
+//
+// NAMESPACE::MOUNTNAMESPACE IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// Namespace::MountNamespace Constructor
+//
+// Arguments:
+//
+//	NONE
+
+Namespace::MountNamespace::MountNamespace()
+{
+}
+
+//---------------------------------------------------------------------------
+// Namespace::MountNamespace::GetCanonicalPathString (private, static)
+//
+// Converts a path_t into a canonical string-based path
+//
+// Arguments:
+//
+//	path		- path_t to be converted into a string
+
+std::string Namespace::MountNamespace::GetCanonicalPathString(std::shared_ptr<path_t> const& path)
+{
+	std::string delimiter("/");					// Standard path delimiter
+
+	// If the path has no canonical parent, this is the root -- return just the delimiter
+	if(!path->canonicalparent) return delimiter;
+
+	std::shared_ptr<path_t>					current(path);
+	std::vector<std::shared_ptr<path_t>>	pathvec;
+	std::string								result;
+
+	// Push all the path_t pointers in the canonical path chain into the vector<>
+	while(current->canonicalparent) { pathvec.push_back(current); current = current->canonicalparent; }
+
+	// Walk the vector<> in forward order to generate the path string
+	for(auto const& iterator : pathvec) result += (delimiter + iterator->name);
+
+	return result;
+}
+
+//---------------------------------------------------------------------------
+// Namespace::MountNamespace::GetPath (private)
+//
+// Converts a string-based path into a path_t using the current namespace
+//
+// Arguments:
+//
+//	path		- Path string to be converted
+
+std::shared_ptr<Namespace::path_t> Namespace::MountNamespace::GetPath(char_t const* path) const
+{
+	UNREFERENCED_PARAMETER(path);
+	return nullptr;
+}
+
+//---------------------------------------------------------------------------
+// Namespace::MountNamespace::GetPathString (private, static)
+//
+// Converts a path_t into a (non-canonical) string-based path
+//
+// Arguments:
+//
+//	path		- path_t to be converted into a string
+
+std::string Namespace::MountNamespace::GetPathString(std::shared_ptr<path_t> const& path)
+{
+	std::string delimiter("/");					// Standard path delimiter
+
+	// If the path has no parent, this is the root -- return just the delimiter
+	if(!path->parent) return delimiter;
+
+	std::shared_ptr<path_t>					current(path);
+	std::vector<std::shared_ptr<path_t>>	pathvec;
+	std::string								result;
+
+	// Push all the path_t pointers in the path chain into the vector<>
+	while(current->parent) { pathvec.push_back(current); current = current->parent; }
+
+	// Walk the vector<> in forward order to generate the path string
+	for(auto const& iterator : pathvec) result += (delimiter + iterator->name);
+
+	return result;
+}
+
+//---------------------------------------------------------------------------
+// Namespace::MountNamespace::MountFileSystem
+//
+// Mounts a file system within this namespace at the specified location
+//
+// Arguments:
+//
+//	path		- Path within the namespace on which to mount the file system
+//	fs			- File system to be mounted
+//	flags		- Standard mounting option flags
+//	data		- Extended/custom mounting options
+//	datalength	- Length of the extended mounting options data
+
+std::unique_ptr<VirtualMachine::Path> Namespace::MountNamespace::MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength)
+{
+	if(fs == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// A pure root mount requires the MS_KERNMOUNT flag be set (User-mode mounts would specify "/" as the path)
+	if((path == nullptr) && ((flags & UAPI_MS_KERNMOUNT) != UAPI_MS_KERNMOUNT)) throw LinuxException(UAPI_EPERM);
+
+	sync::reader_writer_lock::scoped_lock_write writer(m_mountslock);
+
+	// Create the new path_t that will own the actual mount instance
+	std::shared_ptr<path_t> mountpoint = std::make_shared<path_t>();
+
+	try {
+
+		// Attempt to look up the existing path that this mountpoint will hide
+		mountpoint->hides = (path == nullptr) ? m_mounts.at("/") : GetPath(path);
+		if(!mountpoint->hides) throw LinuxException(UAPI_ENOENT);
+
+		// Copy the name, parent and canonical parent of the existing path_t into the new path_t
+		mountpoint->name = mountpoint->hides->name;
+		mountpoint->parent = mountpoint->hides->parent;
+		mountpoint->canonicalparent = mountpoint->hides->canonicalparent;
+	}
+
+	catch(std::out_of_range&) { /* m_mounts.at("/") failed -- no existing root mount */ }
+
+	// Assign the mount point to the path_t by invoking the file system mount function
+	mountpoint->mount = fs->Mount(flags, data, datalength);
+
+	// Add or replace the path_t instance for this mount in the collection
+	m_mounts[GetCanonicalPathString(mountpoint)] = mountpoint;
+
+	// Generate a Path instance for the caller that references the mount path_t
+	return std::make_unique<Path>(mountpoint);
+}
+
+//
+// NAMESPACE::PATH IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// Namespace::Path Constructor
+//
+// Arguments:
+//
+//	path		- Shared path_t instance of the path object
+
+Namespace::Path::Path(std::shared_ptr<path_t> const& path) : m_path(path)
+{
+}
 
 //---------------------------------------------------------------------------
 

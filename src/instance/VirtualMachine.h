@@ -55,6 +55,7 @@ public:
 	struct Handle;
 	struct Mount;
 	struct Node;
+	struct Path;
 	struct SymbolicLink;
 
 	//
@@ -257,6 +258,16 @@ public:
 		// Destructor
 		//
 		virtual ~SymbolicLink()=default;
+	};
+
+	// Path
+	//
+	// Interface that must be implemented by a path object
+	struct Path
+	{
+		// Destructor
+		//
+		virtual ~Path()=default;
 	};
 
 	//-------------------------------------------------------------------------
