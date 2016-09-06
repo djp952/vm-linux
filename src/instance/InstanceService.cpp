@@ -28,6 +28,7 @@
 
 #include "Executable.h"
 #include "Exception.h"
+#include "HostFile.h"
 #include "HostFileSystem.h"
 #include "Namespace.h"
 #include "Process.h"
@@ -207,6 +208,19 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		}
 		
 		catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }
+
+		//
+		// EXTRACT INITRAMFS INTO ROOT FILE SYSTEM
+		//
+
+		if(param_initrd) {
+
+			// Verify that the specified file exists on the host system
+			std::tstring initrd = param_initrd;
+			if(!HostFile::Exists(initrd.c_str())) throw InitialRamFileSystemNotFoundException(initrd.c_str());
+
+			// todo: process the CPIO archive here (pull in the code from the old project for reading CPIO)
+		}
 
 		//
 		// LAUNCH INIT PROCESS

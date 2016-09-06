@@ -92,6 +92,7 @@ private:
 	// Parameter Map
 	//
 	BEGIN_PARAMETER_MAP(m_params)
+		PARAMETER_ENTRY(TEXT("initrd"), param_initrd)
 		PARAMETER_ENTRY(TEXT("log_buf_len"), param_log_buf_len)
 		PARAMETER_ENTRY(TEXT("loglevel"), param_loglevel)
 		PARAMETER_ENTRY(TEXT("ro"), param_ro)
@@ -172,6 +173,7 @@ private:
 
 	// Parameters
 	//
+	Parameter<std::tstring>				param_initrd;
 	Parameter<size_t>					param_log_buf_len	= 2 MiB;
 	Parameter<VirtualMachine::LogLevel>	param_loglevel		= VirtualMachine::LogLevel::Warning;
 	Parameter<void>						param_ro;

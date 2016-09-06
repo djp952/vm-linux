@@ -160,6 +160,15 @@
     <ClInclude Include="Capability.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\CpioArchive.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\StreamReader.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\HostFile.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -272,6 +281,15 @@
     </ClCompile>
     <ClCompile Include="Capability.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\CpioArchive.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\StreamReader.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\HostFile.cpp">
+      <Filter>Source Files\common</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
