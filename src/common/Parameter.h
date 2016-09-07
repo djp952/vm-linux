@@ -184,7 +184,7 @@ public:
 	// Parse (ParameterBase)
 	//
 	// Parses the specified string into the contained value
-	virtual void Parse(const tchar_t* value)
+	virtual void Parse(const tchar_t* value) override
 	{
 		Parse(std::tstring(value));
 	}
@@ -192,7 +192,7 @@ public:
 	// Parse (ParameterBase)
 	//
 	// Parses the specified string into the contained value
-	virtual void Parse(const std::tstring& value)
+	virtual void Parse(const std::tstring& value) override
 	{
 		Parse(value, m_value);
 	}
@@ -200,7 +200,7 @@ public:
 	// TryParse (ParameterBase)
 	//
 	// Tries to parse the specified string into the contained value
-	virtual bool TryParse(const tchar_t* value)
+	virtual bool TryParse(const tchar_t* value) override
 	{
 		return TryParse(std::tstring(value));
 	}
@@ -208,7 +208,7 @@ public:
 	// TryParse (ParameterBase)
 	//
 	// Tries to parse the specified string into the contained value
-	virtual bool TryParse(const std::tstring& value)
+	virtual bool TryParse(const std::tstring& value) override
 	{
 		try { Parse<_type>(value, m_value); }
 		catch(...) { return false; }

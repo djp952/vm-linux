@@ -71,7 +71,7 @@ protected:
 	// GetDefaultMessage (Exception)
 	//
 	// Invoked when an HRESULT code cannot be mapped to a message table string
-	virtual std::tstring GetDefaultMessage(HRESULT const& hresult);
+	virtual std::tstring GetDefaultMessage(HRESULT const& hresult) override;
 };
 
 //-----------------------------------------------------------------------------

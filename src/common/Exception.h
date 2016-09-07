@@ -133,7 +133,7 @@ public:
 	// what (std::exception)
 	//
 	// Gets the exception message text
-	virtual char_t const* what(void) const { return m_what.c_str(); }
+	virtual char_t const* what(void) const override { return m_what.c_str(); }
 
 	// Code
 	//

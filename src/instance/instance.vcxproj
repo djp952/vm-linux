@@ -193,10 +193,16 @@
     <ClInclude Include="..\common\align.h" />
     <ClInclude Include="..\common\Bitmap.h" />
     <ClInclude Include="..\common\bitmask.h" />
+    <ClInclude Include="..\common\BZip2StreamReader.h" />
     <ClInclude Include="..\common\CommandLine.h" />
     <ClInclude Include="..\common\convert.h" />
     <ClInclude Include="..\common\Exception.h" />
+    <ClInclude Include="..\common\GZipStreamReader.h" />
+    <ClInclude Include="..\common\Lz4StreamReader.h" />
+    <ClInclude Include="..\common\LzmaStreamReader.h" />
+    <ClInclude Include="..\common\LzopStreamReader.h" />
     <ClInclude Include="..\common\MemoryRegion.h" />
+    <ClInclude Include="..\common\MemoryStreamReader.h" />
     <ClInclude Include="..\common\Parameter.h" />
     <ClInclude Include="..\common\path.h" />
     <ClInclude Include="..\common\RpcObject.h" />
@@ -207,6 +213,7 @@
     <ClInclude Include="..\common\NtApi.h" />
     <ClInclude Include="..\common\StructuredException.h" />
     <ClInclude Include="..\common\Win32Exception.h" />
+    <ClInclude Include="..\common\XzStreamReader.h" />
     <ClInclude Include="Capability.h" />
     <ClInclude Include="CpioArchive.h" />
     <ClInclude Include="Executable.h" />
@@ -474,10 +481,16 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\common\Bitmap.cpp" />
+    <ClCompile Include="..\common\BZip2StreamReader.cpp" />
     <ClCompile Include="..\common\bz_internal_error.cpp" />
     <ClCompile Include="..\common\CommandLine.cpp" />
     <ClCompile Include="..\common\Exception.cpp" />
+    <ClCompile Include="..\common\GZipStreamReader.cpp" />
+    <ClCompile Include="..\common\Lz4StreamReader.cpp" />
+    <ClCompile Include="..\common\LzmaStreamReader.cpp" />
+    <ClCompile Include="..\common\LzopStreamReader.cpp" />
     <ClCompile Include="..\common\MemoryRegion.cpp" />
+    <ClCompile Include="..\common\MemoryStreamReader.cpp" />
     <ClCompile Include="..\common\NtApi.cpp" />
     <ClCompile Include="..\common\rpcmem.cpp" />
     <ClCompile Include="..\common\RpcObject.cpp" />
@@ -485,6 +498,7 @@
     <ClCompile Include="..\common\StructuredException.cpp" />
     <ClCompile Include="..\common\SystemInformation.cpp" />
     <ClCompile Include="..\common\Win32Exception.cpp" />
+    <ClCompile Include="..\common\XzStreamReader.cpp" />
     <ClCompile Include="Capability.cpp" />
     <ClCompile Include="CpioArchive.cpp" />
     <ClCompile Include="Executable.cpp" />

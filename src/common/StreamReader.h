@@ -79,7 +79,7 @@ public:
 	//
 	// Gets the current position within the stream
 	__declspec(property(get=getPosition)) size_t Position;
-	virtual size_t getPosition(void) = 0;
+	virtual size_t getPosition(void) const = 0;
 };
 
 //-----------------------------------------------------------------------------

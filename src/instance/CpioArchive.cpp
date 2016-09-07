@@ -154,7 +154,7 @@ size_t CpioArchive::FileStream::getLength(void) const
 //
 // Gets the current position of the file stream
 
-size_t CpioArchive::FileStream::getPosition(void) 
+size_t CpioArchive::FileStream::getPosition(void) const
 { 
 	return m_position; 
 }

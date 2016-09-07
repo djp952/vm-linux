@@ -219,12 +219,12 @@ private:
 		// Read (StreamReader)
 		//
 		// Reads data from the current position within the stream
-		virtual size_t Read(void* buffer, size_t length);
+		virtual size_t Read(void* buffer, size_t length) override;
 		
 		// Seek (StreamReader)
 		//
 		// Sets the position within the stream
-		virtual void Seek(size_t position);
+		virtual void Seek(size_t position) override;
 		
 		//---------------------------------------------------------------------
 		// Properties
@@ -233,13 +233,13 @@ private:
 		//
 		// Gets the length of the stream
 		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const;
+		virtual size_t getLength(void) const override;
 
 		// Position (StreamReader)
 		//
 		// Gets the current position within the stream
 		__declspec(property(get=getPosition)) size_t Position;
-		virtual size_t getPosition(void);
+		virtual size_t getPosition(void) const override;
 
 	private:
 

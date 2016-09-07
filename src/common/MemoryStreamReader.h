@@ -20,82 +20,74 @@
 // SOFTWARE.
 //-----------------------------------------------------------------------------
 
-#ifndef __WIN32EXCEPTION_H_
-#define __WIN32EXCEPTION_H_
+#ifndef __MEMORYSTREAMREADER_H_
+#define __MEMORYSTREAMREADER_H_
 #pragma once
 
-#include <exception>
-#include <Windows.h>
+#include "StreamReader.h"
 
-#pragma warning(push, 4)	
+#pragma warning(push, 4)				
 
 //-----------------------------------------------------------------------------
-// Class Win32Exception
+// MemoryStreamReader
 //
-// Exception-based class used to wrap Windows system error codes
+// Memory buffer stream reader implementation
 
-class Win32Exception : public std::exception
+class MemoryStreamReader : public StreamReader
 {
 public:
 
-	// Instance Constructors
+	// Instance Constructor
 	//
-	Win32Exception();
-	Win32Exception(DWORD result);
-
-	// Copy Constructor
-	//
-	Win32Exception(Win32Exception const& rhs);
+	MemoryStreamReader(void const* base, size_t length);
 
 	// Destructor
 	//
-	virtual ~Win32Exception();
+	virtual ~MemoryStreamReader()=default;
 
-	// char const* conversion operator
+	//---------------------------------------------------------------------
+	// Member Functions
+
+	// Read (StreamReader)
 	//
-	operator char const*() const;
-
-	//-------------------------------------------------------------------------
-	// std::exception implementation
-
-	// what
-	//
-	// Gets a pointer to the exception message text
-	virtual char const* what(void) const override;
+	// Reads data from the current position within the stream
+	virtual size_t Read(void* buffer, size_t length) override;
 		
-	//-------------------------------------------------------------------------
+	// Seek (StreamReader)
+	//
+	// Sets the position within the stream
+	virtual void Seek(size_t position) override;
+		
+	//---------------------------------------------------------------------
 	// Properties
 
-	// Code
+	// Length (StreamReader)
 	//
-	// Exposes the Windows system error code
-	__declspec(property(get=getCode)) DWORD Code;
-	DWORD getCode(void) const;
+	// Gets the length of the stream in bytes
+	__declspec(property(get=getLength)) size_t Length;
+	virtual size_t getLength(void) const override;
+
+	// Position (StreamReader)
+	//
+	// Gets the current position within the stream
+	__declspec(property(get=getPosition)) size_t Position;
+	virtual size_t getPosition(void) const override;
 
 private:
 
-	//-------------------------------------------------------------------------
-	// Private Member Functions
-
-	// AllocateMessage
-	//
-	// Generates the formatted message string from the project resources
-	static char* AllocateMessage(DWORD result);
+	MemoryStreamReader(MemoryStreamReader const&)=delete;
+	MemoryStreamReader& operator=(MemoryStreamReader const&)=delete;
 
 	//-------------------------------------------------------------------------
 	// Member Variables
 
-	DWORD const					m_code;			// Windows system error code
-	char* const					m_what;			// Formatted message text
-	bool const					m_owned;		// Flag if message is owned
-
-	// Fallback message text if the code could not be looked up
-	static constexpr LPCTSTR s_defaultformat = TEXT("Win32Exception code %1!lu!");
+	void const*				m_base;				// Base memory address
+	size_t					m_length;			// Length of memory buffer
+	size_t					m_offset;			// Offset into the memory buffer
 };
-
 
 //-----------------------------------------------------------------------------
 
 #pragma warning(pop)
 
-#endif	// __WIN32EXCEPTION_H_
+#endif	// __MEMORYSTREAMREADER_H_

@@ -74,7 +74,7 @@ public:
 	// what
 	//
 	// Gets a pointer to the exception message text
-	virtual char const* what(void) const;
+	virtual char const* what(void) const override;
 		
 	//-------------------------------------------------------------------------
 	// Properties
