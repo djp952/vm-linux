@@ -22,6 +22,7 @@
     </Filter>
     <Filter Include="External Libraries\servicelib">
       <UniqueIdentifier>{5ab7e1cf-74ba-4bea-b110-66ce8e9b3691}</UniqueIdentifier>
+      <SourceControlFiles>False</SourceControlFiles>
     </Filter>
     <Filter Include="Header Files\common">
       <UniqueIdentifier>{aa4a7470-4f95-4a0b-85ba-828d48015856}</UniqueIdentifier>
@@ -35,6 +36,30 @@
     <Filter Include="Source Files\syscalls-x64">
       <UniqueIdentifier>{2ab3b7d7-f253-40e8-bc2e-111a423c4fbd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="External Libraries\bzip2">
+      <UniqueIdentifier>{36fbe8a9-6537-439f-a2ec-473e419b9c89}</UniqueIdentifier>
+      <SourceControlFiles>False</SourceControlFiles>
+    </Filter>
+    <Filter Include="External Libraries\lz4">
+      <UniqueIdentifier>{e0f1327d-283c-4066-8395-a5a68a039a9c}</UniqueIdentifier>
+      <SourceControlFiles>False</SourceControlFiles>
+    </Filter>
+    <Filter Include="External Libraries\lzma">
+      <UniqueIdentifier>{95f9d401-8d0b-4622-8567-bdab70b058ac}</UniqueIdentifier>
+      <SourceControlFiles>False</SourceControlFiles>
+    </Filter>
+    <Filter Include="External Libraries\minilzo">
+      <UniqueIdentifier>{9a3dd8a3-3b46-40e9-83d6-c9db5c10b341}</UniqueIdentifier>
+      <SourceControlFiles>False</SourceControlFiles>
+    </Filter>
+    <Filter Include="External Libraries\xz-embedded">
+      <UniqueIdentifier>{3dea01b7-bb95-42bb-8c62-fe24c02b6321}</UniqueIdentifier>
+      <SourceControlFiles>False</SourceControlFiles>
+    </Filter>
+    <Filter Include="External Libraries\zlib">
+      <UniqueIdentifier>{54b15498-85d7-4e81-8fdc-8a953e9fdf99}</UniqueIdentifier>
+      <SourceControlFiles>False</SourceControlFiles>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -45,9 +70,6 @@
     </ClInclude>
     <ClInclude Include="..\..\tmp\messages\messages.h">
       <Filter>Generated Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\external-servicelib\servicelib.h">
-      <Filter>External Libraries\servicelib</Filter>
     </ClInclude>
     <ClInclude Include="..\common\CommandLine.h">
       <Filter>Header Files\common</Filter>
@@ -169,6 +191,36 @@
     <ClInclude Include="..\common\HostFile.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\external-servicelib\servicelib.h">
+      <Filter>External Libraries\servicelib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external-bzip2\bzlib.h">
+      <Filter>External Libraries\bzip2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external-lzma\C\LzmaDec.h">
+      <Filter>External Libraries\lzma</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external-minilzo\lzoconf.h">
+      <Filter>External Libraries\minilzo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external-minilzo\lzodefs.h">
+      <Filter>External Libraries\minilzo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external-minilzo\minilzo.h">
+      <Filter>External Libraries\minilzo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external-zlib\zconf.h">
+      <Filter>External Libraries\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external-zlib\zlib.h">
+      <Filter>External Libraries\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external-xz-embedded\linux\include\linux\xz.h">
+      <Filter>External Libraries\xz-embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external-lz4\lib\lz4.h">
+      <Filter>External Libraries\lz4</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -176,9 +228,6 @@
     </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\external-servicelib\servicelib.cpp">
-      <Filter>External Libraries\servicelib</Filter>
     </ClCompile>
     <ClCompile Include="..\common\CommandLine.cpp">
       <Filter>Source Files\common</Filter>
@@ -290,6 +339,72 @@
     </ClCompile>
     <ClCompile Include="..\common\HostFile.cpp">
       <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-servicelib\servicelib.cpp">
+      <Filter>External Libraries\servicelib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-bzip2\blocksort.c">
+      <Filter>External Libraries\bzip2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-bzip2\bzcompress.c">
+      <Filter>External Libraries\bzip2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-bzip2\bzlib.c">
+      <Filter>External Libraries\bzip2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-bzip2\crctable.c">
+      <Filter>External Libraries\bzip2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-bzip2\decompress.c">
+      <Filter>External Libraries\bzip2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-bzip2\huffman.c">
+      <Filter>External Libraries\bzip2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-bzip2\randtable.c">
+      <Filter>External Libraries\bzip2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\bz_internal_error.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-lzma\C\LzmaDec.c">
+      <Filter>External Libraries\lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-minilzo\minilzo.c">
+      <Filter>External Libraries\minilzo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-zlib\adler32.c">
+      <Filter>External Libraries\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-zlib\crc32.c">
+      <Filter>External Libraries\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-zlib\inffast.c">
+      <Filter>External Libraries\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-zlib\inflate.c">
+      <Filter>External Libraries\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-zlib\inftrees.c">
+      <Filter>External Libraries\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-zlib\zutil.c">
+      <Filter>External Libraries\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-xz-embedded\linux\lib\xz\xz_crc32.c">
+      <Filter>External Libraries\xz-embedded</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-xz-embedded\linux\lib\xz\xz_dec_bcj.c">
+      <Filter>External Libraries\xz-embedded</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-xz-embedded\linux\lib\xz\xz_dec_lzma2.c">
+      <Filter>External Libraries\xz-embedded</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-xz-embedded\linux\lib\xz\xz_dec_stream.c">
+      <Filter>External Libraries\xz-embedded</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external-lz4\lib\lz4.c">
+      <Filter>External Libraries\lz4</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
