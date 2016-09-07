@@ -26,17 +26,18 @@
 #include <algorithm>
 #include <messages.h>
 
+#include <Exception.h>
+#include <RpcObject.h>
+#include <Win32Exception.h>
+
 #include "Executable.h"
-#include "Exception.h"
 #include "HostFile.h"
 #include "HostFileSystem.h"
 #include "Namespace.h"
 #include "Process.h"
 #include "RootFileSystem.h"
-#include "RpcObject.h"
 #include "SystemLog.h"
 #include "TempFileSystem.h"
-#include "Win32Exception.h"
 
 #pragma warning(push, 4)
 

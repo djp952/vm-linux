@@ -23,6 +23,8 @@
 #include "stdafx.h"
 #include "CommandLine.h"
 
+#include "Win32Exception.h"
+
 #pragma warning(push, 4)				
 
 //-----------------------------------------------------------------------------
@@ -36,7 +38,7 @@
 CommandLine::CommandLine(int argc, tchar_t** argv) : CommandLine(MakeVector(argc, argv))
 {
 	// The executable name is expected to be set in argv[0] when using this constructor
-	if((argc == 0) || (argv[0] == nullptr)) throw Exception(E_INVALIDARG);
+	if((argc == 0) || (argv[0] == nullptr)) throw Win32Exception(ERROR_INVALID_PARAMETER);
 	m_executable = argv[0];
 }
 

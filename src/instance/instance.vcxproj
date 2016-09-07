@@ -195,10 +195,7 @@
     <ClInclude Include="..\common\bitmask.h" />
     <ClInclude Include="..\common\CommandLine.h" />
     <ClInclude Include="..\common\convert.h" />
-    <ClInclude Include="..\common\CpioArchive.h" />
     <ClInclude Include="..\common\Exception.h" />
-    <ClInclude Include="..\common\HostFile.h" />
-    <ClInclude Include="..\common\LinuxException.h" />
     <ClInclude Include="..\common\MemoryRegion.h" />
     <ClInclude Include="..\common\Parameter.h" />
     <ClInclude Include="..\common\path.h" />
@@ -211,10 +208,13 @@
     <ClInclude Include="..\common\StructuredException.h" />
     <ClInclude Include="..\common\Win32Exception.h" />
     <ClInclude Include="Capability.h" />
+    <ClInclude Include="CpioArchive.h" />
     <ClInclude Include="Executable.h" />
     <ClInclude Include="ExecutableFormat.h" />
+    <ClInclude Include="HostFile.h" />
     <ClInclude Include="HostFileSystem.h" />
     <ClInclude Include="IndexPool.h" />
+    <ClInclude Include="LinuxException.h" />
     <ClInclude Include="MountOptions.h" />
     <ClInclude Include="Namespace.h" />
     <ClInclude Include="NativeProcess.h" />
@@ -476,10 +476,7 @@
     <ClCompile Include="..\common\Bitmap.cpp" />
     <ClCompile Include="..\common\bz_internal_error.cpp" />
     <ClCompile Include="..\common\CommandLine.cpp" />
-    <ClCompile Include="..\common\CpioArchive.cpp" />
     <ClCompile Include="..\common\Exception.cpp" />
-    <ClCompile Include="..\common\HostFile.cpp" />
-    <ClCompile Include="..\common\LinuxException.cpp" />
     <ClCompile Include="..\common\MemoryRegion.cpp" />
     <ClCompile Include="..\common\NtApi.cpp" />
     <ClCompile Include="..\common\rpcmem.cpp" />
@@ -489,8 +486,11 @@
     <ClCompile Include="..\common\SystemInformation.cpp" />
     <ClCompile Include="..\common\Win32Exception.cpp" />
     <ClCompile Include="Capability.cpp" />
+    <ClCompile Include="CpioArchive.cpp" />
     <ClCompile Include="Executable.cpp" />
+    <ClCompile Include="HostFile.cpp" />
     <ClCompile Include="HostFileSystem.cpp" />
+    <ClCompile Include="LinuxException.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MountOptions.cpp" />
     <ClCompile Include="Namespace.cpp" />

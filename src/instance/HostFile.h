@@ -25,7 +25,7 @@
 #pragma once
 
 #include <memory>
-#include "text.h"
+#include <text.h>
 
 #pragma warning(push, 4)				
 

@@ -26,9 +26,8 @@
 
 #include <functional>
 #include <memory>
-
-#include "StreamReader.h"
-#include "text.h"
+#include <StreamReader.h>
+#include <text.h>
 
 #pragma warning(push, 4)			
 

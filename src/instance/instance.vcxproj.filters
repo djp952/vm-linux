@@ -158,9 +158,6 @@
     <ClInclude Include="VirtualMachine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\LinuxException.h">
-      <Filter>Header Files\common</Filter>
-    </ClInclude>
     <ClInclude Include="RootFileSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -182,13 +179,7 @@
     <ClInclude Include="Capability.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\CpioArchive.h">
-      <Filter>Header Files\common</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\StreamReader.h">
-      <Filter>Header Files\common</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\HostFile.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\external-servicelib\servicelib.h">
@@ -220,6 +211,15 @@
     </ClInclude>
     <ClInclude Include="..\..\..\external-lz4\lib\lz4.h">
       <Filter>External Libraries\lz4</Filter>
+    </ClInclude>
+    <ClInclude Include="CpioArchive.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LinuxException.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HostFile.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -313,9 +313,6 @@
     <ClCompile Include="VirtualMachine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\common\LinuxException.cpp">
-      <Filter>Source Files\common</Filter>
-    </ClCompile>
     <ClCompile Include="RootFileSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -331,13 +328,7 @@
     <ClCompile Include="Capability.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\common\CpioArchive.cpp">
-      <Filter>Source Files\common</Filter>
-    </ClCompile>
     <ClCompile Include="..\common\StreamReader.cpp">
-      <Filter>Source Files\common</Filter>
-    </ClCompile>
-    <ClCompile Include="..\common\HostFile.cpp">
       <Filter>Source Files\common</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\external-servicelib\servicelib.cpp">
@@ -405,6 +396,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\external-lz4\lib\lz4.c">
       <Filter>External Libraries\lz4</Filter>
+    </ClCompile>
+    <ClCompile Include="CpioArchive.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="LinuxException.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HostFile.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

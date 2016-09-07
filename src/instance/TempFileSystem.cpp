@@ -23,11 +23,12 @@
 #include "stdafx.h"
 #include "TempFileSystem.h"
 
-#include <LinuxException.h>
+#include <SystemInformation.h>
 #include <Win32Exception.h>
+
 #include "Capability.h"
+#include "LinuxException.h"
 #include "MountOptions.h"
-#include "SystemInformation.h"
 
 #pragma warning(push, 4)
 

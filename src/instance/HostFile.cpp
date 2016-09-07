@@ -23,7 +23,7 @@
 #include "stdafx.h"
 #include "HostFile.h"
 
-#include "Win32Exception.h"
+#include <Win32Exception.h>
 
 #pragma warning(push, 4)				
 

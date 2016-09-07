@@ -28,7 +28,6 @@
 #include <memory>
 #include <vector>
 #include "text.h"
-#include "Exception.h"
 
 #pragma warning(push, 4)				
 

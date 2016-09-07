@@ -72,12 +72,12 @@ public:
 	// Instance Constructor (HRESULT)
 	//
 	template <typename... _insertions>
-	Exception(HRESULT const& hresult, _insertions const&... insertions) : Exception{ hresult, s_module, insertions... } {}
+	Exception(HRESULT const& hresult, _insertions const&... insertions) : Exception(hresult, s_module, insertions...) {}
 
 	// Instance Constructor (HRESULT + Inner Exception)
 	//
 	template <typename... _insertions>
-	Exception(HRESULT const& hresult, Exception const& inner, _insertions const&... insertions) : Exception{ hresult, s_module, inner, insertions... } {}
+	Exception(HRESULT const& hresult, Exception const& inner, _insertions const&... insertions) : Exception(hresult, s_module, inner, insertions...) {}
 
 	// Instance Constructor (HRESULT + HMODULE)
 	//

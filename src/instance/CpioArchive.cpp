@@ -23,7 +23,7 @@
 #include "stdafx.h"
 #include "CpioArchive.h"
 
-#include "align.h"
+#include <align.h>
 
 #pragma warning(push, 4)				
 

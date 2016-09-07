@@ -22,10 +22,11 @@
 
 #include "stdafx.h"
 
-#include "CommandLine.h"
+#include <CommandLine.h>
+#include <StructuredException.h>
+#include <Win32Exception.h>
+
 #include "InstanceService.h"
-#include "StructuredException.h"
-#include "Win32Exception.h"
 
 // g_harness
 //
