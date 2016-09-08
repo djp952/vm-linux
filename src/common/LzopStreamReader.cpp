@@ -208,7 +208,8 @@ static intptr_t ReadHeader(intptr_t base, size_t *length, header_t* header)
 	if(header->flags & F_H_FILTER) 
 		base = ReadBE32(base, length, &header->filter);
 
-	// 	base = ReadBE32(base, length, &header->mode);
+	// mode
+	base = ReadBE32(base, length, &header->mode);
 	if(header->flags & F_STDIN) header->mode = 0;
 
 	// mtime_low
@@ -350,7 +351,7 @@ uint32_t LzopStreamReader::ReadNextBlock(void)
 	if(m_lzoflags & F_CRC32_C) m_lzopos = ReadBE32(m_lzopos, &m_lzoremain, &crc32_checksum_c);
 
 	// Sanity checks
-	if(uncompressed > MAX_BLOCK_SIZE) throw std::exception("lzma: decompression stream data is corrupt");
+	if(uncompressed > MAX_BLOCK_SIZE) throw std::exception("lzop: decompression stream data is corrupt");
 	if(compressed > m_lzoremain) throw std::exception("lzop: decompression stream ended prematurely");
 
 	// Reallocate the block buffer if the current one is not large enough
@@ -379,7 +380,7 @@ uint32_t LzopStreamReader::ReadNextBlock(void)
 	if(m_lzoflags & F_ADLER32_D) {
 
 		uint32_t adler = lzo_adler32(ADLER32_INIT_VALUE, m_block, uncompressed);
-		if(adler != adler_checksum_d) throw std::exception("lzma: decompression stream data is corrupt");
+		if(adler != adler_checksum_d) throw std::exception("lzop: decompression stream data is corrupt");
 	}
 #endif
 

@@ -171,8 +171,8 @@ private:
 // appropriate StreamReader and then passing that into the .EnumerateFiles method 
 // along with a lambda to process the data:
 //
-// std::unique_ptr<StreamReader> input(new GzipStreamReader(...));
-// CpioArchive::EnumerateFiles(input, [](CpioFile const& file) -> void {
+// GzipStreamReader input(...);
+// CpioArchive::EnumerateFiles(&input, [](CpioFile const& file) -> void {
 //
 //		create_file(file.Path);
 //		while(file.Read(....)) {
@@ -189,8 +189,9 @@ public:
 	// EnumerateFiles (static)
 	//
 	// Enumerates over all of the entries in a CPIO archive stream
-	static void EnumerateFiles(std::unique_ptr<StreamReader> const& reader, std::function<void(CpioFile const&)> func);
-	static void EnumerateFiles(std::unique_ptr<StreamReader>&& reader, std::function<void(CpioFile const&)> func);
+	static void EnumerateFiles(StreamReader* reader, std::function<void(CpioFile const&)> func);
+	static void EnumerateFiles(StreamReader& reader, std::function<void(CpioFile const&)> func);
+	static void EnumerateFiles(StreamReader&& reader, std::function<void(CpioFile const&)> func);
 
 private:
 

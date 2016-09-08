@@ -215,10 +215,10 @@
     <ClInclude Include="..\common\Win32Exception.h" />
     <ClInclude Include="..\common\XzStreamReader.h" />
     <ClInclude Include="Capability.h" />
+    <ClInclude Include="CompressedFileReader.h" />
     <ClInclude Include="CpioArchive.h" />
     <ClInclude Include="Executable.h" />
     <ClInclude Include="ExecutableFormat.h" />
-    <ClInclude Include="HostFile.h" />
     <ClInclude Include="HostFileSystem.h" />
     <ClInclude Include="IndexPool.h" />
     <ClInclude Include="LinuxException.h" />
@@ -500,9 +500,9 @@
     <ClCompile Include="..\common\Win32Exception.cpp" />
     <ClCompile Include="..\common\XzStreamReader.cpp" />
     <ClCompile Include="Capability.cpp" />
+    <ClCompile Include="CompressedFileReader.cpp" />
     <ClCompile Include="CpioArchive.cpp" />
     <ClCompile Include="Executable.cpp" />
-    <ClCompile Include="HostFile.cpp" />
     <ClCompile Include="HostFileSystem.cpp" />
     <ClCompile Include="LinuxException.cpp" />
     <ClCompile Include="main.cpp" />

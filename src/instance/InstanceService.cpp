@@ -30,8 +30,9 @@
 #include <RpcObject.h>
 #include <Win32Exception.h>
 
+#include "CompressedFileReader.h"
+#include "CpioArchive.h"
 #include "Executable.h"
-#include "HostFile.h"
 #include "HostFileSystem.h"
 #include "Namespace.h"
 #include "Process.h"
@@ -74,6 +75,26 @@ std::unique_ptr<VirtualMachine::FileSystem> InstanceService::CreateProcFileSyste
 	return nullptr;
 }
 
+//---------------------------------------------------------------------------
+// InstanceService::LoadInitialRamFileSystem
+//
+// Loads the contents of an initramfs file into the root file system
+//
+// Arguments:
+//
+//	initramfs		- Path to the initramfs file to be loaded
+
+void InstanceService::LoadInitialRamFileSystem(std::tstring const& initramfs)
+{
+	// initramfs is stored in a CPIO archive that may be compressed via a variety of different
+	// mechanisms. Wrap the file itself in a generic CompressedStreamReader to handle that
+	CpioArchive::EnumerateFiles(CompressedFileReader(initramfs.c_str()), [](CpioFile const& file) -> void {
+
+		UNREFERENCED_PARAMETER(file);
+
+	});
+}
+	
 //---------------------------------------------------------------------------
 // InstanceService::OnStart (private)
 //
@@ -216,11 +237,11 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 
 		if(param_initrd) {
 
-			// Verify that the specified file exists on the host system
-			std::tstring initrd = param_initrd;
-			if(!HostFile::Exists(initrd.c_str())) throw InitialRamFileSystemNotFoundException(initrd.c_str());
+			std::tstring initrd = param_initrd;				// Pull out the param_initrd string
 
-			// todo: process the CPIO archive here (pull in the code from the old project for reading CPIO)
+			// Attempt to extract the contents of the initramfs archive into the root file system
+			try { LoadInitialRamFileSystem(initrd); }
+			catch(std::exception& ex) { throw InitialRamFileSystemException(initrd.c_str(), ex.what()); }
 		}
 
 		//

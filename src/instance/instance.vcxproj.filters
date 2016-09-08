@@ -218,9 +218,6 @@
     <ClInclude Include="LinuxException.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="HostFile.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\BZip2StreamReader.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
@@ -241,6 +238,9 @@
     </ClInclude>
     <ClInclude Include="..\common\XzStreamReader.h">
       <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="CompressedFileReader.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -424,9 +424,6 @@
     <ClCompile Include="LinuxException.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="HostFile.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\common\BZip2StreamReader.cpp">
       <Filter>Source Files\common</Filter>
     </ClCompile>
@@ -447,6 +444,9 @@
     </ClCompile>
     <ClCompile Include="..\common\XzStreamReader.cpp">
       <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="CompressedFileReader.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

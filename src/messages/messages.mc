@@ -112,11 +112,11 @@ PANIC: An exception occurred during instance initialization. %1!S!
 .
 
 MessageId=
-;//ExceptionName=InitialRamFileSystemNotFoundException,path
+;//ExceptionName=InitialRamFileSystemException,path,errormessage
 Severity=Error
 SymbolicName=E_INITRAMFSNOTFOUND
 Language=English
-The specified initial RAM file system (initramfs) archive %1!s! cannot be found
+The specified initial RAM file system (initramfs) archive %1!s! could be processed - %2!S!
 .
 
 ;//----------------------------------------------------------------------------

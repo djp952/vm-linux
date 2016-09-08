@@ -141,10 +141,15 @@ private:
 	// Creates an instance of the procfs file system for this instance
 	static std::unique_ptr<VirtualMachine::FileSystem> CreateProcFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
 
+	// LoadInitialRamFileSystem
+	//
+	// Loads the contents of an initramfs file into the root file system
+	void LoadInitialRamFileSystem(std::tstring const& initramfs);
+	
 	// OnStart (Service)
 	//
 	// Invoked when the service is started
-	virtual void OnStart(int argc, LPTSTR* argv);
+	virtual void OnStart(int argc, LPTSTR* argv) override;
 
 	// OnStop
 	//

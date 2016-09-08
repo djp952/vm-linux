@@ -24,6 +24,7 @@
 #include "CpioArchive.h"
 
 #include <align.h>
+#include <Win32Exception.h>
 
 #pragma warning(push, 4)				
 
@@ -71,9 +72,11 @@ static uint32_t ConvertHexString(const char_t* str, size_t len)
 //	reader		- StreamReader instance set to the beginning of the archive
 //	func		- Function to process each entry in the archive
 
-void CpioArchive::EnumerateFiles(std::unique_ptr<StreamReader> const& reader, std::function<void(CpioFile const&)> func)
+void CpioArchive::EnumerateFiles(StreamReader* reader, std::function<void(CpioFile const&)> func)
 {
 	cpio_header_t			header;				// Current file header
+
+	if(reader == nullptr) throw Win32Exception(ERROR_INVALID_PARAMETER);
 
 	// Process each file embedded in the CPIO archive input stream
 	while(reader->Read(&header, sizeof(cpio_header_t)) == sizeof(cpio_header_t)) {
@@ -95,7 +98,7 @@ void CpioArchive::EnumerateFiles(std::unique_ptr<StreamReader> const& reader, st
 
 		// Create a FileStream around the current base stream position
 		uint32_t datalength = ConvertHexString(header.c_filesize, 8);
-		FileStream filestream(reader.get(), datalength);
+		FileStream filestream(reader, datalength);
 
 		// Invoke the caller-supplied function with a new CpioFile object
 		func(std::move(CpioFile(header, path, filestream)));
@@ -116,9 +119,24 @@ void CpioArchive::EnumerateFiles(std::unique_ptr<StreamReader> const& reader, st
 //	reader		- StreamReader instance set to the beginning of the archive
 //	func		- Function to process each entry in the archive
 
-void CpioArchive::EnumerateFiles(std::unique_ptr<StreamReader>&& reader, std::function<void(CpioFile const&)> func)
+void CpioArchive::EnumerateFiles(StreamReader& reader, std::function<void(CpioFile const&)> func)
 {
-	return EnumerateFiles(std::forward<std::unique_ptr<StreamReader> const&>(reader), func);
+	return EnumerateFiles(&reader, func);
+}
+
+//-----------------------------------------------------------------------------
+// CpioArchive::EnumerateFiles (static)
+//
+// Enumerates over all of the files/objects contained in a CPIO archive
+//
+// Arguments:
+//
+//	reader		- StreamReader instance set to the beginning of the archive
+//	func		- Function to process each entry in the archive
+
+void CpioArchive::EnumerateFiles(StreamReader&& reader, std::function<void(CpioFile const&)> func)
+{
+	return EnumerateFiles(&reader, func);
 }
 
 //
@@ -196,7 +214,7 @@ size_t CpioArchive::FileStream::Read(void* buffer, size_t length)
 void CpioArchive::FileStream::Seek(size_t position) 
 { 
 	UNREFERENCED_PARAMETER(position); 
-	throw Exception(E_NOTIMPL); 
+	throw Win32Exception(ERROR_CALL_NOT_IMPLEMENTED);
 }
 
 //
