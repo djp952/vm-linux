@@ -144,7 +144,7 @@ private:
 	// LoadInitialRamFileSystem
 	//
 	// Loads the contents of an initramfs file into the root file system
-	void LoadInitialRamFileSystem(std::tstring const& initramfs);
+	void LoadInitialRamFileSystem(VirtualMachine::Path const* root, std::tstring const& initramfs);
 	
 	// OnStart (Service)
 	//

@@ -196,6 +196,7 @@
     <ClInclude Include="..\common\BZip2StreamReader.h" />
     <ClInclude Include="..\common\CommandLine.h" />
     <ClInclude Include="..\common\convert.h" />
+    <ClInclude Include="..\common\datetime.h" />
     <ClInclude Include="..\common\Exception.h" />
     <ClInclude Include="..\common\GZipStreamReader.h" />
     <ClInclude Include="..\common\Lz4StreamReader.h" />
@@ -212,6 +213,7 @@
     <ClInclude Include="..\common\text.h" />
     <ClInclude Include="..\common\NtApi.h" />
     <ClInclude Include="..\common\StructuredException.h" />
+    <ClInclude Include="..\common\timespan.h" />
     <ClInclude Include="..\common\Win32Exception.h" />
     <ClInclude Include="..\common\XzStreamReader.h" />
     <ClInclude Include="Capability.h" />
@@ -484,6 +486,7 @@
     <ClCompile Include="..\common\BZip2StreamReader.cpp" />
     <ClCompile Include="..\common\bz_internal_error.cpp" />
     <ClCompile Include="..\common\CommandLine.cpp" />
+    <ClCompile Include="..\common\datetime.cpp" />
     <ClCompile Include="..\common\Exception.cpp" />
     <ClCompile Include="..\common\GZipStreamReader.cpp" />
     <ClCompile Include="..\common\Lz4StreamReader.cpp" />
@@ -497,6 +500,7 @@
     <ClCompile Include="..\common\StreamReader.cpp" />
     <ClCompile Include="..\common\StructuredException.cpp" />
     <ClCompile Include="..\common\SystemInformation.cpp" />
+    <ClCompile Include="..\common\timespan.cpp" />
     <ClCompile Include="..\common\Win32Exception.cpp" />
     <ClCompile Include="..\common\XzStreamReader.cpp" />
     <ClCompile Include="Capability.cpp" />

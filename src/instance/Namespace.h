@@ -234,6 +234,11 @@ private:
 		//
 		~Path()=default;
 
+		// Duplicate (VirtualMachine::Path)
+		//
+		// Duplicates this Path instance
+		virtual std::unique_ptr<VirtualMachine::Path> Duplicate(void) override;
+
 	private:
 
 		Path(Path const&)=delete;

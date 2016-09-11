@@ -268,6 +268,11 @@ public:
 		// Destructor
 		//
 		virtual ~Path()=default;
+
+		// Duplicate
+		//
+		// Duplicates this Path instance
+		virtual std::unique_ptr<Path> Duplicate(void) = 0;
 	};
 
 	//-------------------------------------------------------------------------

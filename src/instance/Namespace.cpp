@@ -258,5 +258,20 @@ Namespace::Path::Path(std::shared_ptr<path_t> const& path) : m_path(path)
 }
 
 //---------------------------------------------------------------------------
+// Namespace::Path::Duplicate
+//
+// Duplicates this Path instance
+//
+// Arguments:
+//
+//	NONE
+
+std::unique_ptr<VirtualMachine::Path> Namespace::Path::Duplicate(void)
+{
+	// Create and return a new Path instance that refers to the same path_t
+	return std::make_unique<Path>(m_path);
+}
+
+//---------------------------------------------------------------------------
 
 #pragma warning(pop)

@@ -24,9 +24,12 @@
 #define __TEMPFILESYSTEM_H_
 #pragma once
 
+#include <datetime.h>
 #include <memory>
 #include <sync.h>
 #include <text.h>
+#include <timespan.h>
+#include <unordered_map>
 
 #include "IndexPool.h"
 #include "VirtualMachine.h"
@@ -125,6 +128,47 @@ private:
 	TempFileSystem(TempFileSystem const&)=delete;
 	TempFileSystem& operator=(TempFileSystem const&)=delete;
 
+	// node_t
+	//
+	// Internal node implementation
+	struct node_t
+	{
+		// atime
+		//
+		// Date/time at which the node was accessed
+		datetime atime;
+
+		// ctime
+		//
+		// Date/time at which the node metadata was changed
+		datetime ctime;
+
+		// crtime
+		//
+		// Date/time at which the node was created
+		datetime crtime;
+
+		// gid
+		//
+		// Node owner group identifier
+		uapi_gid_t	gid;
+
+		// mode
+		//
+		// Node permission mask
+		uapi_mode_t mode;
+
+		// mtime
+		//
+		// Date/time at which the node data was modified
+		datetime mtime;
+		
+		// uid
+		//
+		// Node owner identifier
+		uapi_uid_t uid;
+	};
+
 	// tempfs_t
 	//
 	// Internal shared file system instance
@@ -167,6 +211,16 @@ private:
 		//
 		// Number of allocated nodes
 		std::atomic<size_t> nodecount = 0;
+
+		// nodes
+		//
+		// Collection of active node instances
+		std::unordered_map<int32_t, std::shared_ptr<node_t>> nodes;
+
+		// nodeslock
+		//
+		// Nodes collection synchronization object
+		sync::reader_writer_lock nodeslock;
 
 		//---------------------------------------------------------------------
 		// Member Functions

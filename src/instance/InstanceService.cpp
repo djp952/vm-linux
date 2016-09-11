@@ -82,10 +82,13 @@ std::unique_ptr<VirtualMachine::FileSystem> InstanceService::CreateProcFileSyste
 //
 // Arguments:
 //
+//	root			- Root directory Path instance
 //	initramfs		- Path to the initramfs file to be loaded
 
-void InstanceService::LoadInitialRamFileSystem(std::tstring const& initramfs)
+void InstanceService::LoadInitialRamFileSystem(VirtualMachine::Path const* root, std::tstring const& initramfs)
 {
+	UNREFERENCED_PARAMETER(root);
+
 	// initramfs is stored in a CPIO archive that may be compressed via a variety of different
 	// mechanisms. Wrap the file itself in a generic CompressedStreamReader to handle that
 	CpioArchive::EnumerateFiles(CompressedFileReader(initramfs.c_str()), [](CpioFile const& file) -> void {
@@ -240,7 +243,7 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 			std::tstring initrd = param_initrd;				// Pull out the param_initrd string
 
 			// Attempt to extract the contents of the initramfs archive into the root file system
-			try { LoadInitialRamFileSystem(initrd); }
+			try { LoadInitialRamFileSystem(rootpath.get(), initrd); }
 			catch(std::exception& ex) { throw InitialRamFileSystemException(initrd.c_str(), ex.what()); }
 		}
 

@@ -34,6 +34,9 @@
 //
 // Generic compressed file stream reader, the underlying type of the compression
 // is automatically detected by examining the data
+//
+// todo: This should be more sophicated and not map the entire file into memory at
+// once.  This method will work for initramfs files which aren't going to be huge
 
 class CompressedFileReader : public StreamReader
 {
