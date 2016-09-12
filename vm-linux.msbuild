@@ -5,16 +5,16 @@ Usage:
 
   - Open Developer Command Prompt for VS2015
   - Navigate to vm-linux solution directory
-  - msbuild vm-linux.msbuild /t:[TARGET]
+  - msbuild vm-linux.msbuild [/t:[TARGET]]
 
 Targets:
 
   - RestorePackages     - Restores solution nuget packages
   - Clean               - Cleans release versions
-  - Build               - Rebuilds release versions
+  - Build (default)     - Rebuilds release versions
 
 -->
-<Project DefaultTargets="Package" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   
   <PropertyGroup>
     <SolutionDir>.\</SolutionDir>
@@ -23,20 +23,19 @@ Targets:
   
   <!-- Restore nuget packages -->
   <Target Name="RestorePackages">
-    <Exec Command="$(NuGetExe) restore vm-linux.sln" ContinueOnError="false" />
+    <Exec Condition="!Exists('$(SolutionDir)packages')" Command="$(NuGetExe) restore vm-linux.sln" ContinueOnError="false" />
   </Target>
 
   <!-- Clean release targets and output directory -->
   <Target Name="Clean">
     <MSBuild Projects="vm-linux.sln" Properties="Configuration=Release;Platform=Win32" Targets="Clean" ContinueOnError="false"/>
     <MSBuild Projects="vm-linux.sln" Properties="Configuration=Release;Platform=x64" Targets="Clean" ContinueOnError="false"/>
-    <RemoveDir Directories="$(SolutionDir)packages"/>
     <RemoveDir Directories="$(SolutionDir)tmp"/>
     <RemoveDir Directories="$(SolutionDir)out"/>
   </Target>
 
   <!-- Build release targets -->
-  <Target Name="Build" DependsOnTargets="Clean;RestorePackages">
+  <Target Name="Build" DependsOnTargets="RestorePackages;Clean">
     <MSBuild Projects="vm-linux.sln" Properties="Configuration=Release;Platform=Win32" Targets="Rebuild" ContinueOnError="false"/>
     <MSBuild Projects="vm-linux.sln" Properties="Configuration=Release;Platform=x64" Targets="Rebuild" ContinueOnError="false"/>
   </Target>
