@@ -90,7 +90,9 @@ CompressedFileReader::CompressedFileReader(tchar_t const* path, size_t offset, s
 
 		// Get the size of the specified input file and ensure it does not exceed size_t
 		if(!GetFileSizeEx(file, &filesize)) throw Win32Exception();
+	#ifndef _M_X64
 		if(filesize.QuadPart > std::numeric_limits<size_t>::max()) throw Win32Exception(ERROR_NOT_ENOUGH_MEMORY);
+	#endif
 
 		// Adjust the length to the actual file size if zero was specified
 		length = (length == 0) ? static_cast<size_t>(filesize.QuadPart) : length;
