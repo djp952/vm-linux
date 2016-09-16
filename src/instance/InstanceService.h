@@ -102,21 +102,21 @@ private:
 		PARAMETER_ENTRY(TEXT("rw"), param_rw)
 	END_PARAMETER_MAP()
 
-	// filesystem_map_t
-	//
-	// Collection of active file systems (source, FileSystem*)
-	using filesystem_map_t = std::map<std::string, std::unique_ptr<VirtualMachine::FileSystem>>;
-
 	// filesystemtype_map_t
 	//
 	// Collection of available file systems (name, create function)
-	using filesystemtype_map_t = std::unordered_map<std::tstring, VirtualMachine::CreateFileSystem>;
+	using filesystemtype_map_t = std::unordered_map<std::tstring, VirtualMachine::MountFileSystem>;
 
 	// ProcFileSystem
 	//
 	// Implements the procfs file system
 	class ProcFileSystem : public VirtualMachine::FileSystem
 	{
+		// MountProcFileSystem (friend)
+		//
+		// Creates an instance of ProcFileSystem
+		friend std::unique_ptr<VirtualMachine::Mount> MountProcFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
+
 	public:
 
 		// Instance Constructor
@@ -135,11 +135,6 @@ private:
 
 	//-------------------------------------------------------------------------
 	// Private Member Functions
-
-	// CreateProcFileSystem (static)
-	//
-	// Creates an instance of the procfs file system for this instance
-	static std::unique_ptr<VirtualMachine::FileSystem> CreateProcFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
 
 	// LoadInitialRamFileSystem
 	//
@@ -167,7 +162,6 @@ private:
 	// File System
 	//
 	filesystemtype_map_t			m_fstypes;			// Available file systems
-	filesystem_map_t				m_filesystems;		// Created file systems
 
 	// RPC System Call Objects
 	//

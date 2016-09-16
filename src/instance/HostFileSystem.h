@@ -31,10 +31,10 @@
 
 #pragma warning(push, 4)
 
-// CreateHostFileSystem
+// MountHostFileSystem
 //
-// VirtualMachine::CreateFileSystem function for HostFileSystem
-std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
+// Creates an instance of HostFileSystem
+std::unique_ptr<VirtualMachine::Mount> MountHostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
 
 //-----------------------------------------------------------------------------
 // Class HostFileSystem
@@ -73,26 +73,37 @@ class HostFileSystem : public VirtualMachine::FileSystem
 	// Supported remount operation flags
 	static const uint32_t REMOUNT_FLAGS = UAPI_MS_REMOUNT | UAPI_MS_RDONLY | UAPI_MS_SYNCHRONOUS;
 
+	// MountHostFileSystem (friend)
+	//
+	// Creates an instance of HostFileSystem
+	friend std::unique_ptr<VirtualMachine::Mount> MountHostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
+
+	// FORWARD DECLARATIONS
+	//
+	class Mount;
+
 public:
 
 	// Instance Constructor
 	//
-	HostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
+	HostFileSystem(uint32_t flags);
 
 	// Destructor
 	//
 	~HostFileSystem()=default;
 
-	// hostfs_t
+	//-----------------------------------------------------------------------------
+	// Fields
+
+	// Flags
 	//
-	// Internal shared file system state
-	struct hostfs_t
-	{
-		// flags
-		//
-		// Filesystem-level flags
-		std::atomic<uint32_t> flags = 0;
-	};
+	// File system specific flags
+	std::atomic<uint32_t> Flags = 0;
+	
+private:
+
+	HostFileSystem(HostFileSystem const&)=delete;
+	HostFileSystem& operator=(HostFileSystem const&)=delete;
 
 	// Mount
 	//
@@ -103,41 +114,20 @@ public:
 
 		// Instance Constructor
 		//
-		Mount(std::shared_ptr<hostfs_t> const& fs, uint32_t flags);
+		Mount(std::shared_ptr<HostFileSystem> const& fs, uint32_t flags);
 
 		// Destructor
 		//
 		~Mount()=default;
-
-		//---------------------------------------------------------------------
-		// Member Functions
 
 	private:
 
 		//---------------------------------------------------------------------
 		// Member Variables
 
-		std::shared_ptr<hostfs_t>	m_fs;		// Shared file system instance
-		uint32_t					m_flags;	// Mount-specific flags
+		std::shared_ptr<HostFileSystem>		m_fs;		// File system instance
+		std::atomic<uint32_t>				m_flags;	// Mount-specific flags
 	};
-
-	//-----------------------------------------------------------------------------
-	// Member Functions
-
-	// Mount (FileSystem)
-	//
-	// Mounts the file system
-	virtual std::unique_ptr<VirtualMachine::Mount> Mount(uint32_t flags, void const* data, size_t datalength);
-
-private:
-
-	HostFileSystem(HostFileSystem const&)=delete;
-	HostFileSystem& operator=(HostFileSystem const&)=delete;
-
-	//-------------------------------------------------------------------------
-	// Member Variables
-
-	std::shared_ptr<hostfs_t>		m_fs;			// Shared file system state
 };
 
 //-----------------------------------------------------------------------------

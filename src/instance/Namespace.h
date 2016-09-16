@@ -68,10 +68,10 @@ public:
 	// Performs a path name lookup operation
 	std::unique_ptr<VirtualMachine::Path> LookupPath(void) const;
 
-	// MountFileSystem
-	//
-	// Mounts a file system within this namespace at the specified location
-	std::unique_ptr<VirtualMachine::Path> MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength);
+	//// MountFileSystem
+	////
+	//// Mounts a file system within this namespace at the specified location
+	//std::unique_ptr<VirtualMachine::Path> MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength);
 
 	//-------------------------------------------------------------------------
 	// Properties
@@ -162,10 +162,10 @@ private:
 		//---------------------------------------------------------------------
 		// Member Functions
 
-		// MountFileSystem
-		//
-		// Mounts a file system at the specified location in the namespace
-		std::unique_ptr<VirtualMachine::Path> MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength);
+		//// MountFileSystem
+		////
+		//// Mounts a file system at the specified location in the namespace
+		//std::unique_ptr<VirtualMachine::Path> MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength);
 
 	private:
 

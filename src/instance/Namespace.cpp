@@ -99,11 +99,11 @@ std::unique_ptr<VirtualMachine::Path> Namespace::LookupPath(void) const
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-std::unique_ptr<VirtualMachine::Path> Namespace::MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength)
-{
-	_ASSERTE(m_mountns);
-	return m_mountns->MountFileSystem(path, fs, flags, data, datalength);
-}
+//std::unique_ptr<VirtualMachine::Path> Namespace::MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength)
+//{
+//	_ASSERTE(m_mountns);
+//	return m_mountns->MountFileSystem(path, fs, flags, data, datalength);
+//}
 
 //
 // NAMESPACE::MOUNTNAMESPACE IMPLEMENTATION
@@ -206,41 +206,41 @@ std::string Namespace::MountNamespace::GetPathString(std::shared_ptr<path_t> con
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-std::unique_ptr<VirtualMachine::Path> Namespace::MountNamespace::MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength)
-{
-	if(fs == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// A pure root mount requires the MS_KERNMOUNT flag be set (User-mode mounts would specify "/" as the path)
-	if((path == nullptr) && ((flags & UAPI_MS_KERNMOUNT) != UAPI_MS_KERNMOUNT)) throw LinuxException(UAPI_EPERM);
-
-	sync::reader_writer_lock::scoped_lock_write writer(m_mountslock);
-
-	// Create the new path_t that will own the actual mount instance
-	std::shared_ptr<path_t> mountpoint = std::make_shared<path_t>();
-
-	try {
-
-		// Attempt to look up the existing path that this mountpoint will hide
-		mountpoint->hides = (path == nullptr) ? m_mounts.at("/") : GetPath(path);
-		if(!mountpoint->hides) throw LinuxException(UAPI_ENOENT);
-
-		// Copy the name, parent and canonical parent of the existing path_t into the new path_t
-		mountpoint->name = mountpoint->hides->name;
-		mountpoint->parent = mountpoint->hides->parent;
-		mountpoint->canonicalparent = mountpoint->hides->canonicalparent;
-	}
-
-	catch(std::out_of_range&) { /* m_mounts.at("/") failed -- no existing root mount */ }
-
-	// Assign the mount point to the path_t by invoking the file system mount function
-	mountpoint->mount = fs->Mount(flags, data, datalength);
-
-	// Add or replace the path_t instance for this mount in the collection
-	m_mounts[GetCanonicalPathString(mountpoint)] = mountpoint;
-
-	// Generate a Path instance for the caller that references the mount path_t
-	return std::make_unique<Path>(mountpoint);
-}
+//std::unique_ptr<VirtualMachine::Path> Namespace::MountNamespace::MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength)
+//{
+//	if(fs == nullptr) throw LinuxException(UAPI_EFAULT);
+//
+//	// A pure root mount requires the MS_KERNMOUNT flag be set (User-mode mounts would specify "/" as the path)
+//	if((path == nullptr) && ((flags & UAPI_MS_KERNMOUNT) != UAPI_MS_KERNMOUNT)) throw LinuxException(UAPI_EPERM);
+//
+//	sync::reader_writer_lock::scoped_lock_write writer(m_mountslock);
+//
+//	// Create the new path_t that will own the actual mount instance
+//	std::shared_ptr<path_t> mountpoint = std::make_shared<path_t>();
+//
+//	try {
+//
+//		// Attempt to look up the existing path that this mountpoint will hide
+//		mountpoint->hides = (path == nullptr) ? m_mounts.at("/") : GetPath(path);
+//		if(!mountpoint->hides) throw LinuxException(UAPI_ENOENT);
+//
+//		// Copy the name, parent and canonical parent of the existing path_t into the new path_t
+//		mountpoint->name = mountpoint->hides->name;
+//		mountpoint->parent = mountpoint->hides->parent;
+//		mountpoint->canonicalparent = mountpoint->hides->canonicalparent;
+//	}
+//
+//	catch(std::out_of_range&) { /* m_mounts.at("/") failed -- no existing root mount */ }
+//
+//	// Assign the mount point to the path_t by invoking the file system mount function
+//	mountpoint->mount = fs->Mount(flags, data, datalength);
+//
+//	// Add or replace the path_t instance for this mount in the collection
+//	m_mounts[GetCanonicalPathString(mountpoint)] = mountpoint;
+//
+//	// Generate a Path instance for the caller that references the mount path_t
+//	return std::make_unique<Path>(mountpoint);
+//}
 
 //
 // NAMESPACE::PATH IMPLEMENTATION

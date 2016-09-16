@@ -43,20 +43,9 @@
 #pragma warning(push, 4)
 
 //---------------------------------------------------------------------------
-// InstanceService Constructor
+// MountProcFileSystem
 //
-// Arguments:
-//
-//	NONE
-
-InstanceService::InstanceService()
-{
-}
-
-//---------------------------------------------------------------------------
-// InstanceService::CreateProcFileSystem (static)
-//
-// Creates an instance of the ProcFileSystem file system
+// Creates an instance of InstanceService::ProcFileSystem file system
 //
 // Arguments:
 //
@@ -65,7 +54,7 @@ InstanceService::InstanceService()
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-std::unique_ptr<VirtualMachine::FileSystem> InstanceService::CreateProcFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
+std::unique_ptr<VirtualMachine::Mount> MountProcFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
 	UNREFERENCED_PARAMETER(source);
 	UNREFERENCED_PARAMETER(flags);
@@ -73,6 +62,17 @@ std::unique_ptr<VirtualMachine::FileSystem> InstanceService::CreateProcFileSyste
 	UNREFERENCED_PARAMETER(datalength);
 
 	return nullptr;
+}
+
+//---------------------------------------------------------------------------
+// InstanceService Constructor
+//
+// Arguments:
+//
+//	NONE
+
+InstanceService::InstanceService()
+{
 }
 
 //---------------------------------------------------------------------------
@@ -195,10 +195,10 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// INITIALIZE FILE SYSTEM TYPES
 		//
 
-		m_fstypes.emplace(TEXT("hostfs"), CreateHostFileSystem);
-		m_fstypes.emplace(TEXT("procfs"), CreateProcFileSystem);
-		m_fstypes.emplace(TEXT("rootfs"), CreateRootFileSystem);
-		m_fstypes.emplace(TEXT("tmpfs"), CreateTempFileSystem);
+		m_fstypes.emplace(TEXT("hostfs"), MountHostFileSystem);
+		m_fstypes.emplace(TEXT("procfs"), MountProcFileSystem);
+		m_fstypes.emplace(TEXT("rootfs"), MountRootFileSystem);
+		m_fstypes.emplace(TEXT("tmpfs"), MountTempFileSystem);
 
 		//
 		// REGISTER SYSTEM CALL INTERFACES
@@ -225,11 +225,10 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 			
 			// Attempt to create the root file system instance using the specified parameters
 			auto rootsource = std::to_string(param_root);
-			auto rootfs = rootfsentry->second(rootsource.c_str(), rootfsflags, rootflagsstr.data(), rootflagsstr.length());
+			auto rootmount = rootfsentry->second(rootsource.c_str(), rootfsflags, rootflagsstr.data(), rootflagsstr.length());
 
-			// Mount the file system within the root namespace and set as an active file system if successful
-			rootpath = m_rootns->MountFileSystem(nullptr, rootfs.get(), rootfsflags, rootflagsstr.data(), rootflagsstr.length());
-			m_filesystems.emplace(rootsource, std::move(rootfs));
+			//// Mount the file system within the root namespace and set as an active file system if successful
+			//rootpath = m_rootns->MountFileSystem(nullptr, rootfs.get(), rootfsflags, rootflagsstr.data(), rootflagsstr.length());
 		}
 		
 		catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }
@@ -279,9 +278,6 @@ void InstanceService::OnStop(void)
 	// Forcibly terminate any remaining processes created by this instance
 	TerminateJobObject(m_job, ERROR_PROCESS_ABORTED);
 	CloseHandle(m_job);
-
-	// Remove all active file systems
-	m_filesystems.clear();
 
 	// Revoke the system call interfaces
 #ifdef _M_X64

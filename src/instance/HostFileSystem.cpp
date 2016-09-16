@@ -36,24 +36,9 @@ static_assert(FILE_CURRENT == UAPI_SEEK_CUR, "FILE_CURRENT must be the same valu
 static_assert(FILE_END == UAPI_SEEK_END, "FILE_END must be the same value as UAPI_SEEK_END");
 
 //---------------------------------------------------------------------------
-// CreateHostFileSystem
+// MountHostFileSystem
 //
-// Creates an instance of the HostFileSystem file system
-//
-// Arguments:
-//
-//	source		- Source device string
-//	flags		- Standard mounting option flags
-//	data		- Extended/custom mounting options
-//	datalength	- Length of the extended mounting options data
-
-std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
-{
-	return std::make_unique<HostFileSystem>(source, flags, data, datalength);
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem Constructor
+// Creates an instance of HostFileSystem
 //
 // Arguments:
 //
@@ -62,7 +47,7 @@ std::unique_ptr<VirtualMachine::FileSystem> CreateHostFileSystem(char_t const* s
 //	data		- Extended/custom mounting options
 //	datalength	- Length of the extended mounting options data
 
-HostFileSystem::HostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
+std::unique_ptr<VirtualMachine::Mount> MountHostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
 	bool sandbox = true;						// Flag to sandbox the virtual file system
 
@@ -75,7 +60,7 @@ HostFileSystem::HostFileSystem(char_t const* source, uint32_t flags, void const*
 	MountOptions options(flags, data, datalength);
 
 	// Verify that the specified flags are supported for a creation operation
-	if(options.Flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
+	if(options.Flags & ~HostFileSystem::MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
 
 	try {
 
@@ -92,38 +77,25 @@ HostFileSystem::HostFileSystem(char_t const* source, uint32_t flags, void const*
 
 	catch(...) { throw LinuxException(UAPI_EINVAL); }
 
-	// Create the shared file system state and assign the file system level flags
-	m_fs = std::make_shared<hostfs_t>(); 
-	m_fs->flags = options.Flags & ~UAPI_MS_PERMOUNT_MASK;
+	// Construct the shared file system instance
+	auto fs = std::make_shared<HostFileSystem>(options.Flags & ~UAPI_MS_PERMOUNT_MASK);
+
+	// Create and return the mount point instance to the caller
+	return std::make_unique<HostFileSystem::Mount>(fs, options.Flags & UAPI_MS_PERMOUNT_MASK);
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::Mount
-//
-// Mounts the file system
+// HostFileSystem Constructor
 //
 // Arguments:
 //
-//	flags		- Standard mounting option flags
-//	data		- Extended/custom mounting options
-//	datalength	- Length of the extended mounting options data
+//	flags		- Initial file system level flags
 
-std::unique_ptr<VirtualMachine::Mount> HostFileSystem::Mount(uint32_t flags, void const* data, size_t datalength)
+HostFileSystem::HostFileSystem(uint32_t flags) : Flags(flags)
 {
-	Capability::Demand(UAPI_CAP_SYS_ADMIN);
-
-	// Convert the flags and data parameters into a MountOptions and check for invalid flags
-	MountOptions options(flags, data, datalength);
-	if(options.Flags & ~MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
-
-	// Construct the mount instance, passing only the mount specific flags (MS_NODEV and MS_NOSUID are always set)
-	std::unique_ptr<VirtualMachine::Mount> mount = 
-		std::make_unique<class Mount>(m_fs, (options.Flags & UAPI_MS_PERMOUNT_MASK) | (UAPI_MS_NODEV | UAPI_MS_NOSUID));
-
-	// Reapply the file system level flags to the shared state instance after the mount operation
-	m_fs->flags = options.Flags & ~UAPI_MS_PERMOUNT_MASK;
-
-	return mount;
+	// The specified flags should not include any that apply to the mount point
+	_ASSERTE((flags & UAPI_MS_PERMOUNT_MASK) == 0);
+	if((flags & UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
 }
 
 //
@@ -135,10 +107,10 @@ std::unique_ptr<VirtualMachine::Mount> HostFileSystem::Mount(uint32_t flags, voi
 //
 // Arguments:
 //
-//	fs			- Shared file system state instance
+//	fs			- Shared file system instance
 //	flags		- Mount-specific flags
 
-HostFileSystem::Mount::Mount(std::shared_ptr<hostfs_t> const& fs, uint32_t flags) : m_fs(fs), m_flags(flags)
+HostFileSystem::Mount::Mount(std::shared_ptr<HostFileSystem> const& fs, uint32_t flags) : m_fs(fs), m_flags(flags)
 {
 	_ASSERTE(fs);
 

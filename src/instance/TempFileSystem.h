@@ -36,14 +36,10 @@
 
 #pragma warning(push, 4)
 
-// FORWARD DECLARATIONS
+// MountTempFileSystem
 //
-class MountOptions;
-
-// CreateTempFileSystem
-//
-// VirtualMachine::CreateFileSystem function for TempFileSystem
-std::unique_ptr<VirtualMachine::FileSystem> CreateTempFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
+// Creates an instance of TempFileSystem
+std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
 
 //-----------------------------------------------------------------------------
 // Class TempFileSystem
@@ -105,145 +101,71 @@ class TempFileSystem : public VirtualMachine::FileSystem
 	// Supported remount operation flags
 	static const uint32_t REMOUNT_FLAGS = UAPI_MS_REMOUNT | UAPI_MS_RDONLY | UAPI_MS_SYNCHRONOUS | UAPI_MS_MANDLOCK | UAPI_MS_I_VERSION | UAPI_MS_LAZYTIME;
 
+	// MountTempFileSystem (friend)
+	//
+	// Creates an instance of TempFileSystem
+	friend std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
+
+	// FORWARD DECLARATIONS
+	//
+	class Directory;
+	class Mount;
+
 public:
 
 	// Instance Constructor
 	//
-	TempFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
+	TempFileSystem(uint32_t flags);
 
 	// Destructor
 	//
-	virtual ~TempFileSystem()=default;
+	virtual ~TempFileSystem();
 
 	//-----------------------------------------------------------------------------
+	// Fields
+
+	// Flags
+	//
+	// File system specific flags
+	std::atomic<uint32_t> Flags = 0;
+
+	// NodeIndexPool
+	//
+	// Lock-free pool of node index numbers
+	IndexPool<intptr_t>	NodeIndexPool;
+
+	// MaximumNodes
+	//
+	// Maximum allowed number of file system nodes
+	std::atomic<size_t> MaximumNodes = 0;
+
+	// MaximumSize
+	//
+	// Maximum allowed size of the private heap
+	std::atomic<size_t> MaximumSize = 0;
+
+	//-----------------------------------------------------------------------
 	// Member Functions
 
-	// Mount (FileSystem)
+	// Allocate
 	//
-	// Mounts the file system
-	virtual std::unique_ptr<VirtualMachine::Mount> Mount(uint32_t flags, void const* data, size_t datalength);
+	// Allocates memory from the private heap
+	void* Allocate(size_t bytecount, bool zeroinit = false);
 
+	// Reallocate
+	//
+	// Reallocates memory in the private heap
+	void* Reallocate(void* ptr, size_t bytecount, bool zeroinit = false);
+
+	// Release
+	//
+	// Releases memory from the private heap
+	void Release(void* ptr);
+	
 private:
 
 	TempFileSystem(TempFileSystem const&)=delete;
 	TempFileSystem& operator=(TempFileSystem const&)=delete;
-
-	// node_t
-	//
-	// Internal node implementation
-	struct node_t
-	{
-		// atime
-		//
-		// Date/time at which the node was accessed
-		datetime atime;
-
-		// ctime
-		//
-		// Date/time at which the node metadata was changed
-		datetime ctime;
-
-		// crtime
-		//
-		// Date/time at which the node was created
-		datetime crtime;
-
-		// gid
-		//
-		// Node owner group identifier
-		uapi_gid_t	gid;
-
-		// mode
-		//
-		// Node permission mask
-		uapi_mode_t mode;
-
-		// mtime
-		//
-		// Date/time at which the node data was modified
-		datetime mtime;
-		
-		// uid
-		//
-		// Node owner identifier
-		uapi_uid_t uid;
-	};
-
-	// tempfs_t
-	//
-	// Internal shared file system instance
-	class tempfs_t
-	{
-	public:
-
-		// Instance Constructor
-		//
-		tempfs_t();
-
-		// Destructor
-		//
-		~tempfs_t();
-
-		//---------------------------------------------------------------------
-		// Fields
-
-		// flags
-		//
-		// Filesystem-specific flags
-		std::atomic<uint32_t> flags = 0;
-
-		// indexpool
-		//
-		// Lock-free pool of node index numbers
-		IndexPool<intptr_t>	indexpool;
-											
-		// maxnodes
-		//
-		// Maximum allowed number of nodes
-		std::atomic<size_t> maxnodes = 0;
-
-		// maxsize
-		//
-		// Maximum allowed block storage size
-		std::atomic<size_t> maxsize = 0;
-
-		// nodecount
-		//
-		// Number of allocated nodes
-		std::atomic<size_t> nodecount = 0;
-
-		// nodes
-		//
-		// Collection of active node instances
-		std::unordered_map<int32_t, std::shared_ptr<node_t>> nodes;
-
-		// nodeslock
-		//
-		// Nodes collection synchronization object
-		sync::reader_writer_lock nodeslock;
-
-		//---------------------------------------------------------------------
-		// Member Functions
-
-		// allocate
-		//
-		// Allocates blocks from the private heap, throws if max size has been exceeded
-		uintptr_t allocate(size_t count, bool zeroinit = false);
-
-		// release
-		//
-		// Releases memory from the private heap
-		void release(uintptr_t base);
-
-	private:
-
-		//---------------------------------------------------------------------
-		// Member Variables
-
-		HANDLE						m_heap;			// Private heap handle
-		size_t						m_heapsize;		// Currently allocated heap size
-		sync::critical_section		m_heaplock;		// Heap synchronization object
-	};
 
 	// Directory
 	//
@@ -254,7 +176,7 @@ private:
 
 		// Instance Constructor
 		//
-		Directory(std::shared_ptr<tempfs_t> const& fs, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid);
+		Directory(std::shared_ptr<TempFileSystem> const& fs, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid);
 
 		// Destructor
 		//
@@ -289,10 +211,14 @@ private:
 		//---------------------------------------------------------------------
 		// Member Variables
 
-		std::shared_ptr<tempfs_t>		m_fs;		// Shared file system state
-		std::atomic<uapi_mode_t>		m_mode;		// Permission mask
-		std::atomic<uapi_uid_t>			m_uid;		// Owner id
-		std::atomic<uapi_gid_t>			m_gid;		// Owner group id
+		std::shared_ptr<TempFileSystem>		m_fs;		// File system instance
+		std::atomic<uapi_mode_t>			m_mode;		// Permission mask
+		std::atomic<uapi_uid_t>				m_uid;		// Owner id
+		std::atomic<uapi_gid_t>				m_gid;		// Owner group id
+
+		//datetime m_atime;		// <--- add these in later, probably in a base class with mode, uid and gid
+		//datetime m_ctime;
+		//datetime m_mtime;
 	};
 
 	// Mount
@@ -304,37 +230,27 @@ private:
 
 		// Instance Constructor
 		//
-		Mount(std::shared_ptr<tempfs_t> const& fs, uint32_t flags);
+		Mount(std::shared_ptr<TempFileSystem> const& fs, uint32_t flags);
 
 		// Destructor
 		//
 		~Mount()=default;
-
-		//---------------------------------------------------------------------
-		// Member Functions
 
 	private:
 
 		//---------------------------------------------------------------------
 		// Member Variables
 
-		std::shared_ptr<tempfs_t>	m_fs;		// Shared file system instance
-		uint32_t					m_flags;	// Mount-specific flags
+		std::shared_ptr<TempFileSystem>		m_fs;		// File system instance
+		std::atomic<uint32_t>				m_flags;	// Mount-specific flags
 	};
-
-	//-------------------------------------------------------------------------
-	// Private Member Functions
-
-	// ParseScaledInteger (static)
-	//
-	// Parses a scaled integer value (K/M/G)
-	static size_t ParseScaledInteger(std::string const& str);
 
 	//-------------------------------------------------------------------------
 	// Member Variables
 
-	std::shared_ptr<tempfs_t>		m_fs;			// Shared file system instance
-	std::unique_ptr<Directory>		m_rootnode;		// Root directory node
+	HANDLE							m_heap;			// Private heap handle
+	size_t							m_heapsize;		// Currently allocated heap size
+	sync::critical_section			m_heaplock;		// Heap synchronization object
 };
 
 //-----------------------------------------------------------------------------

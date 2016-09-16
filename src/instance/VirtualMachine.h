@@ -92,11 +92,6 @@ public:
 		static AllocationFlags const TopDown;
 	};
 
-	// CreateFileSystem
-	//
-	// Function signature for a file system's Create() implementation
-	using CreateFileSystem = std::function<std::unique_ptr<FileSystem>(char_t const* source, uint32_t flags, void const* data, size_t datalength)>;
-
 	// LogLevel
 	//
 	// Strongly typed enumeration defining the level of a log entry
@@ -112,6 +107,11 @@ public:
 		Informational	= 6,	// LOGLEVEL_INFO: Informational
 		Debug			= 7,	// LOGLEVEL_DEBUG: Debug-level messages
 	};
+
+	// MountFileSystem
+	//
+	// Function signature for a file system's Mount() implementation
+	using MountFileSystem = std::function<std::unique_ptr<Mount>(char_t const* source, uint32_t flags, void const* data, size_t datalength)>;
 
 	// NodeType
 	//
@@ -175,11 +175,6 @@ public:
 		// Destructor
 		//
 		virtual ~FileSystem()=default;
-
-		// Mount
-		//
-		// Mounts the file system
-		virtual std::unique_ptr<Mount> Mount(uint32_t flags, void const* data, size_t datalength) = 0;
 	};
 
 	// Handle
