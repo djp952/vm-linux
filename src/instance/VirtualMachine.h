@@ -195,6 +195,12 @@ public:
 		// Destructor
 		//
 		virtual ~Mount()=default;
+
+		// Flags
+		//
+		// Gets the mount point flags
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const = 0;
 	};
 
 	// Node
@@ -223,6 +229,12 @@ public:
 		// Gets the node permissions mask
 		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
 		virtual uapi_mode_t getPermissions(void) const = 0;
+
+		// Type
+		//
+		// Gets the node type
+		__declspec(property(get=getType)) NodeType Type;
+		virtual NodeType getType(void) const = 0;
 	};
 
 	// Directory

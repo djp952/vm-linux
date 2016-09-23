@@ -120,6 +120,15 @@ private:
 		//
 		~Mount()=default;
 
+		//-------------------------------------------------------------------
+		// Properties
+
+		// Flags (VirtualMachine::Mount)
+		//
+		// Gets the mount point flags
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const override;
+
 	private:
 
 		//---------------------------------------------------------------------

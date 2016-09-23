@@ -1,4 +1,4 @@
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 // Copyright (c) 2016 Michael G. Brehm
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,7 +18,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 
 #include "stdafx.h"
 #include "TempFileSystem.h"
@@ -179,8 +179,12 @@ std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source,
 	fs->MaximumSize = (maxsize == 0) ? g_maxmemory >> 1 : maxsize;
 	fs->MaximumNodes = (maxnodes == 0) ? std::numeric_limits<size_t>::max() : maxnodes;
 
-	// Create and return the mount point instance to the caller
-	return std::make_unique<TempFileSystem::Mount>(fs, options.Flags & UAPI_MS_PERMOUNT_MASK);
+	// Construct the root directory node on the file system heap using the specified attributes
+	auto rootnode = TempFileSystem::node_t::FromFileSystem(fs, VirtualMachine::NodeType::Directory, mode, uid, gid);
+	auto rootdir = std::make_unique<TempFileSystem::Directory>(rootnode);
+
+	// Create and return the mount point instance, transferring ownership of the root node
+	return std::make_unique<TempFileSystem::Mount>(fs, std::move(rootdir), options.Flags & UAPI_MS_PERMOUNT_MASK);
 }
 
 //---------------------------------------------------------------------------
@@ -202,16 +206,22 @@ TempFileSystem::TempFileSystem(uint32_t flags) : Flags(flags), m_heap(nullptr), 
 	if(m_heap == nullptr) throw LinuxException(UAPI_ENOMEM, Win32Exception());
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 // TempFileSystem Destructor
 
 TempFileSystem::~TempFileSystem()
 {
+	// Check for leaks in _DEBUG builds only; there should be no allocations
+	// on the private heap remaining when it's destroyed if everything is 
+	// cleaning up after itself properly
+	_ASSERTE(m_heapsize == 0);
+
+	// Destroy the private heap
 	if(m_heap) HeapDestroy(m_heap);
 }
 
-//-----------------------------------------------------------------------------
-// TempFileSystem::Allocate
+//---------------------------------------------------------------------------
+// TempFileSystem::AllocateHeap (private)
 //
 // Allocates memory from the private heap
 //
@@ -220,7 +230,7 @@ TempFileSystem::~TempFileSystem()
 //  bytecount	- Number of bytes to allocate from the heap
 //	zeroinit	- Flag to zero-initialize the allocated memory
 
-void* TempFileSystem::Allocate(size_t bytecount, bool zeroinit)
+void* TempFileSystem::AllocateHeap(size_t bytecount, bool zeroinit)
 {
 	sync::critical_section::scoped_lock cs(m_heaplock);
 
@@ -233,8 +243,8 @@ void* TempFileSystem::Allocate(size_t bytecount, bool zeroinit)
 	return ptr;						// Return the allocated heap pointer
 }
 
-//-----------------------------------------------------------------------------
-// TempFileSystem::Reallocate
+//---------------------------------------------------------------------------
+// TempFileSystem::ReallocateHeap (private)
 //
 // Reallocates memory previously allocated from the private heap
 //
@@ -244,7 +254,7 @@ void* TempFileSystem::Allocate(size_t bytecount, bool zeroinit)
 //	bytecount	- New length of the allocation in bytes
 //	zeroinit	- Flag to zero-initialize newly allocated memory
 
-void* TempFileSystem::Reallocate(void* ptr, size_t bytecount, bool zeroinit)
+void* TempFileSystem::ReallocateHeap(void* ptr, size_t bytecount, bool zeroinit)
 {
 	if(ptr == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -268,8 +278,8 @@ void* TempFileSystem::Reallocate(void* ptr, size_t bytecount, bool zeroinit)
 	return newptr;
 }
 
-//-----------------------------------------------------------------------------
-// TempFileSystem::Release
+//---------------------------------------------------------------------------
+// TempFileSystem::ReleaseHeap (private)
 //
 // Releases memory from the private heap
 //
@@ -277,7 +287,7 @@ void* TempFileSystem::Reallocate(void* ptr, size_t bytecount, bool zeroinit)
 //
 //	ptr			- Pointer to allocation to be released
 
-void TempFileSystem::Release(void* ptr)
+void TempFileSystem::ReleaseHeap(void* ptr)
 {
 	// Don't throw an exception if the pointer was never allocated
 	if(ptr == nullptr) return;
@@ -294,6 +304,86 @@ void TempFileSystem::Release(void* ptr)
 }
 
 //
+// TEMPFILESYSTEM::NODE_T IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// TempFileSystem::node_t Constructor
+//
+// Arguments:
+//
+//	fs		- Shared file system instance
+//	type	- Type of node being created
+
+TempFileSystem::node_t::node_t(std::shared_ptr<TempFileSystem> const& fs, VirtualMachine::NodeType type) : node_t(fs, type, 0, 0, 0)
+{
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::node_t Constructor
+//
+// Arguments:
+//
+//	fs		- Shared file system instance
+//	type	- Type of node being created
+//	mode	- Initial permissions to assign to the node
+//	uid		- Initial owner UID to assign to the node
+//	gid		- Initial owner GID to assign to the node
+
+TempFileSystem::node_t::node_t(std::shared_ptr<TempFileSystem> const& fs, VirtualMachine::NodeType type, uapi_mode_t mode, uapi_uid_t uid, 
+	uapi_gid_t gid) : m_fs(fs), m_data(nullptr), m_datalen(0), Index(fs->NodeIndexPool.Allocate()), Type(type), AccessTime(datetime::now()), 
+	ChangeTime(AccessTime), ModifyTime(AccessTime), Permissions(mode), OwnerUserId(uid), OwnerGroupId(gid)
+{
+	_ASSERTE(m_fs);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::node_t Destructor
+
+TempFileSystem::node_t::~node_t()
+{
+	// Release the data if any has been allocated for this node
+	if(m_data != nullptr) allocator_t<uint8_t>(m_fs).deallocate(m_data, m_datalen);
+	
+	// Release the node index from the file system index pool
+	m_fs->NodeIndexPool.Release(Index);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::node_t::FromFileSystem (static)
+//
+// Creates a new shared_ptr<node_t> on a TempFileSystem private heap
+//
+// Arguments:
+//
+//	fs		- TempFileSystem instance on which to create the node
+//	type	- Type of node being created
+
+std::shared_ptr<TempFileSystem::node_t> TempFileSystem::node_t::FromFileSystem(std::shared_ptr<TempFileSystem> const& fs, VirtualMachine::NodeType type)
+{
+	return FromFileSystem(fs, type, 0, 0, 0);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::node_t::FromFileSystem (static)
+//
+// Creates a new shared_ptr<node_t> on a TempFileSystem private heap
+//
+// Arguments:
+//
+//	fs		- TempFileSystem instance on which to create the node
+//	type	- Type of node being created
+//	mode	- Initial permission mask to assign to the node
+//	uid		- Initial node owner UID
+//	gid		- Initial node owner GID
+
+std::shared_ptr<TempFileSystem::node_t> TempFileSystem::node_t::FromFileSystem(std::shared_ptr<TempFileSystem> const& fs, VirtualMachine::NodeType type, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+{
+	_ASSERTE(fs);
+	return std::allocate_shared<node_t, allocator_t<node_t>>(allocator_t<node_t>(fs), fs, type, mode, uid, gid);
+}
+
+//
 // TEMPFILESYSTEM::DIRECTORY IMPLEMENTATION
 //
 
@@ -302,52 +392,171 @@ void TempFileSystem::Release(void* ptr)
 //
 // Arguments:
 //
-//	fs			- Shared file system instance
-//	mode		- Permission flags to assign to the directory node
-//	uid			- Owner UID of the directory node
-//	gid			- Owner GID of the directory node
+//	node		- Shared Node instance
 
-TempFileSystem::Directory::Directory(std::shared_ptr<TempFileSystem> const& fs, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) 
-	: m_fs(fs), m_mode(mode), m_uid(uid), m_gid(gid)
+TempFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : m_node(node)
 {
-	_ASSERTE(fs);
+	_ASSERTE(m_node);
+	_ASSERTE(m_node->Type == VirtualMachine::NodeType::Directory);
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::CreateDirectory
+//
+// Creates a new Directory node within this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	name		- Name to assign to the new directory
+
+VirtualMachine::Directory* TempFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name)
+{
+	// Create the child directory instance inheriting this node's mode, uid and gid values
+	// TODO: This is not correct, see mkdir(2) -- needs umask support among other things
+	return CreateDirectory(mount, name, m_node->Permissions, m_node->OwnerUserId, m_node->OwnerGroupId);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::CreateDirectory
+//
+// Creates a new Directory node within this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	name		- Name to assign to the new directory
+//	mode		- Initial permission flags to assign to the new node
+//	uid			- Initial owner UID to assign to the new node
+//	gid			- Initial owner GID to assign to the new node
+
+VirtualMachine::Directory* TempFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name,
+	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+{
+	_ASSERTE(mount);
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	_ASSERTE(name);
+	// todo - EFAULT?
+
+	// todo: capability check
+	// todo: permission check
+
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	(mode);
+	(uid);
+	(gid);
+	//auto node = std::make_unique<Directory>(m_fs, mode, uid, gid);
+	// todo - create the node
+
+	return nullptr;
+}
+
+//---------------------------------------------------------------------------
 // TempFileSystem::Directory::getOwnerGroupId
 //
 // Gets the currently set owner group identifier for the directory
 
 uapi_gid_t TempFileSystem::Directory::getOwnerGroupId(void) const
 {
-	return m_gid;
+	return m_node->OwnerGroupId;
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 // TempFileSystem::Directory::getOwnerUserId
 //
 // Gets the currently set owner user identifier for the directory
 
 uapi_uid_t TempFileSystem::Directory::getOwnerUserId(void) const
 {
-	return m_uid;
+	return m_node->OwnerUserId;
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 // TempFileSystem::Directory::getPermissions
 //
 // Gets the currently set permissions mask for the directory
 
 uapi_mode_t TempFileSystem::Directory::getPermissions(void) const
 {
-	return m_mode;
+	return m_node->Permissions;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::getType
+//
+// Gets the type of the node instance
+
+VirtualMachine::NodeType TempFileSystem::Directory::getType(void) const
+{
+	_ASSERTE(m_node->Type == VirtualMachine::NodeType::Directory);
+	return VirtualMachine::NodeType::Directory;
+}
+
+//
+// TEMPFILESYSTEM::FILE IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File Constructor
+//
+// Arguments:
+//
+//	node		- Shared Node instance
+
+TempFileSystem::File::File(std::shared_ptr<node_t> const& node) : m_node(node)
+{
+	_ASSERTE(m_node);
+	_ASSERTE(m_node->Type == VirtualMachine::NodeType::File);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::getOwnerGroupId
+//
+// Gets the currently set owner group identifier for the file
+
+uapi_gid_t TempFileSystem::File::getOwnerGroupId(void) const
+{
+	return m_node->OwnerGroupId;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::getOwnerUserId
+//
+// Gets the currently set owner user identifier for the file
+
+uapi_uid_t TempFileSystem::File::getOwnerUserId(void) const
+{
+	return m_node->OwnerUserId;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::getPermissions
+//
+// Gets the currently set permissions mask for the file
+
+uapi_mode_t TempFileSystem::File::getPermissions(void) const
+{
+	return m_node->Permissions;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::getType
+//
+// Gets the type of the node instance
+
+VirtualMachine::NodeType TempFileSystem::File::getType(void) const
+{
+	_ASSERTE(m_node->Type == VirtualMachine::NodeType::File);
+	return VirtualMachine::NodeType::File;
 }
 
 //
 // TEMPFILESYSTEM::MOUNT IMPLEMENTATION
 //
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 // TempFileSystem::Mount Constructor
 //
 // Arguments:
@@ -355,13 +564,29 @@ uapi_mode_t TempFileSystem::Directory::getPermissions(void) const
 //	fs			- Shared file system instance
 //	flags		- Mount-specific flags
 
-TempFileSystem::Mount::Mount(std::shared_ptr<TempFileSystem> const& fs, uint32_t flags) : m_fs(fs), m_flags(flags)
+TempFileSystem::Mount::Mount(std::shared_ptr<TempFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags) : 
+	m_fs(fs), m_rootdir(std::move(rootdir)), m_flags(flags)
 {
-	_ASSERTE(fs);
+	_ASSERTE(m_fs);
+
+	// The root directory node is converted from a unique to a shared pointer so it
+	// can be shared among multiple cloned Mount instances
+	_ASSERTE(m_rootdir);
 
 	// The specified flags should not include any that apply to the file system
 	_ASSERTE((flags & ~UAPI_MS_PERMOUNT_MASK) == 0);
 	if((flags & ~UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Mount::getFlags
+//
+// Gets the mount point flags
+
+uint32_t TempFileSystem::Mount::getFlags(void) const
+{
+	// Combine the mount flags with those of the underlying file system
+	return m_fs->Flags | m_flags;
 }
 
 //---------------------------------------------------------------------------

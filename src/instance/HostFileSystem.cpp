@@ -112,11 +112,22 @@ HostFileSystem::HostFileSystem(uint32_t flags) : Flags(flags)
 
 HostFileSystem::Mount::Mount(std::shared_ptr<HostFileSystem> const& fs, uint32_t flags) : m_fs(fs), m_flags(flags)
 {
-	_ASSERTE(fs);
+	_ASSERTE(m_fs);
 
 	// The specified flags should not include any that apply to the file system
 	_ASSERTE((flags & ~UAPI_MS_PERMOUNT_MASK) == 0);
 	if((flags & ~UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Mount::getFlags
+//
+// Gets the mount point flags
+
+uint32_t HostFileSystem::Mount::getFlags(void) const
+{
+	// Combine the mount flags with those of the underlying file system
+	return m_fs->Flags | m_flags;
 }
 
 //---------------------------------------------------------------------------

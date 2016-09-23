@@ -117,7 +117,7 @@ RootFileSystem::RootFileSystem(uint32_t flags) : Flags(flags)
 RootFileSystem::Directory::Directory(std::shared_ptr<RootFileSystem> const& fs, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) 
 	: m_fs(fs), m_mode(mode), m_uid(uid), m_gid(gid)
 {
-	_ASSERTE(fs);
+	_ASSERTE(m_fs);
 }
 
 //-----------------------------------------------------------------------------
@@ -150,6 +150,16 @@ uapi_mode_t RootFileSystem::Directory::getPermissions(void) const
 	return m_mode;
 }
 
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::getType
+//
+// Gets the type of the node instance
+
+VirtualMachine::NodeType RootFileSystem::Directory::getType(void) const
+{
+	return VirtualMachine::NodeType::Directory;
+}
+
 //
 // ROOTFILESYSTEM::MOUNT IMPLEMENTATION
 //
@@ -164,11 +174,22 @@ uapi_mode_t RootFileSystem::Directory::getPermissions(void) const
 
 RootFileSystem::Mount::Mount(std::shared_ptr<RootFileSystem> const& fs, uint32_t flags) : m_fs(fs), m_flags(flags)
 {
-	_ASSERTE(fs);
+	_ASSERTE(m_fs);
 
 	// The specified flags should not include any that apply to the file system
 	_ASSERTE((flags & ~UAPI_MS_PERMOUNT_MASK) == 0);
 	if((flags & ~UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Mount::getFlags
+//
+// Gets the mount point flags
+
+uint32_t RootFileSystem::Mount::getFlags(void) const
+{
+	// Combine the mount flags with those of the underlying file system
+	return m_fs->Flags | m_flags;
 }
 
 //---------------------------------------------------------------------------

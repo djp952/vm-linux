@@ -125,7 +125,7 @@ private:
 		virtual ~Directory()=default;
 
 		//---------------------------------------------------------------------
-		// Member Functions
+		// Properties
 
 		// OwnerGroupId (VirtualMachine::Node)
 		//
@@ -144,6 +144,12 @@ private:
 		// Gets the node permissions mask
 		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
 		virtual uapi_mode_t getPermissions(void) const override;
+
+		// Type (VirtualMachine::Node)
+		//
+		// Gets the node type
+		__declspec(property(get=getType)) VirtualMachine::NodeType Type;
+		virtual VirtualMachine::NodeType getType(void) const override;
 
 	private:
 
@@ -173,6 +179,15 @@ private:
 		// Destructor
 		//
 		~Mount()=default;
+
+		//-------------------------------------------------------------------
+		// Properties
+
+		// Flags (VirtualMachine::Mount)
+		//
+		// Gets the mount point flags
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const override;
 
 	private:
 
