@@ -39,16 +39,21 @@
 // to any processes within the namespace that they have their own isolated instances 
 // of these resources:
 //
-//	ControlGroup	- Isolates process resource usage
-//	Ipc				- Isolates System V IPC and posix message queues
-//	Mount			- Isolates file system mount points
-//	Network			- Isolates network devices, ports, stacks, etc.
-//	Pid				- Isolates process identifiers
-//	User			- Isolates user and group identifiers
-//	Uts				- Isolates host and domain name strings
+//	CONTROLGROUP	- Isolates process resource usage
+//	IPC				- Isolates System V IPC and posix message queues
+//	MOUNT			- Isolates file system mount points
+//	NETWORK			- Isolates network devices, ports, stacks, etc.
+//	PID				- Isolates process identifiers
+//	USER			- Isolates user and group identifiers
+//	UTS				- Isolates host and domain name strings
 
 class Namespace
 {
+	// FORWARD DECLARATIONS
+	//
+	struct mountns_t;
+	struct path_t;
+
 public:
 
 	// Instance Constructors
@@ -60,13 +65,40 @@ public:
 	//
 	~Namespace()=default;
 
+	// Path
+	//
+	// todo words
+	class Path
+	{
+	public:
+
+		// Instance Constructor
+		//
+		// todo this can't be public
+		Path(std::shared_ptr<path_t> const& path);
+
+		// Destructor
+		//
+		~Path()=default;
+
+	private:
+
+		Path(Path const&)=delete;
+		Path& operator=(Path const&)=delete;
+
+		//---------------------------------------------------------------------
+		// Member Variables
+
+		std::shared_ptr<path_t>		m_path;			// Internal shared state
+	};
+
 	//-------------------------------------------------------------------------
 	// Member Functions
 
 	// LookupPath
 	//
 	// Performs a path name lookup operation
-	std::unique_ptr<VirtualMachine::Path> LookupPath(void) const;
+	std::unique_ptr<Path> LookupPath(void) const;
 
 	//// MountFileSystem
 	////
@@ -86,6 +118,14 @@ private:
 	// Internal shared representation of a Path instance
 	struct path_t
 	{
+		// default constructor
+		//
+		path_t()=default;
+
+		// converting constructor
+		//
+		path_t(std::shared_ptr<path_t> const& rhs);
+
 		// canonicalparent
 		//
 		// Pointer to the canonical path_t, or nullptr if root
@@ -95,11 +135,6 @@ private:
 		//
 		// Pointer to the path_t hidden by a mount point
 		std::shared_ptr<path_t> hides;
-
-		// mount
-		//
-		// Pointer to the VirtualMachine::Mount if this path is a mount point
-		std::unique_ptr<VirtualMachine::Mount> mount;
 
 		// name
 		//
@@ -112,36 +147,31 @@ private:
 		std::shared_ptr<path_t> parent;
 	};
 
-	// ControlGroupNamespace
+	// mountns_t
 	//
-	// Provides an isolated view of process resource usage
-	class ControlGroupNamespace
+	// Provides an isolated view of file system mounts
+	struct mountns_t
 	{
-	public:
+		// default constructor
+		//
+		mountns_t()=default;
 
-		ControlGroupNamespace()=default;
-		~ControlGroupNamespace()=default;
+		// converting constructor
+		//
+		mountns_t(std::shared_ptr<mountns_t> const& rhs);
 
-	private:
+		// mounts
+		//
+		// Collection of mount points active in this namespace
+		std::unordered_map<std::shared_ptr<path_t>, std::unique_ptr<VirtualMachine::Mount>> mounts;
 
-		ControlGroupNamespace(ControlGroupNamespace const&)=delete;
-		ControlGroupNamespace& operator=(ControlGroupNamespace const&)=delete;
-	};
+		// mountslock
+		//
+		// Synchronization object
+		sync::reader_writer_lock mountslock;
 
-	// IpcNamespace
-	//
-	// Provides an isolated view of System V IPC / Posix message queues
-	class IpcNamespace
-	{
-	public:
-
-		IpcNamespace()=default;
-		~IpcNamespace()=default;
-
-	private:
-
-		IpcNamespace(IpcNamespace const&)=delete;
-		IpcNamespace& operator=(IpcNamespace const&)=delete;
+		mountns_t(mountns_t const&)=delete;
+		mountns_t operator=(mountns_t const&)=delete;
 	};
 
 	// MountNamespace
@@ -203,114 +233,13 @@ private:
 		sync::reader_writer_lock	m_mountslock;		// Synchronization object
 	};
 
-	// NetworkNamespace
-	//
-	// Provides an isolated view of network devices, stacks, ports, etc
-	class NetworkNamespace
-	{
-	public:
-
-		NetworkNamespace()=default;
-		~NetworkNamespace()=default;
-
-	private:
-
-		NetworkNamespace(NetworkNamespace const&)=delete;
-		NetworkNamespace& operator=(NetworkNamespace const&)=delete;
-	};
-
-	// Path
-	//
-	// Implements VirtualMachine::Path
-	class Path : public VirtualMachine::Path
-	{
-	public:
-
-		// Instance Constructor
-		//
-		Path(std::shared_ptr<path_t> const& path);
-
-		// Destructor
-		//
-		~Path()=default;
-
-		// Duplicate (VirtualMachine::Path)
-		//
-		// Duplicates this Path instance
-		virtual std::unique_ptr<VirtualMachine::Path> Duplicate(void) override;
-
-	private:
-
-		Path(Path const&)=delete;
-		Path& operator=(Path const&)=delete;
-
-		//---------------------------------------------------------------------
-		// Member Variables
-
-		std::shared_ptr<path_t>		m_path;			// Internal shared state
-	};
-
-	// PidNamespace
-	//
-	// Provides an isolated process id number space. See pid_namespace(7).
-	class PidNamespace
-	{
-	public:
-
-		PidNamespace()=default;
-		~PidNamespace()=default;
-
-	private:
-
-		PidNamespace(PidNamespace const&)=delete;
-		PidNamespace& operator=(PidNamespace const&)=delete;
-	};
-
-	// UserNamespace
-	//
-	// Provides isolation of user and group identifiers 
-	class UserNamespace
-	{
-	public:
-
-		UserNamespace()=default;
-		~UserNamespace()=default;
-
-	private:
-
-		UserNamespace(UserNamespace const&)=delete;
-		UserNamespace& operator=(UserNamespace const&)=delete;
-	};
-
-	// UtsNamespace
-	//
-	// Provides isolation of host and domain name identifiers 
-	class UtsNamespace
-	{
-	public:
-
-		UtsNamespace()=default;
-		~UtsNamespace()=default;
-
-	private:
-
-		UtsNamespace(UtsNamespace const&)=delete;
-		UtsNamespace& operator=(UtsNamespace const&)=delete;
-	};
-
 	//-------------------------------------------------------------------------
 	// Private Member Functions
 
 	//-------------------------------------------------------------------------
 	// Member Variables
 
-	std::shared_ptr<ControlGroupNamespace>	m_cgroupns;		// Shared ControlGroupNamespace instance
-	std::shared_ptr<IpcNamespace>			m_ipcns;		// Shared IpcNamespace instance
-	std::shared_ptr<MountNamespace>			m_mountns;		// Shared MountNamespace instance
-	std::shared_ptr<NetworkNamespace>		m_netns;		// Shared NetworkNamespace instance
-	std::shared_ptr<PidNamespace>			m_pidns;		// Shared PidNamespace instance
-	std::shared_ptr<UserNamespace>			m_userns;		// Shared UserNamespace instance
-	std::shared_ptr<UtsNamespace>			m_utsns;		// Shared UtsNamespace instance
+	std::shared_ptr<mountns_t>			m_mountns;		// Shared mount namespace
 };
 
 //-----------------------------------------------------------------------------

@@ -23,7 +23,6 @@
 #include "stdafx.h"
 #include "RootFileSystem.h"
 
-#include "Capability.h"
 #include "LinuxException.h"
 #include "MountOptions.h"
 
@@ -43,8 +42,6 @@
 
 std::unique_ptr<VirtualMachine::Mount> MountRootFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
-	Capability::Demand(UAPI_CAP_SYS_ADMIN);
-
 	// Source is ignored but must be specified by contract
 	if(source == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -120,44 +117,97 @@ RootFileSystem::Directory::Directory(std::shared_ptr<RootFileSystem> const& fs, 
 	_ASSERTE(m_fs);
 }
 
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::CreateDirectory
+//
+// Creates and opens a new directory node as a child of this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	name		- Name to assign to the new node
+//	mode		- Initial permissions to assign to the node
+//	uid			- Initial owner user id to assign to the node
+//	gid			- Initial owner group id to assign to the node
+
+std::unique_ptr<VirtualMachine::Directory> RootFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name,
+	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+{
+	UNREFERENCED_PARAMETER(mount);
+	UNREFERENCED_PARAMETER(name);
+	UNREFERENCED_PARAMETER(mode);
+	UNREFERENCED_PARAMETER(uid);
+	UNREFERENCED_PARAMETER(gid);
+
+	// todo
+	return nullptr;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::CreateFile
+//
+// Creates and opens a new file node as a child of this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	name		- Name to assign to the new node
+//	mode		- Initial permissions to assign to the node
+//	uid			- Initial owner user id to assign to the node
+//	gid			- Initial owner group id to assign to the node
+
+std::unique_ptr<VirtualMachine::File> RootFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, char_t const* name,
+	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+{
+	UNREFERENCED_PARAMETER(mount);
+	UNREFERENCED_PARAMETER(name);
+	UNREFERENCED_PARAMETER(mode);
+	UNREFERENCED_PARAMETER(uid);
+	UNREFERENCED_PARAMETER(gid);
+
+	// todo
+	return nullptr;
+}
+
 //-----------------------------------------------------------------------------
-// RootFileSystem::Directory::getOwnerGroupId
+// RootFileSystem::Directory::getGroupId
 //
 // Gets the currently set owner group identifier for the directory
 
-uapi_gid_t RootFileSystem::Directory::getOwnerGroupId(void) const
+uapi_gid_t RootFileSystem::Directory::getGroupId(void) const
 {
 	return m_gid;
 }
 
-//-----------------------------------------------------------------------------
-// RootFileSystem::Directory::getOwnerUserId
-//
-// Gets the currently set owner user identifier for the directory
-
-uapi_uid_t RootFileSystem::Directory::getOwnerUserId(void) const
-{
-	return m_uid;
-}
-
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 // RootFileSystem::Directory::getPermissions
 //
-// Gets the currently set permissions mask for the directory
+// Gets the permissions mask assigned to this node
 
 uapi_mode_t RootFileSystem::Directory::getPermissions(void) const
 {
-	return m_mode;
+	// Strip out S_IFMT flags from the mode mask
+	return m_mode & ~UAPI_S_IFMT;
 }
 
 //---------------------------------------------------------------------------
 // RootFileSystem::Directory::getType
 //
-// Gets the type of the node instance
+// Gets the type of file system node being represented
 
 VirtualMachine::NodeType RootFileSystem::Directory::getType(void) const
 {
 	return VirtualMachine::NodeType::Directory;
+}
+
+//-----------------------------------------------------------------------------
+// RootFileSystem::Directory::getUserId
+//
+// Gets the currently set owner user identifier for the directory
+
+uapi_uid_t RootFileSystem::Directory::getUserId(void) const
+{
+	return m_uid;
 }
 
 //
@@ -179,6 +229,42 @@ RootFileSystem::Mount::Mount(std::shared_ptr<RootFileSystem> const& fs, uint32_t
 	// The specified flags should not include any that apply to the file system
 	_ASSERTE((flags & ~UAPI_MS_PERMOUNT_MASK) == 0);
 	if((flags & ~UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Mount Copy Constructor
+//
+// Arguments:
+//
+//	rhs		- Existing Mount instance to create a copy of
+
+RootFileSystem::Mount::Mount(Mount const& rhs) : m_fs(rhs.m_fs), m_flags(static_cast<uint32_t>(rhs.m_flags))
+{
+	// A copy of a mount references the same shared file system and copies the flags
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Mount::Duplicate
+//
+// Duplicates this mount instance
+//
+// Arguments:
+//
+//	NONE
+
+std::unique_ptr<VirtualMachine::Mount> RootFileSystem::Mount::Duplicate(void) const
+{
+	return std::make_unique<RootFileSystem::Mount>(*this);
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Mount::getFileSystem
+//
+// Accesses the underlying file system instance
+
+VirtualMachine::FileSystem const* RootFileSystem::Mount::getFileSystem(void) const
+{
+	return m_fs.get();
 }
 
 //---------------------------------------------------------------------------

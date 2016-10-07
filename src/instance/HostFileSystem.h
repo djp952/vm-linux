@@ -116,12 +116,30 @@ private:
 		//
 		Mount(std::shared_ptr<HostFileSystem> const& fs, uint32_t flags);
 
+		// Copy Constructor
+		//
+		Mount(Mount const& rhs);
+
 		// Destructor
 		//
 		~Mount()=default;
 
 		//-------------------------------------------------------------------
+		// Member Functions
+
+		// Duplicate (VirtualMachine::Mount)
+		//
+		// Duplicates this mount instance
+		virtual std::unique_ptr<VirtualMachine::Mount> Duplicate(void) const override;
+
+		//-------------------------------------------------------------------
 		// Properties
+
+		// FileSystem (VirtualMachine::Mount)
+		//
+		// Accesses the underlying file system instance
+		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem const* FileSystem;
+		virtual VirtualMachine::FileSystem const* getFileSystem(void) const override;
 
 		// Flags (VirtualMachine::Mount)
 		//
@@ -130,6 +148,8 @@ private:
 		virtual uint32_t getFlags(void) const override;
 
 	private:
+
+		Mount& operator=(Mount const&)=delete;
 
 		//---------------------------------------------------------------------
 		// Member Variables

@@ -23,7 +23,6 @@
 #include "stdafx.h"
 #include "HostFileSystem.h"
 
-#include "Capability.h"
 #include "LinuxException.h"
 #include "MountOptions.h"
 
@@ -50,8 +49,6 @@ static_assert(FILE_END == UAPI_SEEK_END, "FILE_END must be the same value as UAP
 std::unique_ptr<VirtualMachine::Mount> MountHostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
 	bool sandbox = true;						// Flag to sandbox the virtual file system
-
-	Capability::Demand(UAPI_CAP_SYS_ADMIN);
 
 	// Source is ignored, but has to be specified by contract
 	if(source == nullptr) throw LinuxException(UAPI_EFAULT);
@@ -117,6 +114,42 @@ HostFileSystem::Mount::Mount(std::shared_ptr<HostFileSystem> const& fs, uint32_t
 	// The specified flags should not include any that apply to the file system
 	_ASSERTE((flags & ~UAPI_MS_PERMOUNT_MASK) == 0);
 	if((flags & ~UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Mount Copy Constructor
+//
+// Arguments:
+//
+//	rhs		- Existing Mount instance to create a copy of
+
+HostFileSystem::Mount::Mount(Mount const& rhs) : m_fs(rhs.m_fs), m_flags(static_cast<uint32_t>(rhs.m_flags))
+{
+	// A copy of a mount references the same shared file system and copies the flags
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Mount::Duplicate
+//
+// Duplicates this mount instance
+//
+// Arguments:
+//
+//	NONE
+
+std::unique_ptr<VirtualMachine::Mount> HostFileSystem::Mount::Duplicate(void) const
+{
+	return std::make_unique<HostFileSystem::Mount>(*this);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Mount::getFileSystem
+//
+// Accesses the underlying file system instance
+
+VirtualMachine::FileSystem const* HostFileSystem::Mount::getFileSystem(void) const
+{
+	return m_fs.get();
 }
 
 //---------------------------------------------------------------------------

@@ -34,7 +34,6 @@
 #include "CpioArchive.h"
 #include "Executable.h"
 #include "HostFileSystem.h"
-#include "Namespace.h"
 #include "Process.h"
 #include "RootFileSystem.h"
 #include "SystemLog.h"
@@ -85,7 +84,7 @@ InstanceService::InstanceService()
 //	root			- Root directory Path instance
 //	initramfs		- Path to the initramfs file to be loaded
 
-void InstanceService::LoadInitialRamFileSystem(VirtualMachine::Path const* root, std::tstring const& initramfs)
+void InstanceService::LoadInitialRamFileSystem(Namespace::Path const* root, std::tstring const& initramfs)
 {
 	UNREFERENCED_PARAMETER(root);
 
@@ -110,10 +109,10 @@ void InstanceService::LoadInitialRamFileSystem(VirtualMachine::Path const* root,
 
 void InstanceService::OnStart(int argc, LPTSTR* argv)
 {
-	std::vector<tchar_t const*>				initargs;		// Arguments passed to init
-	std::vector<tchar_t const*>				initenv;		// Environment variables passed to init
-	std::vector<tchar_t const*>				invalidargs;	// Invalid parameter arguments
-	std::unique_ptr<VirtualMachine::Path>	rootpath;		// Root Path instance
+	std::vector<tchar_t const*>			initargs;		// Arguments passed to init
+	std::vector<tchar_t const*>			initenv;		// Environment variables passed to init
+	std::vector<tchar_t const*>			invalidargs;	// Invalid parameter arguments
+	std::unique_ptr<Namespace::Path>	rootpath;		// Root Path instance
 
 	try {
 
@@ -227,8 +226,8 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 			auto rootsource = std::to_string(param_root);
 			auto rootmount = rootfsentry->second(rootsource.c_str(), rootfsflags, rootflagsstr.data(), rootflagsstr.length());
 
-			//// Mount the file system within the root namespace and set as an active file system if successful
-			//rootpath = m_rootns->MountFileSystem(nullptr, rootfs.get(), rootfsflags, rootflagsstr.data(), rootflagsstr.length());
+			// Mount the root filesystem within the root namespace at /
+			//rootpath = m_rootns->AddMount("/", std::move(rootmount));
 		}
 		
 		catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }

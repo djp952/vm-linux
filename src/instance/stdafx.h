@@ -51,6 +51,10 @@
 #define MiB		*(1 << 20)		// MiB multiplier
 #define GiB		*(1 << 30)		// GiB multiplier
 
+// ssize_t
+//
+typedef intptr_t ssize_t;
+
 // external-servicelib
 //
 #include <servicelib.h>

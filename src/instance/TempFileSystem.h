@@ -89,6 +89,13 @@ std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source,
 
 class TempFileSystem : public VirtualMachine::FileSystem
 {
+	// FORWARD DECLARATIONS
+	//
+	class node_t;
+	class Directory;
+	class File;
+	class Mount;
+
 	// MOUNT_FLAGS
 	//
 	// Supported creation/mount operation flags
@@ -105,13 +112,6 @@ class TempFileSystem : public VirtualMachine::FileSystem
 	//
 	// Creates an instance of TempFileSystem
 	friend std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength);
-
-	// FORWARD DECLARATIONS
-	//
-	class node_t;
-	class Directory;
-	class File;
-	class Mount;
 
 public:
 
@@ -182,7 +182,7 @@ private:
 			typedef allocator_t<_u> other;
 		};
 
-		// Instance Constructor
+		// Instance Constructors
 		//
 		allocator_t(std::shared_ptr<TempFileSystem> const& fs) : m_fs(fs) {}
 
@@ -253,6 +253,7 @@ private:
 		// Calls the destructor of the object pointed to by p 
 		template<typename _u> void destroy(_u* p)
 		{
+			UNREFERENCED_PARAMETER(p);		// Not really, but shuts up the compiler
 			p->~_u();
 		}
 
@@ -277,7 +278,7 @@ private:
 		//-------------------------------------------------------------------
 		// Member Variables
 
-		std::shared_ptr<TempFileSystem>		m_fs;		// File system instance
+		std::shared_ptr<TempFileSystem>		m_fs;			// File system instance
 	};
 
 	// node_t
@@ -287,79 +288,234 @@ private:
 	{
 	public:
 
-		// Instance Constructors
-		//
-		node_t(std::shared_ptr<TempFileSystem> const& fs, VirtualMachine::NodeType type);
-		node_t(std::shared_ptr<TempFileSystem> const& fs, VirtualMachine::NodeType type, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid);
-
 		// Destructor
 		//
-		~node_t();
+		virtual ~node_t();
 
 		//-------------------------------------------------------------------
 		// Fields
 
-		// AccessTime
+		// atime
 		//
 		// Date/time that the node was last accessed
-		datetime AccessTime;
+		datetime atime;
 
-		// ChangeTime
+		// ctime
 		//
 		// Date/time that the node metadata was last changed
-		datetime ChangeTime;
+		datetime ctime;
 
-		// Index
+		// fs
 		//
-		// The node index value
-		intptr_t const Index;
+		// Shared pointer to the parent file system
+		std::shared_ptr<TempFileSystem> const fs;
 
-		// ModifyTime
-		//
-		// Date/time that the node data was last changed
-		datetime ModifyTime;
-
-		// OwnerGroupId
+		// gid
 		//
 		// Node owner group identifier
-		std::atomic<uapi_gid_t> OwnerGroupId;
+		std::atomic<uapi_gid_t> gid;
 
-		// OwnerUserId
+		// index
+		//
+		// The node index value
+		intptr_t const index;
+
+		// mode
+		//
+		// The node type and permission flags
+		std::atomic<uapi_mode_t> mode;
+
+		// mtime
+		//
+		// Date/time that the node data was last changed
+		datetime mtime;
+
+		// uid
 		//
 		// Node owner user identifier
-		std::atomic<uapi_uid_t> OwnerUserId;
+		std::atomic<uapi_uid_t> uid;
 
-		// Permissions
+	protected:
+
+		// Instance Constructor
 		//
-		// The node permission flags
-		std::atomic<uapi_mode_t> Permissions;
-
-		// Type
-		//
-		// The type of node being represented
-		VirtualMachine::NodeType const Type;
-
-		//-------------------------------------------------------------------
-		// Member Functions
-
-		// FromFileSystem (static)
-		//
-		// Helper function to allocate a new node_t on a TempFileSystem heap
-		static std::shared_ptr<node_t> FromFileSystem(std::shared_ptr<TempFileSystem> const& fs, VirtualMachine::NodeType type);
-		static std::shared_ptr<node_t> FromFileSystem(std::shared_ptr<TempFileSystem> const& fs, VirtualMachine::NodeType type, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid);
+		node_t(std::shared_ptr<TempFileSystem> const& filesystem, uapi_mode_t nodemode, uapi_uid_t userid, uapi_gid_t groupid);
 
 	private:
 
 		node_t(node_t const&)=delete;
 		node_t& operator=(node_t const&)=delete;
+	};
+
+	// directory_node_t
+	//
+	// Specialization of node_t for directory nodes
+	class directory_node_t : public node_t
+	{
+	public:
+
+		// nodemap_t
+		//
+		// Collection of named VirtualMachine::Node instances allocated on file system private heap
+		using nodemap_t = std::unordered_map<std::string, std::shared_ptr<node_t>, std::hash<std::string>,
+			std::equal_to<std::string>, allocator_t<std::pair<std::string const, std::shared_ptr<node_t>>>>;
+
+		// Instance Constructor
+		//
+		directory_node_t(std::shared_ptr<TempFileSystem> const& filesystem, uapi_mode_t nodemode, uapi_uid_t userid, uapi_gid_t groupid);
+
+		// Destructor
+		//
+		virtual ~directory_node_t()=default;
 
 		//-------------------------------------------------------------------
-		// Member Variables
+		// Member Functions
 
-		std::shared_ptr<TempFileSystem> m_fs;		// File system instance
-		uint8_t*						m_data;		// Node data
-		size_t							m_datalen;	// Length of the node data
-		sync::reader_writer_lock		m_datalock;	// Synchronization object
+		// allocate_shared (static)
+		//
+		// Creates a new directory_node_t instance on the file system private heap
+		static std::shared_ptr<directory_node_t> allocate_shared(std::shared_ptr<TempFileSystem> const& fs, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid);
+
+		//-------------------------------------------------------------------
+		// Fields
+
+		// nodes
+		//
+		// Collection of child nodes
+		nodemap_t nodes;
+
+		// nodeslock
+		//
+		// Synchronization object
+		sync::reader_writer_lock nodeslock;
+
+	private:
+
+		directory_node_t(directory_node_t const&)=delete;
+		directory_node_t& operator=(directory_node_t const&)=delete;
+	};
+
+	// file_node_t
+	//
+	// Specialization of node_t for file nodes
+	class file_node_t : public node_t
+	{
+	public:
+
+		// data_t
+		//
+		// std::vector allocated on file system private heap
+		using data_t = std::vector<uint8_t, allocator_t<uint8_t>>;
+
+		// Instance Constructor
+		//
+		file_node_t(std::shared_ptr<TempFileSystem> const& filesystem, uapi_mode_t nodemode, uapi_uid_t userid, uapi_gid_t groupid);
+
+		// Destructor
+		//
+		virtual ~file_node_t()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// allocate_shared (static)
+		//
+		// Creates a new file_node_t instance on the file system private heap
+		static std::shared_ptr<file_node_t> allocate_shared(std::shared_ptr<TempFileSystem> const& fs, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid);
+
+		//-------------------------------------------------------------------
+		// Fields
+
+		// data
+		//
+		// File data stored in a vector<> instance
+		data_t data;
+
+		// datalock
+		//
+		// Synchronization object
+		sync::reader_writer_lock datalock;
+
+	private:
+
+		file_node_t(file_node_t const&)=delete;
+		file_node_t& operator=(file_node_t const&)=delete;
+	};
+
+	// file_handle_t
+	//
+	// Internal shared representation of a file handle
+	class file_handle_t
+	{
+	public:
+
+		// Instance Constructor
+		//
+		file_handle_t(std::shared_ptr<file_node_t> const& filenode);
+
+		// Destructor
+		//
+		~file_handle_t()=default;
+
+		//-------------------------------------------------------------------
+		// Fields
+
+		// node
+		//
+		// Shared pointer to the referenced node instance
+		std::shared_ptr<file_node_t> const node;
+
+		// position
+		//
+		// Current file pointer
+		std::atomic<size_t> position;
+
+	private:
+
+		file_handle_t(file_handle_t const&)=delete;
+		file_handle_t& operator=(file_handle_t const&)=delete;
+	};
+
+	// symlink_node_t
+	//
+	// Specialization of node_t for symbolic link nodes
+	class symlink_node_t : public node_t
+	{
+	public:
+
+		// target_t
+		//
+		// std::string allocated on file system private heap
+		using target_t = std::basic_string<char_t, std::char_traits<char_t>, allocator_t<char_t>>;
+
+		// Instance Constructor
+		//
+		symlink_node_t(std::shared_ptr<TempFileSystem> const& filesystem, char_t const* linktarget, uapi_uid_t userid, uapi_gid_t groupid);
+
+		// Destructor
+		//
+		virtual ~symlink_node_t()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// allocate_shared (static)
+		//
+		// Creates a new symlink_node_t instance on the file system private heap
+		static std::shared_ptr<symlink_node_t> allocate_shared(std::shared_ptr<TempFileSystem> const& fs, char_t const* target, uapi_uid_t uid, uapi_gid_t gid);
+
+		//-------------------------------------------------------------------
+		// Fields
+
+		// target
+		//
+		// The symbolic link target
+		target_t const target;
+
+	private:
+
+		symlink_node_t(symlink_node_t const&)=delete;
+		symlink_node_t& operator=(symlink_node_t const&)=delete;
 	};
 
 	// Directory
@@ -382,54 +538,50 @@ private:
 
 		// CreateDirectory (VirtualMachine::Directory)
 		//
-		// Creates a new Directory node within this directory
-		virtual VirtualMachine::Directory* CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name) /* override - todo */;
-		virtual VirtualMachine::Directory* CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) /* override - todo */;
+		// Creates and opens a new directory node as a child of this directory
+		virtual std::unique_ptr<VirtualMachine::Directory> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+
+		// CreateFile (VirtualMachine::Directory)
+		//
+		// Creates and opens a new regular file node as a child of this directory
+		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
 		//-------------------------------------------------------------------
 		// Properties
 
-		// OwnerGroupId (VirtualMachine::Node)
+		// GroupId (VirtualMachine::Node)
 		//
 		// Gets the node owner group identifier
-		__declspec(property(get=getOwnerGroupId)) uapi_gid_t OwnerGroupId;
-		virtual uapi_gid_t getOwnerGroupId(void) const override;
-
-		// OwnerUserId (VirtualMachine::Node)
-		//
-		// Gets the node owner user identifier 
-		__declspec(property(get=getOwnerUserId)) uapi_uid_t OwnerUserId;
-		virtual uapi_uid_t getOwnerUserId(void) const override;
+		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
+		virtual uapi_gid_t getGroupId(void) const override;
 
 		// Permissions (VirtualMachine::Node)
 		//
-		// Gets the node permissions mask
+		// Gets the permissions mask assigned to this node
 		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
 		virtual uapi_mode_t getPermissions(void) const override;
 
 		// Type (VirtualMachine::Node)
 		//
-		// Gets the node type
+		// Gets the type of file system node being represented
 		__declspec(property(get=getType)) VirtualMachine::NodeType Type;
 		virtual VirtualMachine::NodeType getType(void) const override;
+
+		// UserId (VirtualMachine::Node)
+		//
+		// Gets the node owner user identifier 
+		__declspec(property(get=getUserId)) uapi_uid_t UserId;
+		virtual uapi_uid_t getUserId(void) const override;
 
 	private:
 
 		Directory(Directory const&)=delete;
 		Directory& operator=(Directory const&)=delete;
 
-		// nodemap_t
-		//
-		// Collection of named VirtualMachine::Node instances
-		using nodemap_t = std::unordered_map<std::string, std::unique_ptr<VirtualMachine::Node>>;
-
 		//---------------------------------------------------------------------
 		// Member Variables
 
-		std::shared_ptr<TempFileSystem>	m_fs;				// Owning file system
-		std::shared_ptr<node_t>			m_node;				// Shared node instance
-		nodemap_t						m_children;			// Collection of children
-		sync::reader_writer_lock		m_childrenlock;		// Synchronization object
+		std::shared_ptr<directory_node_t>	m_node;		// Shared node instance
 	};
 
 	// File
@@ -450,29 +602,29 @@ private:
 		//---------------------------------------------------------------------
 		// Properties
 
-		// OwnerGroupId (VirtualMachine::Node)
+		// GroupId (VirtualMachine::Node)
 		//
 		// Gets the node owner group identifier
-		__declspec(property(get=getOwnerGroupId)) uapi_gid_t OwnerGroupId;
-		virtual uapi_gid_t getOwnerGroupId(void) const override;
-
-		// OwnerUserId (VirtualMachine::Node)
-		//
-		// Gets the node owner user identifier 
-		__declspec(property(get=getOwnerUserId)) uapi_uid_t OwnerUserId;
-		virtual uapi_uid_t getOwnerUserId(void) const override;
+		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
+		virtual uapi_gid_t getGroupId(void) const override;
 
 		// Permissions (VirtualMachine::Node)
 		//
-		// Gets the node permissions mask
+		// Gets the permissions mask assigned to this node
 		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
 		virtual uapi_mode_t getPermissions(void) const override;
 
 		// Type (VirtualMachine::Node)
 		//
-		// Gets the node type
+		// Gets the type of file system node being represented
 		__declspec(property(get=getType)) VirtualMachine::NodeType Type;
 		virtual VirtualMachine::NodeType getType(void) const override;
+
+		// UserId (VirtualMachine::Node)
+		//
+		// Gets the node owner user identifier 
+		__declspec(property(get=getUserId)) uapi_uid_t UserId;
+		virtual uapi_uid_t getUserId(void) const override;
 
 	private:
 
@@ -482,7 +634,77 @@ private:
 		//-------------------------------------------------------------------
 		// Member Variables
 
-		std::shared_ptr<node_t>			m_node;		// Shared node instance
+		std::shared_ptr<file_node_t>	m_node;		// Shared node instance
+	};
+
+	// FileHandle
+	//
+	// Implements VirtualMachine::Handle
+	class FileHandle : public VirtualMachine::Handle
+	{
+	public:
+
+		// Instance Constructor
+		//
+		FileHandle(std::shared_ptr<file_handle_t> const& handle, uint32_t flags);
+
+		// Destructor
+		//
+		~FileHandle()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// Duplicate (VirtualMachine::Handle)
+		//
+		// Creates a duplicate Handle instance
+		virtual std::unique_ptr<VirtualMachine::Handle> Duplicate(void) const override;
+
+		// Read (VirtualMachine::Handle)
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t Read(void* buffer, size_t count) override;
+
+		// ReadAt (VirtualMachine::Handle)
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t ReadAt(ssize_t offset, int whence, void* buffer, size_t count) override;
+
+		// Seek (VirtualMachine::Handle)
+		//
+		// Changes the file position
+		virtual size_t Seek(ssize_t offset, int whence) override;
+
+		// Sync (VirtualMachine::Handle)
+		//
+		// Synchronizes all metadata and data associated with the file to storage
+		virtual void Sync(void) const override;
+
+		// SyncData (VirtualMachine::Handle)
+		//
+		// Synchronizes all data associated with the file to storage, not metadata
+		virtual void SyncData(void) const override;
+
+		// Write (VirtualMachine::Handle)
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t Write(const void* buffer, size_t count) override;
+
+		// WriteAt (VirtualMachine::Handle)
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t WriteAt(ssize_t offset, int whence, const void* buffer, size_t count) override;
+
+	private:
+
+		FileHandle(FileHandle const&)=delete;
+		FileHandle& operator=(FileHandle const&)=delete;
+
+		//-------------------------------------------------------------------
+		// Member Variables
+
+		std::shared_ptr<file_handle_t>	m_handle;	// Shared handle instance
+		uint32_t						m_flags;	// Handle flags
 	};
 
 	// Mount
@@ -496,12 +718,30 @@ private:
 		//
 		Mount(std::shared_ptr<TempFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags);
 
+		// Copy Constructor
+		//
+		Mount(Mount const& rhs);
+
 		// Destructor
 		//
 		~Mount()=default;
 
 		//-------------------------------------------------------------------
+		// Member Functions
+
+		// Duplicate (VirtualMachine::Mount)
+		//
+		// Duplicates this mount instance
+		virtual std::unique_ptr<VirtualMachine::Mount> Duplicate(void) const override;
+
+		//-------------------------------------------------------------------
 		// Properties
+
+		// FileSystem (VirtualMachine::Mount)
+		//
+		// Accesses the underlying file system instance
+		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem const* FileSystem;
+		virtual VirtualMachine::FileSystem const* getFileSystem(void) const override;
 
 		// Flags (VirtualMachine::Mount)
 		//
@@ -510,6 +750,8 @@ private:
 		virtual uint32_t getFlags(void) const override;
 
 	private:
+
+		Mount& operator=(Mount const&)=delete;
 
 		//---------------------------------------------------------------------
 		// Member Variables

@@ -30,13 +30,13 @@
 #include <vector>
 #include <Parameter.h>
 
+#include "Namespace.h"
 #include "VirtualMachine.h"
 
 #pragma warning(push, 4)
 
 // FORWARD DECLARATIONS
 //
-class Namespace;
 class Process;
 class RpcObject;
 class SystemLog;
@@ -139,7 +139,7 @@ private:
 	// LoadInitialRamFileSystem
 	//
 	// Loads the contents of an initramfs file into the root file system
-	void LoadInitialRamFileSystem(VirtualMachine::Path const* root, std::tstring const& initramfs);
+	void LoadInitialRamFileSystem(Namespace::Path const* root, std::tstring const& initramfs);
 	
 	// OnStart (Service)
 	//

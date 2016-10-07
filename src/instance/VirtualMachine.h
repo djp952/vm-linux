@@ -55,7 +55,6 @@ public:
 	struct Handle;
 	struct Mount;
 	struct Node;
-	struct Path;
 	struct SymbolicLink;
 
 	//
@@ -65,6 +64,7 @@ public:
 	// MaxSymbolicLinks
 	//
 	// Constant indicating the maximum recursion depth of a path lookup
+	// todo: move to namespace?
 	static const int MaxSymbolicLinks = 40;
 
 	//
@@ -185,6 +185,46 @@ public:
 		// Destructor
 		//
 		virtual ~Handle()=default;
+
+		// Duplicate
+		//
+		// Creates a duplicate Handle instance
+		virtual std::unique_ptr<Handle> Duplicate(void) const = 0;
+
+		// Read
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t Read(void* buffer, size_t count) = 0;
+
+		// ReadAt
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t ReadAt(ssize_t offset, int whence, void* buffer, size_t count) = 0;
+
+		// Seek
+		//
+		// Changes the file position
+		virtual size_t Seek(ssize_t offset, int whence) = 0;
+
+		// Sync
+		//
+		// Synchronizes all metadata and data associated with the file to storage
+		virtual void Sync(void) const = 0;
+
+		// SyncData
+		//
+		// Synchronizes all data associated with the file to storage, not metadata
+		virtual void SyncData(void) const = 0;
+
+		// Write
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t Write(const void* buffer, size_t count) = 0;
+
+		// WriteAt
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t WriteAt(ssize_t offset, int whence, const void* buffer, size_t count) = 0;
 	};
 
 	// Mount
@@ -195,6 +235,17 @@ public:
 		// Destructor
 		//
 		virtual ~Mount()=default;
+
+		// Duplicate
+		//
+		// Duplicates the Mount instance
+		virtual std::unique_ptr<Mount> Duplicate(void) const = 0;
+
+		// FileSystem
+		//
+		// Accesses the underlying file system instance
+		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem const* FileSystem;
+		virtual VirtualMachine::FileSystem const* getFileSystem(void) const = 0;
 
 		// Flags
 		//
@@ -212,29 +263,29 @@ public:
 		//
 		virtual ~Node()=default;
 
-		// OwnerGroupId
+		// GroupId
 		//
 		// Gets the node owner group identifier
-		__declspec(property(get=getOwnerGroupId)) uapi_gid_t OwnerGroupId;
-		virtual uapi_gid_t getOwnerGroupId(void) const = 0;
-
-		// OwnerUserId
-		//
-		// Gets the node owner user identifier 
-		__declspec(property(get=getOwnerUserId)) uapi_uid_t OwnerUserId;
-		virtual uapi_uid_t getOwnerUserId(void) const = 0;
+		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
+		virtual uapi_gid_t getGroupId(void) const = 0;
 
 		// Permissions
 		//
-		// Gets the node permissions mask
+		// Gets the permissions mask assigned to this node
 		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
 		virtual uapi_mode_t getPermissions(void) const = 0;
 
 		// Type
 		//
-		// Gets the node type
+		// Gets the type of file system node being represented
 		__declspec(property(get=getType)) NodeType Type;
 		virtual NodeType getType(void) const = 0;
+
+		// UserId
+		//
+		// Gets the node owner user identifier 
+		__declspec(property(get=getUserId)) uapi_uid_t UserId;
+		virtual uapi_uid_t getUserId(void) const = 0;
 	};
 
 	// Directory
@@ -245,6 +296,16 @@ public:
 		// Destructor
 		//
 		virtual ~Directory()=default;
+
+		// CreateDirectory
+		//
+		// Creates and opens a new directory node as a child of this directory
+		virtual std::unique_ptr<Directory> CreateDirectory(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
+
+		// CreateFile
+		//
+		// Creates and opens a new regular file node as a child of this directory
+		virtual std::unique_ptr<File> CreateFile(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 	};
 
 	// File
@@ -265,21 +326,6 @@ public:
 		// Destructor
 		//
 		virtual ~SymbolicLink()=default;
-	};
-
-	// Path
-	//
-	// Interface that must be implemented by a path object
-	struct Path
-	{
-		// Destructor
-		//
-		virtual ~Path()=default;
-
-		// Duplicate
-		//
-		// Duplicates this Path instance
-		virtual std::unique_ptr<Path> Duplicate(void) = 0;
 	};
 
 	//-------------------------------------------------------------------------

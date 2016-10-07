@@ -124,32 +124,45 @@ private:
 		//
 		virtual ~Directory()=default;
 
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// CreateDirectory (VirtualMachine::Directory)
+		//
+		// Creates and opens a new directory node as a child of this directory
+		virtual std::unique_ptr<VirtualMachine::Directory> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+
+		// CreateFile (VirtualMachine::Directory)
+		//
+		// Creates and opens a new regular file node as a child of this directory
+		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+
 		//---------------------------------------------------------------------
 		// Properties
 
-		// OwnerGroupId (VirtualMachine::Node)
+		// GroupId (VirtualMachine::Node)
 		//
 		// Gets the node owner group identifier
-		__declspec(property(get=getOwnerGroupId)) uapi_gid_t OwnerGroupId;
-		virtual uapi_gid_t getOwnerGroupId(void) const override;
-
-		// OwnerUserId (VirtualMachine::Node)
-		//
-		// Gets the node owner user identifier 
-		__declspec(property(get=getOwnerUserId)) uapi_uid_t OwnerUserId;
-		virtual uapi_uid_t getOwnerUserId(void) const override;
+		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
+		virtual uapi_gid_t getGroupId(void) const override;
 
 		// Permissions (VirtualMachine::Node)
 		//
-		// Gets the node permissions mask
+		// Gets the permissions mask assigned to this node
 		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
 		virtual uapi_mode_t getPermissions(void) const override;
 
 		// Type (VirtualMachine::Node)
 		//
-		// Gets the node type
+		// Gets the type of file system node being represented
 		__declspec(property(get=getType)) VirtualMachine::NodeType Type;
 		virtual VirtualMachine::NodeType getType(void) const override;
+
+		// UserId (VirtualMachine::Node)
+		//
+		// Gets the node owner user identifier 
+		__declspec(property(get=getUserId)) uapi_uid_t UserId;
+		virtual uapi_uid_t getUserId(void) const override;
 
 	private:
 
@@ -176,12 +189,30 @@ private:
 		//
 		Mount(std::shared_ptr<RootFileSystem> const& fs, uint32_t flags);
 
+		// Copy Constructor
+		//
+		Mount(Mount const& rhs);
+
 		// Destructor
 		//
 		~Mount()=default;
 
 		//-------------------------------------------------------------------
+		// Member Functions
+
+		// Duplicate (VirtualMachine::Mount)
+		//
+		// Duplicates this mount instance
+		virtual std::unique_ptr<VirtualMachine::Mount> Duplicate(void) const override;
+
+		//-------------------------------------------------------------------
 		// Properties
+
+		// FileSystem (VirtualMachine::Mount)
+		//
+		// Accesses the underlying file system instance
+		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem const* FileSystem;
+		virtual VirtualMachine::FileSystem const* getFileSystem(void) const override;
 
 		// Flags (VirtualMachine::Mount)
 		//
@@ -190,6 +221,8 @@ private:
 		virtual uint32_t getFlags(void) const override;
 
 	private:
+
+		Mount& operator=(Mount const&)=delete;
 
 		//---------------------------------------------------------------------
 		// Member Variables

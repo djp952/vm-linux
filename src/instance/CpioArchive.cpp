@@ -230,7 +230,7 @@ void CpioArchive::FileStream::Seek(size_t position)
 //	header		- Reference to the CPIO file header
 //	path		- File path extracted from the data stream
 
-CpioFile::CpioFile(cpio_header_t const& header, char_t const* path, StreamReader& data)	: m_path(path), m_data(data)
+CpioFile::CpioFile(cpio_header_t const& header, char_t const* path, StreamReader& data) : m_path(path), m_data(data)
 {
 	m_inode		= ConvertHexString(header.c_ino, 8);
 	m_mode		= ConvertHexString(header.c_mode, 8);
