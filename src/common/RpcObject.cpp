@@ -88,7 +88,7 @@ RpcObject::RpcObject(RPC_IF_HANDLE const& ifspec, uuid_t const& objectid, uuid_t
 //	epv			- Entry point vector
 //	flags		- Interface registration flags
 
-RpcObject::RpcObject(RPC_IF_HANDLE const& ifspec, uuid_t const& objectid, uuid_t const& mgrtypeid, RPC_MGR_EPV* const epv, unsigned int flags) :
+RpcObject::RpcObject(RPC_IF_HANDLE const& ifspec, uuid_t const& objectid, uuid_t const& mgrtypeid, RPC_MGR_EPV* epv, unsigned int flags) :
 	m_ifspec(ifspec), m_objectid(objectid), m_mgrtypeid(mgrtypeid)
 {
 	// Attempt to register the RPC object interface using the provided details

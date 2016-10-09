@@ -129,13 +129,18 @@ private:
 
 		// CreateDirectory (VirtualMachine::Directory)
 		//
-		// Creates and opens a new directory node as a child of this directory
+		// Creates a new directory node as a child of this directory
 		virtual std::unique_ptr<VirtualMachine::Directory> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
 		// CreateFile (VirtualMachine::Directory)
 		//
-		// Creates and opens a new regular file node as a child of this directory
+		// Creates a new regular file node as a child of this directory
 		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+
+		// OpenHandle (VirtualMachine::Node)
+		//
+		// Opens a handle against this node
+		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
 
 		//---------------------------------------------------------------------
 		// Properties
@@ -187,7 +192,7 @@ private:
 
 		// Instance Constructor
 		//
-		Mount(std::shared_ptr<RootFileSystem> const& fs, uint32_t flags);
+		Mount(std::shared_ptr<RootFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags);
 
 		// Copy Constructor
 		//
@@ -211,14 +216,20 @@ private:
 		// FileSystem (VirtualMachine::Mount)
 		//
 		// Accesses the underlying file system instance
-		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem const* FileSystem;
-		virtual VirtualMachine::FileSystem const* getFileSystem(void) const override;
+		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem* FileSystem;
+		virtual VirtualMachine::FileSystem* getFileSystem(void) const override;
 
 		// Flags (VirtualMachine::Mount)
 		//
 		// Gets the mount point flags
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
+
+		// RootNode (VirtualMachine::Mount)
+		//
+		// Gets the root node of the mount point
+		__declspec(property(get=getRootNode)) VirtualMachine::Node* RootNode;
+		virtual VirtualMachine::Node* getRootNode(void) const override;
 
 	private:
 
@@ -228,6 +239,7 @@ private:
 		// Member Variables
 
 		std::shared_ptr<RootFileSystem>		m_fs;		// File system instance
+		std::shared_ptr<Directory>			m_rootdir;	// Root node instance
 		std::atomic<uint32_t>				m_flags;	// Mount-level flags
 	};
 };

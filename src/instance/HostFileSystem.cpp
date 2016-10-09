@@ -147,7 +147,7 @@ std::unique_ptr<VirtualMachine::Mount> HostFileSystem::Mount::Duplicate(void) co
 //
 // Accesses the underlying file system instance
 
-VirtualMachine::FileSystem const* HostFileSystem::Mount::getFileSystem(void) const
+VirtualMachine::FileSystem* HostFileSystem::Mount::getFileSystem(void) const
 {
 	return m_fs.get();
 }
@@ -161,6 +161,17 @@ uint32_t HostFileSystem::Mount::getFlags(void) const
 {
 	// Combine the mount flags with those of the underlying file system
 	return m_fs->Flags | m_flags;
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Mount::getRootNode
+//
+// Gets the root node of the mount point
+
+VirtualMachine::Node* HostFileSystem::Mount::getRootNode(void) const
+{
+	// todo: placeholder
+	return nullptr;
 }
 
 //---------------------------------------------------------------------------

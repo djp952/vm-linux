@@ -538,13 +538,18 @@ private:
 
 		// CreateDirectory (VirtualMachine::Directory)
 		//
-		// Creates and opens a new directory node as a child of this directory
+		// Creates a new directory node as a child of this directory
 		virtual std::unique_ptr<VirtualMachine::Directory> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
 		// CreateFile (VirtualMachine::Directory)
 		//
-		// Creates and opens a new regular file node as a child of this directory
+		// Creates a new regular file node as a child of this directory
 		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+
+		// OpenHandle (VirtualMachine::Node)
+		//
+		// Opens a handle against this node
+		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
 
 		//-------------------------------------------------------------------
 		// Properties
@@ -598,6 +603,14 @@ private:
 		// Destructor
 		//
 		~File()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// OpenHandle (VirtualMachine::Node)
+		//
+		// Opens a handle against this node
+		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
 
 		//---------------------------------------------------------------------
 		// Properties
@@ -675,6 +688,11 @@ private:
 		// Changes the file position
 		virtual size_t Seek(ssize_t offset, int whence) override;
 
+		// SetLength (VirtualMachine::Handle)
+		//
+		// Sets the length of the file
+		virtual size_t SetLength(size_t length) override;
+
 		// Sync (VirtualMachine::Handle)
 		//
 		// Synchronizes all metadata and data associated with the file to storage
@@ -695,16 +713,39 @@ private:
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t WriteAt(ssize_t offset, int whence, const void* buffer, size_t count) override;
 
+		//-------------------------------------------------------------------
+		// Properties
+
+		// Flags (VirtualMachine::Handle)
+		//
+		// Gets the handle flags
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const override;
+
+		// Position (VirtualMachine::Handle)
+		//
+		// Gets the current file position for this handle
+		__declspec(property(get=getPosition)) size_t Position;
+		virtual size_t getPosition(void) const override;
+
 	private:
 
 		FileHandle(FileHandle const&)=delete;
 		FileHandle& operator=(FileHandle const&)=delete;
 
 		//-------------------------------------------------------------------
+		// Private Member Functions
+
+		// AdjustPosition
+		//
+		// Generates an adjusted handle position based on a delta and starting location
+		size_t AdjustPosition(sync::reader_writer_lock::scoped_lock const& lock, ssize_t delta, int whence) const;
+
+		//-------------------------------------------------------------------
 		// Member Variables
 
 		std::shared_ptr<file_handle_t>	m_handle;	// Shared handle instance
-		uint32_t						m_flags;	// Handle flags
+		std::atomic<uint32_t>			m_flags;	// Handle flags
 	};
 
 	// Mount
@@ -740,14 +781,20 @@ private:
 		// FileSystem (VirtualMachine::Mount)
 		//
 		// Accesses the underlying file system instance
-		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem const* FileSystem;
-		virtual VirtualMachine::FileSystem const* getFileSystem(void) const override;
+		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem* FileSystem;
+		virtual VirtualMachine::FileSystem* getFileSystem(void) const override;
 
 		// Flags (VirtualMachine::Mount)
 		//
 		// Gets the mount point flags
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
+
+		// RootNode (VirtualMachine::Mount)
+		//
+		// Gets the root node of the mount point
+		__declspec(property(get=getRootNode)) VirtualMachine::Node* RootNode;
+		virtual VirtualMachine::Node* getRootNode(void) const override;
 
 	private:
 

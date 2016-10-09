@@ -44,7 +44,7 @@ public:
 	RpcObject(RPC_IF_HANDLE const& ifspec, unsigned int flags);
 	RpcObject(RPC_IF_HANDLE const& ifspec, uuid_t const& objectid, unsigned int flags);
 	RpcObject(RPC_IF_HANDLE const& ifspec, uuid_t const& objectid, uuid_t const& mgrtypeid, unsigned int flags);
-	RpcObject(RPC_IF_HANDLE const& ifspec, uuid_t const& objectid, uuid_t const& mgrtypeid, RPC_MGR_EPV* const epv, unsigned int flags);
+	RpcObject(RPC_IF_HANDLE const& ifspec, uuid_t const& objectid, uuid_t const& mgrtypeid, RPC_MGR_EPV* epv, unsigned int flags);
 
 	// Destructor
 	//

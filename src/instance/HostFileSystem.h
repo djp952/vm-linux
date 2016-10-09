@@ -138,14 +138,20 @@ private:
 		// FileSystem (VirtualMachine::Mount)
 		//
 		// Accesses the underlying file system instance
-		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem const* FileSystem;
-		virtual VirtualMachine::FileSystem const* getFileSystem(void) const override;
+		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem* FileSystem;
+		virtual VirtualMachine::FileSystem* getFileSystem(void) const override;
 
 		// Flags (VirtualMachine::Mount)
 		//
 		// Gets the mount point flags
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
+
+		// RootNode (VirtualMachine::Mount)
+		//
+		// Gets the root node of the mount point
+		__declspec(property(get=getRootNode)) VirtualMachine::Node* RootNode;
+		virtual VirtualMachine::Node* getRootNode(void) const override;
 
 	private:
 

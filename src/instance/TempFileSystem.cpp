@@ -180,20 +180,8 @@ std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source,
 	auto rootnode = TempFileSystem::directory_node_t::allocate_shared(fs, (mode & ~UAPI_S_IFMT) | UAPI_S_IFDIR, uid, gid);
 	auto rootdir = std::make_unique<TempFileSystem::Directory>(rootnode);
 
-	/// test
-	auto p = rootdir.get();
-
 	// Create and return the mount point instance, transferring ownership of the root node
-	//return std::make_unique<TempFileSystem::Mount>(fs, std::move(rootdir), options.Flags & UAPI_MS_PERMOUNT_MASK);
-	auto m = std::make_unique<TempFileSystem::Mount>(fs, std::move(rootdir), options.Flags & UAPI_MS_PERMOUNT_MASK);
-
-	p->CreateDirectory(m.get(), "hello", UAPI_S_IFDIR | 0755, 0, 0);
-	p->CreateDirectory(m.get(), "hello2", UAPI_S_IFDIR | 0755, 0, 0);
-	p->CreateDirectory(m.get(), "hello3", UAPI_S_IFDIR | 0755, 0, 0);
-	p->CreateFile(m.get(), "myfile", UAPI_S_IFREG | 0644, 0, 0);
-	/// end: test
-
-	return std::unique_ptr<TempFileSystem::Mount>(m.release());
+	return std::make_unique<TempFileSystem::Mount>(fs, std::move(rootdir), options.Flags & UAPI_MS_PERMOUNT_MASK);
 }
 
 //---------------------------------------------------------------------------
@@ -494,7 +482,7 @@ TempFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : m_no
 //---------------------------------------------------------------------------
 // TempFileSystem::Directory::CreateDirectory
 //
-// Creates and opens a new directory node as a child of this directory
+// Creates a new directory node as a child of this directory
 //
 // Arguments:
 //
@@ -535,7 +523,7 @@ std::unique_ptr<VirtualMachine::Directory> TempFileSystem::Directory::CreateDire
 //---------------------------------------------------------------------------
 // TempFileSystem::Directory::CreateFile
 //
-// Creates and opens a new file node as a child of this directory
+// Creates a new file node as a child of this directory
 //
 // Arguments:
 //
@@ -583,6 +571,23 @@ uapi_gid_t TempFileSystem::Directory::getGroupId(void) const
 	return m_node->gid;
 }
 
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::OpenHandle
+//
+// Opens a handle against this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	flags		- Handle flags
+
+std::unique_ptr<VirtualMachine::Handle> TempFileSystem::Directory::OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags)
+{
+	UNREFERENCED_PARAMETER(mount);
+	UNREFERENCED_PARAMETER(flags);
+	return nullptr;
+}
+		
 //---------------------------------------------------------------------------
 // TempFileSystem::Directory::getPermissions
 //
@@ -642,6 +647,29 @@ uapi_gid_t TempFileSystem::File::getGroupId(void) const
 }
 
 //---------------------------------------------------------------------------
+// TempFileSystem::File::OpenHandle
+//
+// Opens a handle against this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	flags		- Handle flags
+
+std::unique_ptr<VirtualMachine::Handle> TempFileSystem::File::OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the provided mount is part of the same file system instance
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// todo: validate flags (both mount and handle)
+
+	// Handles are allocated normally within the process heap
+	return std::make_unique<FileHandle>(std::make_shared<file_handle_t>(m_node), flags);
+}
+
+//---------------------------------------------------------------------------
 // TempFileSystem::File::getPermissions
 //
 // Gets the permissions mask assigned to this node
@@ -689,6 +717,51 @@ TempFileSystem::FileHandle::FileHandle(std::shared_ptr<file_handle_t> const& han
 }
 
 //---------------------------------------------------------------------------
+// TempFileSystem::FileHandle::AdjustPosition (private)
+//
+// Generates an adjusted handle position based on a delta and starting location
+//
+// Arguments:
+//
+//	lock		- Reference to a scoped_lock against the node data
+//	delta		- Delta to current handle position to be calculated
+//	whence		- Location from which to apply the specified delta
+
+size_t TempFileSystem::FileHandle::AdjustPosition(sync::reader_writer_lock::scoped_lock const& lock, ssize_t delta, int whence) const
+{
+	UNREFERENCED_PARAMETER(lock);			// Unused; ensures caller has a scoped_lock
+
+	size_t pos = m_handle->position;		// Copy the current position
+
+	switch(whence) {
+
+		// UAPI_SEEK_SET - Seeks to an offset relative to the beginning of the file;
+		case UAPI_SEEK_SET:
+
+			if(delta < 0) throw LinuxException(UAPI_EINVAL);
+			pos = static_cast<size_t>(delta);
+			break;
+
+		// UAPI_SEEK_CUR - Seeks to an offset relative to the current position
+		case UAPI_SEEK_CUR:
+
+			if((delta < 0) && ((pos - delta) < 0)) throw LinuxException(UAPI_EINVAL);
+			pos += delta;
+			break;
+
+		// UAPI_SEEK_END - Seeks to an offset relative to the end of the file
+		case UAPI_SEEK_END:
+
+			pos = m_handle->node->data.size() + delta;
+			break;
+
+		default: throw LinuxException(UAPI_EINVAL);
+	}
+
+	return pos;
+}
+
+//---------------------------------------------------------------------------
 // TempFileSystem::FileHandle::Duplicate
 //
 // Duplicates this handle instance
@@ -701,6 +774,26 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::FileHandle::Duplicate(vo
 {
 	// Duplication of a file handle removes O_CLOEXEC from the flags -- see dup(2)
 	return std::make_unique<TempFileSystem::FileHandle>(m_handle, (m_flags & ~(UAPI_O_CLOEXEC)));
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::FileHandle::getFlags
+//
+// Gets the current flags for this handle
+
+uint32_t TempFileSystem::FileHandle::getFlags(void) const
+{
+	return m_flags;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::FileHandle::getPosition
+//
+// Gets the current file position for this handle
+
+size_t TempFileSystem::FileHandle::getPosition(void) const
+{
+	return m_handle->position;
 }
 
 //---------------------------------------------------------------------------
@@ -718,6 +811,11 @@ size_t TempFileSystem::FileHandle::Read(void* buffer, size_t count)
 	if(count == 0) return 0;
 	if(buffer == nullptr) throw LinuxException(UAPI_EFAULT);
 
+	uint32_t flags = m_flags;				// Copy the currently set flags
+
+	// The file cannot be open for write-only mode
+	if((flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
 	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
 
 	size_t pos = m_handle->position;		// Copy the current position
@@ -731,13 +829,16 @@ size_t TempFileSystem::FileHandle::Read(void* buffer, size_t count)
 
 	m_handle->position = (pos + count);		// Set the new position	
 	
+	// todo: atime
+
 	return count;
 }
 
 //---------------------------------------------------------------------------
 // TempFileSystem::FileHandle::ReadAt
 //
-// Synchronously reads data from the underlying node into a buffer
+// Synchronously reads data from the underlying node into a buffer, does not
+// change the current file position
 //
 // Arguments:
 //
@@ -748,12 +849,29 @@ size_t TempFileSystem::FileHandle::Read(void* buffer, size_t count)
 
 size_t TempFileSystem::FileHandle::ReadAt(ssize_t offset, int whence, void* buffer, size_t count)
 {
-	UNREFERENCED_PARAMETER(offset);
-	UNREFERENCED_PARAMETER(whence);
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
+	if(count == 0) return 0;
+	if(buffer == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	return 0;
+	uint32_t flags = m_flags;				// Copy the currently set flags
+
+	// The file cannot be open for write-only mode
+	if((flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
+	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
+
+	// Calculate the starting position for the read operation
+	size_t pos = AdjustPosition(reader, offset, whence);
+
+	// Determine the number of bytes to actually read from the file data
+	if(pos >= m_handle->node->data.size()) return 0;
+	count = std::min(count, m_handle->node->data.size() - pos);
+
+	// Copy the requested data from the file into the provided buffer
+	memcpy(buffer, &m_handle->node->data[pos], count);
+
+	// todo: atime
+
+	return count;
 }
 
 //---------------------------------------------------------------------------
@@ -770,36 +888,42 @@ size_t TempFileSystem::FileHandle::Seek(ssize_t offset, int whence)
 {
 	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
 
-	size_t pos = m_handle->position;		// Copy the current position
+	m_handle->position = AdjustPosition(reader, offset, whence);
+	return m_handle->position;
+}
 
-	switch(whence) {
+//---------------------------------------------------------------------------
+// TempFileSystem::FileHandle::SetLength
+//
+// Sets the length of the file
+//
+// Arguments:
+//
+//	length		- New length to assign to the file
 
-		// SEEK_SET - Seeks to an offset relative to the beginning of the file
-		case SEEK_SET:
+size_t TempFileSystem::FileHandle::SetLength(size_t length)
+{
+	uint32_t flags = m_flags;				// Copy the currently set flags
 
-			if(offset < 0) throw LinuxException(UAPI_EINVAL);
-			pos = static_cast<size_t>(offset);
-			break;
+	// The file cannot be open for read-only mode
+	if((flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
 
-		// SEEK_CUR - Seeks to an offset relative to the current position
-		case SEEK_CUR:
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
 
-			if((offset < 0) && ((pos - offset) < 0)) throw LinuxException(UAPI_EINVAL);
-			pos += offset;
-			break;
+	// Determine if the operation will shrink the file data buffer
+	bool shrink = (length < m_handle->node->data.size());
 
-		// SEEK_END - Seeks to an offset relative to the end of the file
-		case SEEK_END:
+	// Resize the buffer initializing any new allocations to zero
+	try { m_handle->node->data.resize(length, 0); }
+	catch(...) { throw LinuxException(UAPI_ENOSPC); }
 
-			pos = m_handle->node->data.size() + offset;
-			break;
+	// If the new length is less than the original length, trim the buffer
+	if(shrink) m_handle->node->data.shrink_to_fit();
 
-		default: throw LinuxException(UAPI_EINVAL);
-	}
+	// Update the modification and change times for the node
+	m_handle->node->mtime = m_handle->node->ctime = datetime::now();
 
-	m_handle->position = pos;				// Set the new file position
-	
-	return pos;
+	return m_handle->node->data.size();
 }
 
 //---------------------------------------------------------------------------
@@ -842,16 +966,42 @@ void TempFileSystem::FileHandle::SyncData(void) const
 
 size_t TempFileSystem::FileHandle::Write(const void* buffer, size_t count)
 {
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
+	if(count == 0) return 0;
+	if(buffer == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	return 0;
+	uint32_t flags = m_flags;				// Copy the currently set flags
+
+	// The file cannot be open for read-only mode
+	if((flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
+
+	size_t pos = m_handle->position;		// Copy the current position
+
+	// Ensure that the node buffer is large enough to accept the data
+	if((pos + count) > m_handle->node->data.size()) {
+		
+		try { m_handle->node->data.resize(pos + count); }
+		catch(...) { throw LinuxException(UAPI_ENOSPC); }
+	}
+
+	// Copy the data from the input buffer into the node data buffer
+	memcpy(&m_handle->node->data[pos], buffer, count);
+	
+	// Adjust the current file position to immediately beyond the write
+	m_handle->position += count;
+
+	// Update the modification and change times for the node
+	m_handle->node->mtime = m_handle->node->ctime = datetime::now();
+
+	return count;
 }
 
 //---------------------------------------------------------------------------
 // TempFileSystem::FileHandle::WriteAt
 //
-// Synchronously writes data from a buffer to the underlying node
+// Synchronously writes data from a buffer to the underlying node, does not
+// change the current file position
 //
 // Arguments:
 //
@@ -862,12 +1012,33 @@ size_t TempFileSystem::FileHandle::Write(const void* buffer, size_t count)
 
 size_t TempFileSystem::FileHandle::WriteAt(ssize_t offset, int whence, const void* buffer, size_t count)
 {
-	UNREFERENCED_PARAMETER(offset);
-	UNREFERENCED_PARAMETER(whence);
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
+	if(count == 0) return 0;
+	if(buffer == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	return 0;
+	uint32_t flags = m_flags;				// Copy the currently set flags
+
+	// The file cannot be open for read-only mode
+	if((flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
+
+	// Calculate the starting position for the write operation
+	size_t pos = AdjustPosition(writer, offset, whence);
+
+	// Ensure that the node buffer is large enough to accept the data
+	if((pos + count) > m_handle->node->data.size()) {
+		
+		try { m_handle->node->data.resize(pos + count); }
+		catch(...) { throw LinuxException(UAPI_ENOSPC); }
+	}
+
+	// Copy the data from the input buffer into the node data buffer
+	memcpy(&m_handle->node->data[pos], buffer, count);
+
+	// Update the modification and change times for the node
+	m_handle->node->mtime = m_handle->node->ctime = datetime::now();
+
+	return count;
 }
 		
 //
@@ -880,6 +1051,7 @@ size_t TempFileSystem::FileHandle::WriteAt(ssize_t offset, int whence, const voi
 // Arguments:
 //
 //	fs			- Shared file system instance
+//	rootdir		- Root directory node instance
 //	flags		- Mount-specific flags
 
 TempFileSystem::Mount::Mount(std::shared_ptr<TempFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags) : 
@@ -928,7 +1100,7 @@ std::unique_ptr<VirtualMachine::Mount> TempFileSystem::Mount::Duplicate(void) co
 //
 // Accesses the underlying file system instance
 
-VirtualMachine::FileSystem const* TempFileSystem::Mount::getFileSystem(void) const
+VirtualMachine::FileSystem* TempFileSystem::Mount::getFileSystem(void) const
 {
 	return m_fs.get();
 }
@@ -942,6 +1114,16 @@ uint32_t TempFileSystem::Mount::getFlags(void) const
 {
 	// Combine the mount flags with those of the underlying file system
 	return m_fs->Flags | m_flags;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Mount::getRootNode
+//
+// Gets the root node of the mount point
+
+VirtualMachine::Node* TempFileSystem::Mount::getRootNode(void) const
+{
+	return m_rootdir.get();
 }
 
 //---------------------------------------------------------------------------

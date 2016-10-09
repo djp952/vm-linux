@@ -79,8 +79,11 @@ std::unique_ptr<VirtualMachine::Mount> MountRootFileSystem(char_t const* source,
 	// Construct the shared file system instance
 	auto fs = std::make_shared<RootFileSystem>(options.Flags & ~UAPI_MS_PERMOUNT_MASK);
 
+	// Construct the root directory node against the shared file system
+	auto rootdir = std::make_unique<RootFileSystem::Directory>(fs, (mode & ~UAPI_S_IFMT) | UAPI_S_IFDIR, uid, gid);
+
 	// Create and return the mount point instance to the caller
-	return std::make_unique<RootFileSystem::Mount>(fs, options.Flags & UAPI_MS_PERMOUNT_MASK);
+	return std::make_unique<RootFileSystem::Mount>(fs, std::move(rootdir), options.Flags & UAPI_MS_PERMOUNT_MASK);
 }
 
 //---------------------------------------------------------------------------
@@ -120,7 +123,7 @@ RootFileSystem::Directory::Directory(std::shared_ptr<RootFileSystem> const& fs, 
 //---------------------------------------------------------------------------
 // RootFileSystem::Directory::CreateDirectory
 //
-// Creates and opens a new directory node as a child of this directory
+// Creates a new directory node as a child of this directory
 //
 // Arguments:
 //
@@ -133,20 +136,27 @@ RootFileSystem::Directory::Directory(std::shared_ptr<RootFileSystem> const& fs, 
 std::unique_ptr<VirtualMachine::Directory> RootFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name,
 	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
-	UNREFERENCED_PARAMETER(mount);
-	UNREFERENCED_PARAMETER(name);
 	UNREFERENCED_PARAMETER(mode);
 	UNREFERENCED_PARAMETER(uid);
 	UNREFERENCED_PARAMETER(gid);
 
-	// todo
-	return nullptr;
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the provided mount is part of the same file system instance
+	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// Verify that the file system was not mounted read-only
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// RootFileSystem does not allow creation of child nodes
+	throw LinuxException(UAPI_EPERM);
 }
 
 //---------------------------------------------------------------------------
 // RootFileSystem::Directory::CreateFile
 //
-// Creates and opens a new file node as a child of this directory
+// Creates a new file node as a child of this directory
 //
 // Arguments:
 //
@@ -159,14 +169,21 @@ std::unique_ptr<VirtualMachine::Directory> RootFileSystem::Directory::CreateDire
 std::unique_ptr<VirtualMachine::File> RootFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, char_t const* name,
 	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
-	UNREFERENCED_PARAMETER(mount);
-	UNREFERENCED_PARAMETER(name);
 	UNREFERENCED_PARAMETER(mode);
 	UNREFERENCED_PARAMETER(uid);
 	UNREFERENCED_PARAMETER(gid);
 
-	// todo
-	return nullptr;
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the provided mount is part of the same file system instance
+	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// Verify that the file system was not mounted read-only
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// RootFileSystem does not allow creation of child nodes
+	throw LinuxException(UAPI_EPERM);
 }
 
 //-----------------------------------------------------------------------------
@@ -177,6 +194,25 @@ std::unique_ptr<VirtualMachine::File> RootFileSystem::Directory::CreateFile(Virt
 uapi_gid_t RootFileSystem::Directory::getGroupId(void) const
 {
 	return m_gid;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::OpenHandle
+//
+// Opens a handle against this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	flags		- Handle flags
+
+std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Directory::OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags)
+{
+	UNREFERENCED_PARAMETER(mount);
+	UNREFERENCED_PARAMETER(flags);
+
+	// todo - need DirectoryHandle object
+	return nullptr;
 }
 
 //---------------------------------------------------------------------------
@@ -220,11 +256,17 @@ uapi_uid_t RootFileSystem::Directory::getUserId(void) const
 // Arguments:
 //
 //	fs			- Shared file system instance
+//	rootdir		- Root directory node instance
 //	flags		- Mount-specific flags
 
-RootFileSystem::Mount::Mount(std::shared_ptr<RootFileSystem> const& fs, uint32_t flags) : m_fs(fs), m_flags(flags)
+RootFileSystem::Mount::Mount(std::shared_ptr<RootFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags) : 
+	m_fs(fs), m_rootdir(std::move(rootdir)), m_flags(flags)
 {
 	_ASSERTE(m_fs);
+
+	// The root directory node is converted from a unique to a shared pointer so it
+	// can be shared among multiple cloned Mount instances
+	_ASSERTE(m_rootdir);
 
 	// The specified flags should not include any that apply to the file system
 	_ASSERTE((flags & ~UAPI_MS_PERMOUNT_MASK) == 0);
@@ -238,9 +280,10 @@ RootFileSystem::Mount::Mount(std::shared_ptr<RootFileSystem> const& fs, uint32_t
 //
 //	rhs		- Existing Mount instance to create a copy of
 
-RootFileSystem::Mount::Mount(Mount const& rhs) : m_fs(rhs.m_fs), m_flags(static_cast<uint32_t>(rhs.m_flags))
+RootFileSystem::Mount::Mount(Mount const& rhs) : m_fs(rhs.m_fs), m_rootdir(rhs.m_rootdir), m_flags(static_cast<uint32_t>(rhs.m_flags))
 {
-	// A copy of a mount references the same shared file system and copies the flags
+	// A copy of a mount references the same shared file system and root
+	// directory instance as well as a copy of the mount flags
 }
 
 //---------------------------------------------------------------------------
@@ -262,7 +305,7 @@ std::unique_ptr<VirtualMachine::Mount> RootFileSystem::Mount::Duplicate(void) co
 //
 // Accesses the underlying file system instance
 
-VirtualMachine::FileSystem const* RootFileSystem::Mount::getFileSystem(void) const
+VirtualMachine::FileSystem* RootFileSystem::Mount::getFileSystem(void) const
 {
 	return m_fs.get();
 }
@@ -276,6 +319,16 @@ uint32_t RootFileSystem::Mount::getFlags(void) const
 {
 	// Combine the mount flags with those of the underlying file system
 	return m_fs->Flags | m_flags;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Mount::getRootNode
+//
+// Gets the root node of the mount point
+
+VirtualMachine::Node* RootFileSystem::Mount::getRootNode(void) const
+{
+	return m_rootdir.get();
 }
 
 //---------------------------------------------------------------------------

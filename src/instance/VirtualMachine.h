@@ -206,6 +206,12 @@ public:
 		// Changes the file position
 		virtual size_t Seek(ssize_t offset, int whence) = 0;
 
+		// SetLength
+		//
+		// Sets the length of the file
+		// todo: I think this should be on File, not on Handle, it only applies to files?
+		virtual size_t SetLength(size_t length) = 0;
+
 		// Sync
 		//
 		// Synchronizes all metadata and data associated with the file to storage
@@ -225,6 +231,18 @@ public:
 		//
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t WriteAt(ssize_t offset, int whence, const void* buffer, size_t count) = 0;
+
+		// Flags
+		//
+		// Gets the handle flags
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const = 0;
+
+		// Position
+		//
+		// Gets the current file position for this handle
+		__declspec(property(get=getPosition)) size_t Position;
+		virtual size_t getPosition(void) const = 0;
 	};
 
 	// Mount
@@ -244,14 +262,20 @@ public:
 		// FileSystem
 		//
 		// Accesses the underlying file system instance
-		__declspec(property(get=getFileSystem)) VirtualMachine::FileSystem const* FileSystem;
-		virtual VirtualMachine::FileSystem const* getFileSystem(void) const = 0;
+		__declspec(property(get=getFileSystem)) struct FileSystem* FileSystem;
+		virtual  struct FileSystem* getFileSystem(void) const = 0;
 
 		// Flags
 		//
 		// Gets the mount point flags
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const = 0;
+
+		// RootNode
+		//
+		// Gets the root node of the mount point
+		__declspec(property(get=getRootNode)) Node* RootNode;
+		virtual Node* getRootNode(void) const = 0;
 	};
 
 	// Node
@@ -262,6 +286,11 @@ public:
 		// Destructor
 		//
 		virtual ~Node()=default;
+
+		// OpenHandle
+		//
+		// Opens a handle against this node
+		virtual std::unique_ptr<struct Handle> OpenHandle(Mount const* mount, uint32_t flags) = 0;
 
 		// GroupId
 		//
@@ -299,12 +328,12 @@ public:
 
 		// CreateDirectory
 		//
-		// Creates and opens a new directory node as a child of this directory
+		// Creates a new directory node as a child of this directory
 		virtual std::unique_ptr<Directory> CreateDirectory(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 
 		// CreateFile
 		//
-		// Creates and opens a new regular file node as a child of this directory
+		// Creates a new regular file node as a child of this directory
 		virtual std::unique_ptr<File> CreateFile(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 	};
 
