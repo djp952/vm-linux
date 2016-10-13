@@ -529,6 +529,10 @@ private:
 		//
 		Directory(std::shared_ptr<node_t> const& node);
 
+		// todo: test
+		//
+		Directory(std::unique_ptr<Directory> const& rhs);
+
 		// Destructor
 		//
 		virtual ~Directory()=default;
@@ -546,6 +550,16 @@ private:
 		// Creates a new regular file node as a child of this directory
 		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
+		// Duplicate (VirtualMachine::Node)
+		//
+		// Duplicates this Node instance
+		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
+
+		// Lookup (VirtualMachine::Directory)
+		//
+		// Accesses a child node of this directory by name
+		virtual std::unique_ptr<VirtualMachine::Node> Lookup(VirtualMachine::Mount const* mount, char_t const* name) const override;
+
 		// OpenHandle (VirtualMachine::Node)
 		//
 		// Opens a handle against this node
@@ -559,6 +573,12 @@ private:
 		// Gets the node owner group identifier
 		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
 		virtual uapi_gid_t getGroupId(void) const override;
+
+		// Index  (VirtualMachine::Node)
+		//
+		// Gets the node index within the file system (inode number)
+		__declspec(property(get=getIndex)) intptr_t Index;
+		virtual intptr_t getIndex(void) const override;
 
 		// Permissions (VirtualMachine::Node)
 		//
@@ -607,6 +627,11 @@ private:
 		//-------------------------------------------------------------------
 		// Member Functions
 
+		// Duplicate (VirtualMachine::Node)
+		//
+		// Duplicates this Node instance
+		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
+
 		// OpenHandle (VirtualMachine::Node)
 		//
 		// Opens a handle against this node
@@ -620,6 +645,12 @@ private:
 		// Gets the node owner group identifier
 		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
 		virtual uapi_gid_t getGroupId(void) const override;
+
+		// Index  (VirtualMachine::Node)
+		//
+		// Gets the node index within the file system (inode number)
+		__declspec(property(get=getIndex)) intptr_t Index;
+		virtual intptr_t getIndex(void) const override;
 
 		// Permissions (VirtualMachine::Node)
 		//
@@ -757,7 +788,7 @@ private:
 
 		// Instance Constructor
 		//
-		Mount(std::shared_ptr<TempFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags);
+		Mount(std::shared_ptr<TempFileSystem> const& fs, std::shared_ptr<directory_node_t> const& rootdir, uint32_t flags);
 
 		// Copy Constructor
 		//
@@ -774,6 +805,10 @@ private:
 		//
 		// Duplicates this mount instance
 		virtual std::unique_ptr<VirtualMachine::Mount> Duplicate(void) const override;
+
+		// todo:test
+		//
+		virtual std::unique_ptr<VirtualMachine::Node> GetRootNode(void) const override;
 
 		//-------------------------------------------------------------------
 		// Properties
@@ -804,7 +839,7 @@ private:
 		// Member Variables
 
 		std::shared_ptr<TempFileSystem>		m_fs;		// File system instance
-		std::shared_ptr<Directory>			m_rootdir;	// Root node instance
+		std::shared_ptr<directory_node_t>	m_rootdir;	// Root node instance
 		std::atomic<uint32_t>				m_flags;	// Mount-specific flags
 	};
 

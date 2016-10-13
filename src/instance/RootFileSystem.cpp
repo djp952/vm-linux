@@ -187,6 +187,21 @@ std::unique_ptr<VirtualMachine::File> RootFileSystem::Directory::CreateFile(Virt
 }
 
 //-----------------------------------------------------------------------------
+// RootFileSystem::Directory::Duplicate
+//
+// Duplicates this Node instance
+//
+// Arguments:
+//
+//	NONE
+
+std::unique_ptr<VirtualMachine::Node> RootFileSystem::Directory::Duplicate(void) const
+{
+	// todo
+	return nullptr;
+}
+
+//-----------------------------------------------------------------------------
 // RootFileSystem::Directory::getGroupId
 //
 // Gets the currently set owner group identifier for the directory
@@ -194,6 +209,24 @@ std::unique_ptr<VirtualMachine::File> RootFileSystem::Directory::CreateFile(Virt
 uapi_gid_t RootFileSystem::Directory::getGroupId(void) const
 {
 	return m_gid;
+}
+
+//-----------------------------------------------------------------------------
+// RootFileSystem::Directory::Lookup
+//
+// Accesses a child node of this directory by name
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	name		- Name of the child node to be looked up
+
+std::unique_ptr<VirtualMachine::Node> RootFileSystem::Directory::Lookup(VirtualMachine::Mount const* mount, char_t const* name) const 
+{
+	UNREFERENCED_PARAMETER(mount);
+	UNREFERENCED_PARAMETER(name);
+
+	throw LinuxException(UAPI_ENOENT);
 }
 
 //---------------------------------------------------------------------------
@@ -213,6 +246,16 @@ std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Directory::OpenHandle(Vi
 
 	// todo - need DirectoryHandle object
 	return nullptr;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::getIndex
+//
+// Gets the node index within the file system (inode number)
+
+intptr_t RootFileSystem::Directory::getIndex(void) const
+{
+	return 1;			// todo
 }
 
 //---------------------------------------------------------------------------
@@ -319,6 +362,14 @@ uint32_t RootFileSystem::Mount::getFlags(void) const
 {
 	// Combine the mount flags with those of the underlying file system
 	return m_fs->Flags | m_flags;
+}
+
+// todo: test
+//
+std::unique_ptr<VirtualMachine::Node> RootFileSystem::Mount::GetRootNode(void) const
+{
+	return std::make_unique<Directory>(m_fs, 0, 0, 0);	// todo: temporary
+	//return nullptr;
 }
 
 //---------------------------------------------------------------------------

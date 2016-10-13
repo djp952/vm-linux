@@ -259,6 +259,10 @@ public:
 		// Duplicates the Mount instance
 		virtual std::unique_ptr<Mount> Duplicate(void) const = 0;
 
+		// todo:test
+		//
+		virtual std::unique_ptr<Node> GetRootNode(void) const = 0;
+
 		// FileSystem
 		//
 		// Accesses the underlying file system instance
@@ -287,6 +291,11 @@ public:
 		//
 		virtual ~Node()=default;
 
+		// Duplicate
+		//
+		// Duplicates this Node instance
+		virtual std::unique_ptr<Node> Duplicate(void) const = 0;
+
 		// OpenHandle
 		//
 		// Opens a handle against this node
@@ -297,6 +306,12 @@ public:
 		// Gets the node owner group identifier
 		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
 		virtual uapi_gid_t getGroupId(void) const = 0;
+
+		// Index
+		//
+		// Gets the node index within the file system (inode number)
+		__declspec(property(get=getIndex)) intptr_t Index;
+		virtual intptr_t getIndex(void) const = 0;
 
 		// Permissions
 		//
@@ -335,6 +350,11 @@ public:
 		//
 		// Creates a new regular file node as a child of this directory
 		virtual std::unique_ptr<File> CreateFile(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
+
+		// Lookup
+		//
+		// Accesses a child node of this directory by name
+		virtual std::unique_ptr<Node> Lookup(Mount const* mount, char_t const* name) const = 0;
 	};
 
 	// File
@@ -355,6 +375,12 @@ public:
 		// Destructor
 		//
 		virtual ~SymbolicLink()=default;
+
+		// Target
+		//
+		// Exposes the symbolic link target
+		__declspec(property(get=getTarget)) char_t const* Target;
+		virtual char_t const* getTarget(void) const = 0;
 	};
 
 	//-------------------------------------------------------------------------

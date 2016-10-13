@@ -233,9 +233,9 @@ void CpioArchive::FileStream::Seek(size_t position)
 CpioFile::CpioFile(cpio_header_t const& header, char_t const* path, StreamReader& data) : m_path(path), m_data(data)
 {
 	m_inode		= ConvertHexString(header.c_ino, 8);
-	m_mode		= ConvertHexString(header.c_mode, 8);
-	m_uid		= ConvertHexString(header.c_uid, 8);
-	m_gid		= ConvertHexString(header.c_gid, 8);
+	m_mode		= static_cast<uapi_mode_t>(ConvertHexString(header.c_mode, 8));
+	m_uid		= static_cast<uapi_uid_t>(ConvertHexString(header.c_uid, 8));
+	m_gid		= static_cast<uapi_gid_t>(ConvertHexString(header.c_gid, 8));
 	m_numlinks	= ConvertHexString(header.c_nlink, 8);
 	m_mtime		= ConvertHexString(header.c_mtime, 8);
 	m_devmajor	= ConvertHexString(header.c_maj, 8);
@@ -279,7 +279,7 @@ uint32_t CpioFile::getDeviceMinor(void) const
 //
 // Gets the file owner GID
 
-uint32_t CpioFile::getGID(void) const 
+uapi_gid_t CpioFile::getGID(void) const 
 { 
 	return m_gid; 
 }
@@ -299,7 +299,7 @@ uint32_t CpioFile::getINode(void) const
 //
 // Gets the file mode and permission flags
 
-uint32_t CpioFile::getMode(void) const 
+uapi_mode_t CpioFile::getMode(void) const 
 { 
 	return m_mode; 
 }
@@ -359,7 +359,7 @@ uint32_t CpioFile::getReferencedDeviceMinor(void) const
 //
 // Gets the file owner UID
 
-uint32_t CpioFile::getUID(void) const 
+uapi_uid_t CpioFile::getUID(void) const 
 { 
 	return m_uid; 
 }

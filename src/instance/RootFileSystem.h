@@ -137,6 +137,16 @@ private:
 		// Creates a new regular file node as a child of this directory
 		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
+		// Duplicate (VirtualMachine::Node)
+		//
+		// Duplicates this Node instance
+		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
+
+		// Lookup (VirtualMachine::Directory)
+		//
+		// Accesses a child node of this directory by name
+		virtual std::unique_ptr<VirtualMachine::Node> Lookup(VirtualMachine::Mount const* mount, char_t const* name) const override;
+
 		// OpenHandle (VirtualMachine::Node)
 		//
 		// Opens a handle against this node
@@ -150,6 +160,12 @@ private:
 		// Gets the node owner group identifier
 		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
 		virtual uapi_gid_t getGroupId(void) const override;
+
+		// Index  (VirtualMachine::Node)
+		//
+		// Gets the node index within the file system (inode number)
+		__declspec(property(get=getIndex)) intptr_t Index;
+		virtual intptr_t getIndex(void) const override;
 
 		// Permissions (VirtualMachine::Node)
 		//
@@ -209,6 +225,10 @@ private:
 		//
 		// Duplicates this mount instance
 		virtual std::unique_ptr<VirtualMachine::Mount> Duplicate(void) const override;
+
+		// todo:test
+		//
+		virtual std::unique_ptr<VirtualMachine::Node> GetRootNode(void) const override;
 
 		//-------------------------------------------------------------------
 		// Properties

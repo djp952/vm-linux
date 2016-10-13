@@ -132,6 +132,10 @@ private:
 		// Duplicates this mount instance
 		virtual std::unique_ptr<VirtualMachine::Mount> Duplicate(void) const override;
 
+		// todo:test
+		//
+		virtual std::unique_ptr<VirtualMachine::Node> GetRootNode(void) const override;
+
 		//-------------------------------------------------------------------
 		// Properties
 

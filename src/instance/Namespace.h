@@ -58,7 +58,7 @@ public:
 
 	// Instance Constructors
 	//
-	Namespace();
+	Namespace(std::unique_ptr<VirtualMachine::Mount>&& rootmount);
 	Namespace(Namespace const* rhs, uint32_t flags);
 
 	// Destructor
@@ -70,16 +70,38 @@ public:
 	// todo words
 	class Path
 	{
+	friend class Namespace;
 	public:
 
 		// Instance Constructor
+		// todo: this should be private but I don't want to use friend make_unique<> functions
 		//
-		// todo this can't be public
 		Path(std::shared_ptr<path_t> const& path);
 
 		// Destructor
 		//
 		~Path()=default;
+
+		//-------------------------------------------------------------------
+		// Properties
+
+		// Mount
+		//
+		// Accesses the underlying mount instance
+		__declspec(property(get=getMount)) VirtualMachine::Mount* Mount;
+		VirtualMachine::Mount* getMount(void) const;
+
+		// Node
+		//
+		// Accesses the underlying node instance
+		__declspec(property(get=getNode)) VirtualMachine::Node* Node;
+		VirtualMachine::Node* getNode(void) const;
+
+		// Type
+		//
+		// The type of node represented by the path
+		__declspec(property(get=getType)) VirtualMachine::NodeType Type;
+		VirtualMachine::NodeType getType(void) const;
 
 	private:
 
@@ -89,24 +111,27 @@ public:
 		//---------------------------------------------------------------------
 		// Member Variables
 
-		std::shared_ptr<path_t>		m_path;			// Internal shared state
+		std::shared_ptr<path_t>					m_path;		// Internal shared state
+		std::unique_ptr<VirtualMachine::Node>	m_node;		// Node instance
 	};
 
 	//-------------------------------------------------------------------------
 	// Member Functions
 
+	// AddMount
+	//
+	// Adds a new mount point to the namespace
+	std::unique_ptr<Path> AddMount(std::unique_ptr<VirtualMachine::Mount>&& mount, Path const* path);
+
+	// GetRootPath
+	//
+	// Gets the namespace root path
+	std::unique_ptr<Path> GetRootPath(void) const;
+
 	// LookupPath
 	//
 	// Performs a path name lookup operation
-	std::unique_ptr<Path> LookupPath(void) const;
-
-	//// MountFileSystem
-	////
-	//// Mounts a file system within this namespace at the specified location
-	//std::unique_ptr<VirtualMachine::Path> MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength);
-
-	//-------------------------------------------------------------------------
-	// Properties
+	std::unique_ptr<Path> LookupPath(Path const* working, char_t const* path) const;
 
 private:
 
@@ -126,20 +151,20 @@ private:
 		//
 		path_t(std::shared_ptr<path_t> const& rhs);
 
-		// canonicalparent
+		// mount
 		//
-		// Pointer to the canonical path_t, or nullptr if root
-		std::shared_ptr<path_t> canonicalparent;
-
-		// hides
-		//
-		// Pointer to the path_t hidden by a mount point
-		std::shared_ptr<path_t> hides;
+		// Pointer to the mount point for this path
+		std::shared_ptr<VirtualMachine::Mount> mount;
 
 		// name
 		//
 		// Name of the node pointed to by this path
 		std::string	name;
+
+		// node
+		//
+		// Pointer to the node that the path references
+		std::unique_ptr<VirtualMachine::Node> node;
 
 		// parent
 		//
@@ -147,99 +172,42 @@ private:
 		std::shared_ptr<path_t> parent;
 	};
 
-	// mountns_t
+	// equals_path_t
 	//
-	// Provides an isolated view of file system mounts
-	struct mountns_t
+	// Equality algorthm used for hash-based collections of path_t instances
+	struct equals_path_t
 	{
-		// default constructor
-		//
-		mountns_t()=default;
-
-		// converting constructor
-		//
-		mountns_t(std::shared_ptr<mountns_t> const& rhs);
-
-		// mounts
-		//
-		// Collection of mount points active in this namespace
-		std::unordered_map<std::shared_ptr<path_t>, std::unique_ptr<VirtualMachine::Mount>> mounts;
-
-		// mountslock
-		//
-		// Synchronization object
-		sync::reader_writer_lock mountslock;
-
-		mountns_t(mountns_t const&)=delete;
-		mountns_t operator=(mountns_t const&)=delete;
+		bool operator()(std::shared_ptr<path_t> const& lhs, std::shared_ptr<path_t> const& rhs) const;
 	};
 
-	// MountNamespace
+	// hash_path_t
 	//
-	// Provides an isolated view of file system mounts
-	class MountNamespace
+	// Hash algorithm used for hash-based collections of path_t instances
+	struct hash_path_t
 	{
-	public:
-
-		// Instance Constructor
-		//
-		MountNamespace();
-
-		// Destructor
-		//
-		~MountNamespace()=default;
-
-		//---------------------------------------------------------------------
-		// Member Functions
-
-		//// MountFileSystem
-		////
-		//// Mounts a file system at the specified location in the namespace
-		//std::unique_ptr<VirtualMachine::Path> MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength);
-
-	private:
-
-		MountNamespace(MountNamespace const&)=delete;
-		MountNamespace& operator=(MountNamespace const&)=delete;
-
-		// mount_map_t
-		//
-		// Collection of mounted path_t instances, which keeps them as well as any
-		// parent path_t instances alive until it's unmounted/removed from the namespace
-		using mount_map_t = std::unordered_map<std::string, std::shared_ptr<path_t>>;
-
-		//---------------------------------------------------------------------
-		// Private Member Functions
-
-		// GetCanonicalPathString (static)
-		//
-		// Gets the canonical path string of a path_t instance
-		static std::string GetCanonicalPathString(std::shared_ptr<path_t> const& path);
-		
-		// GetPath
-		//
-		// Converts a string-based path into a path_t instance
-		std::shared_ptr<path_t> GetPath(char_t const* path) const;
-
-		// GetPathString (static)
-		//
-		// Gets the path string of a path_t instance
-		static std::string GetPathString(std::shared_ptr<path_t> const& path);
-
-		//---------------------------------------------------------------------
-		// Member Variables
-
-		mount_map_t					m_mounts;			// Collection of mount points
-		sync::reader_writer_lock	m_mountslock;		// Synchronization object
+		size_t operator()(std::shared_ptr<path_t> const& key) const;
 	};
+
+	// mountmap_t
+	//
+	// Type defintion for an unordered_map<> collection of mount points
+	using mountmap_t = std::unordered_map<std::shared_ptr<path_t>, std::shared_ptr<VirtualMachine::Mount>, hash_path_t, equals_path_t>;
 
 	//-------------------------------------------------------------------------
 	// Private Member Functions
 
+	// LookupPath
+	//
+	// Performs a path name lookup operation
+	std::shared_ptr<path_t> LookupPath(sync::reader_writer_lock::scoped_lock& lock, std::shared_ptr<path_t> const& working, 
+		char_t const* path, int* numlinks) const;
+
 	//-------------------------------------------------------------------------
 	// Member Variables
 
-	std::shared_ptr<mountns_t>			m_mountns;		// Shared mount namespace
+	std::shared_ptr<path_t>				m_rootpath;		// Namespace root path
+	mountmap_t							m_mounts;		// Collection of mount points
+	mutable sync::reader_writer_lock	m_mountslock;	// Synchronization object
 };
 
 //-----------------------------------------------------------------------------

@@ -23,6 +23,7 @@
 #include "stdafx.h"
 #include "Namespace.h"
 
+#include <path.h>
 #include <vector>
 #include "LinuxException.h"
 
@@ -33,14 +34,26 @@
 //
 // Arguments:
 //
-//	NONE
+//	rootmount		- The namespace root mount
 
-Namespace::Namespace()
+Namespace::Namespace(std::unique_ptr<VirtualMachine::Mount>&& rootmount)
 {
-	// New namespace instances get unique isolation points; this is typically
-	// only going to be for the initial root namespace
+	// Convert the provided root mount instance into a shared_ptr<>
+	std::shared_ptr<VirtualMachine::Mount> mountpoint(std::move(rootmount));
 
-	m_mountns = std::make_shared<mountns_t>();
+	// Insert the mount into the mounts collection with a null path to indicate that
+	// it is the absolute root of the namespace file system.  (Using nullptr prevents
+	// the node from ever being matched during overmount lookups -- see equals_path_t())
+	auto result = m_mounts.emplace(nullptr, mountpoint);
+	if(!result.second) throw LinuxException(UAPI_ENOMEM);
+
+	// Create a root "/" path_t instance that can be accessed for path lookups that
+	// initially refers to the absolute root of the namespace file system
+	m_rootpath = std::make_shared<path_t>();
+	m_rootpath->mount = mountpoint;
+	m_rootpath->node = mountpoint->GetRootNode();
+	m_rootpath->name = "/";
+	m_rootpath->parent = nullptr;
 }
 
 //---------------------------------------------------------------------------
@@ -53,10 +66,59 @@ Namespace::Namespace()
 
 Namespace::Namespace(Namespace const* rhs, uint32_t flags)
 {
-	// Cloned namespace instances can either get a shared reference to the source
-	// namespace isolation points or get new copies of them, depending on the clone flags
-	//
-	m_mountns = ((flags & UAPI_CLONE_NEWNS) == UAPI_CLONE_NEWNS) ? std::make_shared<mountns_t>(rhs->m_mountns) : rhs->m_mountns;
+	UNREFERENCED_PARAMETER(rhs);
+	UNREFERENCED_PARAMETER(flags);
+
+	// todo: clone the namespace(s)
+}
+
+//---------------------------------------------------------------------------
+// Namespace::AddMount
+//
+// Adds a mount point to this namespace
+//
+// Arguments:
+//
+//	mount		- Mount instance to be added (takes ownership)
+//	path		- Path on which to apply the mount point
+
+std::unique_ptr<Namespace::Path> Namespace::AddMount(std::unique_ptr<VirtualMachine::Mount>&& mount, Path const* path)
+{
+	// Convert the provided mount point into a shared_ptr<>
+	std::shared_ptr<VirtualMachine::Mount> mountpoint(std::move(mount));
+
+	// Copy the provided path into a new path_t that refers to the mount point
+	auto mountpath = std::make_shared<path_t>();
+	mountpath->mount = mountpoint;
+	mountpath->name = path->m_path->name;
+	mountpath->node = mountpoint->GetRootNode();
+	mountpath->parent = path->m_path->parent;
+
+	// Acquire an exclusive lock against the mount collection
+	sync::reader_writer_lock::scoped_lock_write writer(m_mountslock);
+
+	// Insert the mount point into the collection using the ORIGINAL path instance, this way
+	// way whenever that ORIGINAL path instance is discovered it can be replaced with the mount
+	auto result = m_mounts.emplace(path->m_path, mountpoint);
+	if(!result.second) throw LinuxException(UAPI_ENOMEM);
+
+	// Return the newly constructed path_t to the caller as a Path instance
+	return std::make_unique<Path>(mountpath);
+}
+
+//---------------------------------------------------------------------------
+// Namespace::GetRootPath
+//
+// Gets the namespace root path
+//
+// Arguments:
+//
+//	NONE
+
+std::unique_ptr<Namespace::Path> Namespace::GetRootPath(void) const
+{
+	sync::reader_writer_lock::scoped_lock_read reader(m_mountslock);
+	return std::make_unique<Path>(m_rootpath);
 }
 
 //---------------------------------------------------------------------------
@@ -66,169 +128,122 @@ Namespace::Namespace(Namespace const* rhs, uint32_t flags)
 //
 // Arguments:
 //
-//	NONE
+//	working			- Current working directory path
+//	path			- Path to be looked up
 
-std::unique_ptr<Namespace::Path> Namespace::LookupPath(void) const
+std::unique_ptr<Namespace::Path> Namespace::LookupPath(Path const* working, char_t const* path) const
 {
-	_ASSERTE(m_mountns);
-	return nullptr;
+	int numlinks = 0;							// Number of encountered symbolic links
+
+	if(working == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(path == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	sync::reader_writer_lock::scoped_lock_read reader(m_mountslock);
+
+	// Hit the internal version of LookupPath that accepts shared_ptr<path_t>
+	return std::make_unique<Path>(LookupPath(reader, working->m_path, path, &numlinks));
 }
 
 //---------------------------------------------------------------------------
-// Namespace::MountFileSystem
+// Namespace::LookupPath (private)
 //
-// Mounts a file system within this namespace at the specified location
-//
-// Arguments:
-//
-//	path		- Path within the namespace on which to mount the file system
-//	fs			- File system to be mounted
-//	flags		- Standard mounting option flags
-//	data		- Extended/custom mounting options
-//	datalength	- Length of the extended mounting options data
-
-//std::unique_ptr<VirtualMachine::Path> Namespace::MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength)
-//{
-//	_ASSERTE(m_mountns);
-//	return m_mountns->MountFileSystem(path, fs, flags, data, datalength);
-//}
-
-//
-// NAMESPACE::MOUNTNAMESPACE IMPLEMENTATION
-//
-
-//---------------------------------------------------------------------------
-// Namespace::MountNamespace Constructor
+// Performs a path name lookup operation.  This is the internal version that
+// requires a lock be held against the mount namespace elements
 //
 // Arguments:
 //
-//	NONE
+//	lock		- Ensures that the caller holds a lock against the mounts
+//	current		- Reference to the current path_t
+//	path		- Remaining path to be looked up
+//	numlinks	- Running count of symbolic links encountered
 
-Namespace::MountNamespace::MountNamespace()
+std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_lock::scoped_lock& lock, std::shared_ptr<path_t> const& working, 
+	char_t const* path, int* numlinks) const
 {
+	mountmap_t::const_iterator		mountpoint;			// Mount collection iterator
+	posix_path						lookuppath(path);	// Convert into a posix_path
+
+	UNREFERENCED_PARAMETER(lock);		// Unused; ensures the caller holds a scoped_lock
+
+	if(path == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(numlinks == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Clone either the working path_t or the namespace root path_t as the starting point
+	auto current = std::make_shared<path_t>((lookuppath.absolute()) ? m_rootpath : working);
+
+	// Handle any mount points stacked on top of the starting node by switching the mount and
+	// node pointers appropriately; this does not change the name or the parent pointer
+	mountpoint = m_mounts.find(current);
+	while(mountpoint != m_mounts.end()) { 
+
+		current->mount = mountpoint->second;
+		current->node = mountpoint->second->GetRootNode();
+		mountpoint = m_mounts.find(current);
+	}
+
+	// Iterate over each component of the lookup path and build out the resultant path_t
+	for(auto const& iterator : lookuppath) {
+
+		// SELF [.]: skip the path component
+		if(strcmp(iterator, ".") == 0) continue;
+
+		// PARENT [..] move current to its parent if there is one
+		else if(strcmp(iterator, "..") == 0) { if(current->parent) current = current->parent; }
+
+		// ROOT [/]: move current to the namespace root
+		else if(strcmp(iterator, "/") == 0) current = m_rootpath;
+
+		// DIRECTORY LOOKUP
+		else if(current->node->Type == VirtualMachine::NodeType::Directory) {
+
+			// The node is stored as a unique_ptr<>, dynamic cast it into a Directory instance
+			auto directory = dynamic_cast<VirtualMachine::Directory*>(current->node.get());
+			if(directory == nullptr) throw LinuxException(UAPI_ENOTDIR);
+
+			// Create a new path_t for the child that uses the directory as its parent
+			auto child = std::make_shared<path_t>();
+			child->mount = current->mount;
+			child->parent = current;
+			child->name = iterator;
+			child->node = directory->Lookup(current->mount.get(), iterator);
+
+			current = child;			// move to the child node
+		}
+
+		// FOLLOW SYMBOLIC LINK
+		else if(current->node->Type == VirtualMachine::NodeType::SymbolicLink) {
+		
+			// The node is stored as a unique_ptr<>, dynamic cast it into a SymbolicLink instance
+			auto symlink = dynamic_cast<VirtualMachine::SymbolicLink*>(current->node.get());
+			if(symlink == nullptr) throw LinuxException(UAPI_ENOTDIR);
+
+			// Ensure that the maximum number of symbolic links has not been reached
+			if(++(*numlinks) > VirtualMachine::MaxSymbolicLinks) throw LinuxException(UAPI_ELOOP);
+
+			// Move current to the target of the symbolic link; note that the lookup is
+			// relative to the symbolic link's parent, not the symbolic link itself
+			_ASSERTE(current->parent);
+			current = LookupPath(lock, current->parent, symlink->Target, numlinks);
+		}
+
+		// LOOKUP ERROR
+		else throw LinuxException(UAPI_ENOTDIR);
+
+		// Bubble up any mount points stacked on top of the current node
+		mountpoint = m_mounts.find(current);
+		while(mountpoint != m_mounts.end()) { 
+
+			current->mount = mountpoint->second;
+			current->node = mountpoint->second->GetRootNode();
+			mountpoint = m_mounts.find(current);
+		}
+	}
+
+	// todo: need flags to check if final node was a directory, if it should 
+	// follow a symbolic link or not, etc.
+
+	return current;
 }
-
-//---------------------------------------------------------------------------
-// Namespace::MountNamespace::GetCanonicalPathString (private, static)
-//
-// Converts a path_t into a canonical string-based path
-//
-// Arguments:
-//
-//	path		- path_t to be converted into a string
-
-std::string Namespace::MountNamespace::GetCanonicalPathString(std::shared_ptr<path_t> const& path)
-{
-	std::string delimiter("/");					// Standard path delimiter
-
-	// If the path has no canonical parent, this is the root -- return just the delimiter
-	if(!path->canonicalparent) return delimiter;
-
-	std::shared_ptr<path_t>					current(path);
-	std::vector<std::shared_ptr<path_t>>	pathvec;
-	std::string								result;
-
-	// Push all the path_t pointers in the canonical path chain into the vector<>
-	while(current->canonicalparent) { pathvec.push_back(current); current = current->canonicalparent; }
-
-	// Walk the vector<> in forward order to generate the path string
-	for(auto const& iterator : pathvec) result += (delimiter + iterator->name);
-
-	return result;
-}
-
-//---------------------------------------------------------------------------
-// Namespace::MountNamespace::GetPath (private)
-//
-// Converts a string-based path into a path_t using the current namespace
-//
-// Arguments:
-//
-//	path		- Path string to be converted
-
-std::shared_ptr<Namespace::path_t> Namespace::MountNamespace::GetPath(char_t const* path) const
-{
-	UNREFERENCED_PARAMETER(path);
-	return nullptr;
-}
-
-//---------------------------------------------------------------------------
-// Namespace::MountNamespace::GetPathString (private, static)
-//
-// Converts a path_t into a (non-canonical) string-based path
-//
-// Arguments:
-//
-//	path		- path_t to be converted into a string
-
-std::string Namespace::MountNamespace::GetPathString(std::shared_ptr<path_t> const& path)
-{
-	std::string delimiter("/");					// Standard path delimiter
-
-	// If the path has no parent, this is the root -- return just the delimiter
-	if(!path->parent) return delimiter;
-
-	std::shared_ptr<path_t>					current(path);
-	std::vector<std::shared_ptr<path_t>>	pathvec;
-	std::string								result;
-
-	// Push all the path_t pointers in the path chain into the vector<>
-	while(current->parent) { pathvec.push_back(current); current = current->parent; }
-
-	// Walk the vector<> in forward order to generate the path string
-	for(auto const& iterator : pathvec) result += (delimiter + iterator->name);
-
-	return result;
-}
-
-//---------------------------------------------------------------------------
-// Namespace::MountNamespace::MountFileSystem
-//
-// Mounts a file system within this namespace at the specified location
-//
-// Arguments:
-//
-//	path		- Path within the namespace on which to mount the file system
-//	fs			- File system to be mounted
-//	flags		- Standard mounting option flags
-//	data		- Extended/custom mounting options
-//	datalength	- Length of the extended mounting options data
-
-//std::unique_ptr<VirtualMachine::Path> Namespace::MountNamespace::MountFileSystem(char_t const* path, VirtualMachine::FileSystem* fs, uint32_t flags, void const* data, size_t datalength)
-//{
-//	if(fs == nullptr) throw LinuxException(UAPI_EFAULT);
-//
-//	// A pure root mount requires the MS_KERNMOUNT flag be set (User-mode mounts would specify "/" as the path)
-//	if((path == nullptr) && ((flags & UAPI_MS_KERNMOUNT) != UAPI_MS_KERNMOUNT)) throw LinuxException(UAPI_EPERM);
-//
-//	sync::reader_writer_lock::scoped_lock_write writer(m_mountslock);
-//
-//	// Create the new path_t that will own the actual mount instance
-//	std::shared_ptr<path_t> mountpoint = std::make_shared<path_t>();
-//
-//	try {
-//
-//		// Attempt to look up the existing path that this mountpoint will hide
-//		mountpoint->hides = (path == nullptr) ? m_mounts.at("/") : GetPath(path);
-//		if(!mountpoint->hides) throw LinuxException(UAPI_ENOENT);
-//
-//		// Copy the name, parent and canonical parent of the existing path_t into the new path_t
-//		mountpoint->name = mountpoint->hides->name;
-//		mountpoint->parent = mountpoint->hides->parent;
-//		mountpoint->canonicalparent = mountpoint->hides->canonicalparent;
-//	}
-//
-//	catch(std::out_of_range&) { /* m_mounts.at("/") failed -- no existing root mount */ }
-//
-//	// Assign the mount point to the path_t by invoking the file system mount function
-//	mountpoint->mount = fs->Mount(flags, data, datalength);
-//
-//	// Add or replace the path_t instance for this mount in the collection
-//	m_mounts[GetCanonicalPathString(mountpoint)] = mountpoint;
-//
-//	// Generate a Path instance for the caller that references the mount path_t
-//	return std::make_unique<Path>(mountpoint);
-//}
 
 //
 // NAMESPACE::PATH IMPLEMENTATION
@@ -245,6 +260,36 @@ Namespace::Path::Path(std::shared_ptr<path_t> const& path) : m_path(path)
 {
 }
 
+//---------------------------------------------------------------------------
+// Namespace::Path::getMount
+//
+// Gets a pointer to the referenced mount instance
+
+VirtualMachine::Mount* Namespace::Path::getMount(void) const
+{
+	return m_path->mount.get();
+}
+		
+//---------------------------------------------------------------------------
+// Namespace::Path::getNode
+//
+// Gets a pointer to the referenced node instance
+
+VirtualMachine::Node* Namespace::Path::getNode(void) const
+{
+	return m_path->node.get();
+}
+		
+//---------------------------------------------------------------------------
+// Namespace::Path::getType
+//
+// Gets the type of node represented by the path
+
+VirtualMachine::NodeType Namespace::Path::getType(void) const
+{
+	return m_path->node->Type;
+}
+		
 //
 // NAMESPACE::PATH_T IMPLEMENTATION
 //
@@ -256,30 +301,53 @@ Namespace::Path::Path(std::shared_ptr<path_t> const& path) : m_path(path)
 //
 //	rhs		- Right-hand shared_ptr<path_t> to clone into this path_t
 
-Namespace::path_t::path_t(std::shared_ptr<path_t> const& rhs) : canonicalparent(rhs->canonicalparent), 
-	hides(rhs->hides), name(rhs->name), parent(rhs->parent)
+Namespace::path_t::path_t(std::shared_ptr<path_t> const& rhs) : mount(rhs->mount), name(rhs->name), 
+	node(rhs->node->Duplicate()), parent(rhs->parent)
 {
 }
 
 //
-// NAMESPACE::MOUNTNS_T IMPLEMENTATION
+// NAMESPACE::EQUALSPATH_T IMPLEMENTATION
 //
 
 //---------------------------------------------------------------------------
-// Namespace::mountns_t Constructor
-//
-// Arguments:
-//
-//	rhs		- Right-hand shared_ptr<mountns_t> to clone into this mountns_t
+// Namespace::equals_path_t::operator()
 
-Namespace::mountns_t::mountns_t(std::shared_ptr<mountns_t> const& rhs)
+bool Namespace::equals_path_t::operator()(std::shared_ptr<path_t> const& lhs, std::shared_ptr<path_t> const& rhs) const
 {
-	sync::reader_writer_lock::scoped_lock_read reader(rhs->mountslock);
-	for(auto const& iterator : rhs->mounts) {
+	if((!lhs) || (!rhs)) return false;				// Neither shared_ptr<> can be null for this to work
+	if(lhs.get() == rhs.get()) return true;			// Equal if the same underlying pointer
 
-		// clone the right-hand mount collection
-		mounts.emplace(std::make_pair(std::make_shared<path_t>(iterator.first), std::move(iterator.second->Duplicate())));
-	}
+	return ((lhs->mount->FileSystem == rhs->mount->FileSystem) && (lhs->node->Index == rhs->node->Index));
+}
+
+//
+// NAMESPACE::HASH_PATH_T IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// Namespace::hash_path_t::operator()
+
+size_t Namespace::hash_path_t::operator()(std::shared_ptr<path_t> const& key) const
+{
+	if(!key) return 0;					// Null shared_ptr has no hash value
+
+	// http://www.isthe.com/chongo/tech/comp/fnv/index.html#FNV-source
+
+#ifndef _M_X64
+	// 32-bit FNV-1a hash
+	const size_t fnv_offset_basis{ 2166136261U };
+	const size_t fnv_prime{ 16777619U };
+#else
+	// 64-bit FNV-1a hash
+	const size_t fnv_offset_basis{ 14695981039346656037ULL };
+	const size_t fnv_prime{ 1099511628211ULL };
+#endif
+
+	// Calcuate the FNV-1a hash for this path_t instance; base it on the file system
+	// instance pointer and the node unique identifier value on that file system
+	size_t hash = fnv_offset_basis & (reinterpret_cast<uintptr_t>(key->mount->FileSystem) ^ key->node->Index);
+	return hash * fnv_prime;
 }
 
 //---------------------------------------------------------------------------

@@ -89,8 +89,8 @@ public:
 	// GroupId
 	//
 	// Gets the file owner GID
-	__declspec(property(get=getGID)) uint32_t GroupId;
-	uint32_t getGID(void) const;
+	__declspec(property(get=getGID)) uapi_gid_t GroupId;
+	uapi_gid_t getGID(void) const;
 
 	// INode
 	//
@@ -101,8 +101,8 @@ public:
 	// Mode
 	//
 	// Gets the file mode and permission flags
-	__declspec(property(get=getMode)) uint32_t Mode;
-	uint32_t getMode(void) const;
+	__declspec(property(get=getMode)) uapi_mode_t Mode;
+	uapi_mode_t getMode(void) const;
 
 	// ModificationTime
 	//
@@ -137,8 +137,8 @@ public:
 	// UserId
 	//
 	// Gets the file owner UID
-	__declspec(property(get=getUID)) uint32_t UserId;
-	uint32_t getUID(void) const;
+	__declspec(property(get=getUID)) uapi_uid_t UserId;
+	uapi_uid_t getUID(void) const;
 
 private:
 
@@ -149,9 +149,9 @@ private:
 	// Member Variables
 
 	uint32_t						m_inode;			// File inode number
-	uint32_t						m_mode;				// File mode and permissions
-	uint32_t						m_uid;				// File owner uid
-	uint32_t						m_gid;				// File owner gid
+	uapi_mode_t						m_mode;				// File mode and permissions
+	uapi_uid_t						m_uid;				// File owner uid
+	uapi_gid_t						m_gid;				// File owner gid
 	uint32_t						m_numlinks;			// Number of links to this file
 	uint32_t						m_mtime;			// Modification time of the file
 	uint32_t						m_devmajor;			// File device major version

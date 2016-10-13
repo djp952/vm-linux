@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <messages.h>
+#include <path.h>
 
 #include <Exception.h>
 #include <RpcObject.h>
@@ -34,6 +35,7 @@
 #include "CpioArchive.h"
 #include "Executable.h"
 #include "HostFileSystem.h"
+#include "LinuxException.h"
 #include "Process.h"
 #include "RootFileSystem.h"
 #include "SystemLog.h"
@@ -75,25 +77,64 @@ InstanceService::InstanceService()
 }
 
 //---------------------------------------------------------------------------
-// InstanceService::LoadInitialRamFileSystem
+// InstanceService::LoadInitialRamFileSystem (static)
 //
 // Loads the contents of an initramfs file into the root file system
 //
 // Arguments:
 //
-//	root			- Root directory Path instance
+//	current			- Current working directory Path instance
 //	initramfs		- Path to the initramfs file to be loaded
 
-void InstanceService::LoadInitialRamFileSystem(Namespace::Path const* root, std::tstring const& initramfs)
+void InstanceService::LoadInitialRamFileSystem(Namespace const* ns, Namespace::Path const* current, std::tstring const& initramfs)
 {
-	UNREFERENCED_PARAMETER(root);
+	if(ns == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(current == nullptr) throw LinuxException(UAPI_EFAULT);
 
 	// initramfs is stored in a CPIO archive that may be compressed via a variety of different
 	// mechanisms. Wrap the file itself in a generic CompressedStreamReader to handle that
-	CpioArchive::EnumerateFiles(CompressedFileReader(initramfs.c_str()), [](CpioFile const& file) -> void {
+	CpioArchive::EnumerateFiles(CompressedFileReader(initramfs.c_str()), [=](CpioFile const& file) -> void {
 
-		UNREFERENCED_PARAMETER(file);
+		posix_path filepath(file.Path);
+		auto fp = filepath.operator const char *();
 
+		OutputDebugStringA(fp);
+		OutputDebugStringA("\r\n");
+		
+		// initramfs does not automatically create branch directory objects, they have to exist
+		auto branchpath = ns->LookupPath(current, filepath.branch());
+		if(branchpath->Type != VirtualMachine::NodeType::Directory) throw LinuxException(UAPI_ENOTDIR);
+
+		// Get a pointer to the Directory instance pointed to by the branch path
+		VirtualMachine::Directory* branchdir = dynamic_cast<VirtualMachine::Directory*>(branchpath->Node);
+		if(branchdir == nullptr) throw LinuxException(UAPI_ENOTDIR);
+
+		// todo -----------------
+		// todo change this to if/else and get rid of the scope currently under UAPI_S_IFREG
+		switch(file.Mode & UAPI_S_IFMT) {
+
+			case UAPI_S_IFDIR: 
+				branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+				break;
+
+			case UAPI_S_IFREG:
+			{
+				auto handle = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId)->OpenHandle(branchpath->Mount, UAPI_O_RDWR);
+				handle->SetLength(file.Data.Length);
+				std::vector<uint8_t> buffer(81920);
+				auto read = file.Data.Read(&buffer[0], 81920);
+				while(read) {
+
+					handle->Write(&buffer[0], read);
+					read = file.Data.Read(&buffer[0], 81920);
+				}
+			}
+
+			default:
+				// todo
+				break;
+		}
+		// todo ----------------------
 	});
 }
 	
@@ -112,7 +153,6 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 	std::vector<tchar_t const*>			initargs;		// Arguments passed to init
 	std::vector<tchar_t const*>			initenv;		// Environment variables passed to init
 	std::vector<tchar_t const*>			invalidargs;	// Invalid parameter arguments
-	std::unique_ptr<Namespace::Path>	rootpath;		// Root Path instance
 
 	try {
 
@@ -184,13 +224,6 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		if(m_job == nullptr) throw CreateJobObjectException(GetLastError(), Win32Exception(GetLastError()));
 
 		//
-		// INITIALIZE ROOT NAMESPACE
-		//
-
-		try { m_rootns = std::make_unique<Namespace>(); }
-		catch(std::exception& ex) { throw CreateRootNamespaceException(ex.what()); }
-
-		//
 		// INITIALIZE FILE SYSTEM TYPES
 		//
 
@@ -220,17 +253,17 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		uint32_t rootfsflags = UAPI_MS_KERNMOUNT | ((param_ro) ? UAPI_MS_RDONLY : 0);
 		std::string rootflagsstr = std::to_string(param_rootflags);
 
-		try {
-			
-			// Attempt to create the root file system instance using the specified parameters
-			auto rootsource = std::to_string(param_root);
-			auto rootmount = rootfsentry->second(rootsource.c_str(), rootfsflags, rootflagsstr.data(), rootflagsstr.length());
-
-			// Mount the root filesystem within the root namespace at /
-			//rootpath = m_rootns->AddMount("/", std::move(rootmount));
-		}
-		
+		// Attempt to create the root file system instance using the specified parameters
+		std::unique_ptr<VirtualMachine::Mount> rootmount;
+		try { rootmount = rootfsentry->second(std::to_string(param_root).c_str(), rootfsflags, rootflagsstr.data(), rootflagsstr.length()); }
 		catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }
+
+		//
+		// INITIALIZE ROOT NAMESPACE
+		//
+
+		try { m_rootns = std::make_unique<Namespace>(std::move(rootmount)); }
+		catch(std::exception& ex) { throw CreateRootNamespaceException(ex.what()); }
 
 		//
 		// EXTRACT INITRAMFS INTO ROOT FILE SYSTEM
@@ -239,9 +272,10 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		if(param_initrd) {
 
 			std::tstring initrd = param_initrd;				// Pull out the param_initrd string
+			auto rootpath = m_rootns->GetRootPath();		// Get the namespace root path
 
 			// Attempt to extract the contents of the initramfs archive into the root file system
-			try { LoadInitialRamFileSystem(rootpath.get(), initrd); }
+			try { LoadInitialRamFileSystem(m_rootns.get(), rootpath.get(), initrd); }
 			catch(std::exception& ex) { throw InitialRamFileSystemException(initrd.c_str(), ex.what()); }
 		}
 

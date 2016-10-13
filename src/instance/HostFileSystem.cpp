@@ -163,6 +163,13 @@ uint32_t HostFileSystem::Mount::getFlags(void) const
 	return m_fs->Flags | m_flags;
 }
 
+// todo: test
+//
+std::unique_ptr<VirtualMachine::Node> HostFileSystem::Mount::GetRootNode(void) const
+{
+	return nullptr;
+}
+
 //---------------------------------------------------------------------------
 // HostFileSystem::Mount::getRootNode
 //

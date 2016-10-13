@@ -177,11 +177,10 @@ std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source,
 	fs->MaximumNodes = (maxnodes == 0) ? std::numeric_limits<size_t>::max() : maxnodes;
 
 	// Construct the root directory node on the file system heap using the specified attributes
-	auto rootnode = TempFileSystem::directory_node_t::allocate_shared(fs, (mode & ~UAPI_S_IFMT) | UAPI_S_IFDIR, uid, gid);
-	auto rootdir = std::make_unique<TempFileSystem::Directory>(rootnode);
+	auto rootdir = TempFileSystem::directory_node_t::allocate_shared(fs, (mode & ~UAPI_S_IFMT) | UAPI_S_IFDIR, uid, gid);
 
 	// Create and return the mount point instance, transferring ownership of the root node
-	return std::make_unique<TempFileSystem::Mount>(fs, std::move(rootdir), options.Flags & UAPI_MS_PERMOUNT_MASK);
+	return std::make_unique<TempFileSystem::Mount>(fs, rootdir, options.Flags & UAPI_MS_PERMOUNT_MASK);
 }
 
 //---------------------------------------------------------------------------
@@ -561,6 +560,20 @@ std::unique_ptr<VirtualMachine::File> TempFileSystem::Directory::CreateFile(Virt
 	return std::make_unique<File>(node);
 }
 
+//-----------------------------------------------------------------------------
+// TempFileSystem::Directory::Duplicate
+//
+// Duplicates this Node instance
+//
+// Arguments:
+//
+//	NONE
+
+std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Duplicate(void) const
+{
+	return std::make_unique<Directory>(m_node);
+}
+
 //---------------------------------------------------------------------------
 // TempFileSystem::Directory::getGroupId
 //
@@ -569,6 +582,41 @@ std::unique_ptr<VirtualMachine::File> TempFileSystem::Directory::CreateFile(Virt
 uapi_gid_t TempFileSystem::Directory::getGroupId(void) const
 {
 	return m_node->gid;
+}
+
+//-----------------------------------------------------------------------------
+// TempFileSystem::Directory::Lookup
+//
+// Accesses a child node of this directory by name
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	name		- Name of the child node to be looked up
+
+std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Lookup(VirtualMachine::Mount const* mount, char_t const* name) const 
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the provided mount is part of the same file system instance
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// Lock the nodes collection for shared access
+	sync::reader_writer_lock::scoped_lock_read reader(m_node->nodeslock);
+
+	// Attempt to find the node in the collection, ENOENT if it doesn't exist
+	auto found = m_node->nodes.find(name);
+	if(found == m_node->nodes.end()) throw LinuxException(UAPI_ENOENT);
+
+	// Return the appropriate type of VirtualMachine::Node instance to the caller
+	switch(found->second->mode & UAPI_S_IFMT) {
+
+		case UAPI_S_IFDIR: return std::make_unique<Directory>(found->second);
+		case UAPI_S_IFREG: return std::make_unique<File>(found->second);
+	}
+
+	throw LinuxException(UAPI_ENOENT);	// <--- todo; need all the node types above
 }
 
 //---------------------------------------------------------------------------
@@ -588,6 +636,16 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::Directory::OpenHandle(Vi
 	return nullptr;
 }
 		
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::getIndex
+//
+// Gets the node index within the file system (inode number)
+
+intptr_t TempFileSystem::Directory::getIndex(void) const
+{
+	return m_node->index;
+}
+
 //---------------------------------------------------------------------------
 // TempFileSystem::Directory::getPermissions
 //
@@ -636,6 +694,20 @@ TempFileSystem::File::File(std::shared_ptr<node_t> const& node) : m_node(std::dy
 	_ASSERTE((m_node->mode & UAPI_S_IFMT) == UAPI_S_IFREG);
 }
 
+//-----------------------------------------------------------------------------
+// TempFileSystem::File::Duplicate
+//
+// Duplicates this Node instance
+//
+// Arguments:
+//
+//	NONE
+
+std::unique_ptr<VirtualMachine::Node> TempFileSystem::File::Duplicate(void) const
+{
+	return std::make_unique<File>(m_node);
+}
+
 //---------------------------------------------------------------------------
 // TempFileSystem::File::getGroupId
 //
@@ -667,6 +739,16 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::File::OpenHandle(Virtual
 
 	// Handles are allocated normally within the process heap
 	return std::make_unique<FileHandle>(std::make_shared<file_handle_t>(m_node), flags);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::getIndex
+//
+// Gets the node index within the file system (inode number)
+
+intptr_t TempFileSystem::File::getIndex(void) const
+{
+	return m_node->index;
 }
 
 //---------------------------------------------------------------------------
@@ -1054,8 +1136,8 @@ size_t TempFileSystem::FileHandle::WriteAt(ssize_t offset, int whence, const voi
 //	rootdir		- Root directory node instance
 //	flags		- Mount-specific flags
 
-TempFileSystem::Mount::Mount(std::shared_ptr<TempFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags) : 
-	m_fs(fs), m_rootdir(std::move(rootdir)), m_flags(flags)
+TempFileSystem::Mount::Mount(std::shared_ptr<TempFileSystem> const& fs, std::shared_ptr<directory_node_t> const& rootdir, uint32_t flags) : 
+	m_fs(fs), m_rootdir(rootdir), m_flags(flags)
 {
 	_ASSERTE(m_fs);
 
@@ -1116,6 +1198,17 @@ uint32_t TempFileSystem::Mount::getFlags(void) const
 	return m_fs->Flags | m_flags;
 }
 
+// todo: test
+//
+TempFileSystem::Directory::Directory(std::unique_ptr<TempFileSystem::Directory> const& rhs) : m_node(rhs->m_node)
+{
+}
+
+std::unique_ptr<VirtualMachine::Node> TempFileSystem::Mount::GetRootNode(void) const
+{
+	return std::make_unique<TempFileSystem::Directory>(m_rootdir);
+}
+
 //---------------------------------------------------------------------------
 // TempFileSystem::Mount::getRootNode
 //
@@ -1123,7 +1216,7 @@ uint32_t TempFileSystem::Mount::getFlags(void) const
 
 VirtualMachine::Node* TempFileSystem::Mount::getRootNode(void) const
 {
-	return m_rootdir.get();
+	return nullptr; // m_rootdir.get();  todo
 }
 
 //---------------------------------------------------------------------------
