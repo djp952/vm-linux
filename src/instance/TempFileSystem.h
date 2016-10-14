@@ -529,10 +529,6 @@ private:
 		//
 		Directory(std::shared_ptr<node_t> const& node);
 
-		// todo: test
-		//
-		Directory(std::unique_ptr<Directory> const& rhs);
-
 		// Destructor
 		//
 		virtual ~Directory()=default;
@@ -549,11 +545,6 @@ private:
 		//
 		// Creates a new regular file node as a child of this directory
 		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
-
-		// Duplicate (VirtualMachine::Node)
-		//
-		// Duplicates this Node instance
-		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
 
 		// Lookup (VirtualMachine::Directory)
 		//
@@ -626,11 +617,6 @@ private:
 
 		//-------------------------------------------------------------------
 		// Member Functions
-
-		// Duplicate (VirtualMachine::Node)
-		//
-		// Duplicates this Node instance
-		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
 
 		// OpenHandle (VirtualMachine::Node)
 		//
@@ -806,8 +792,9 @@ private:
 		// Duplicates this mount instance
 		virtual std::unique_ptr<VirtualMachine::Mount> Duplicate(void) const override;
 
-		// todo:test
+		// GetRootNode (VirtualMachine::Mount)
 		//
+		// Gets the root node of the mount point
 		virtual std::unique_ptr<VirtualMachine::Node> GetRootNode(void) const override;
 
 		//-------------------------------------------------------------------
@@ -824,12 +811,6 @@ private:
 		// Gets the mount point flags
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
-
-		// RootNode (VirtualMachine::Mount)
-		//
-		// Gets the root node of the mount point
-		__declspec(property(get=getRootNode)) VirtualMachine::Node* RootNode;
-		virtual VirtualMachine::Node* getRootNode(void) const override;
 
 	private:
 

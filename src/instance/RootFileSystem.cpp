@@ -76,14 +76,12 @@ std::unique_ptr<VirtualMachine::Mount> MountRootFileSystem(char_t const* source,
 
 	catch(...) { throw LinuxException(UAPI_EINVAL); }
 
-	// Construct the shared file system instance
+	// Construct the shared file system instance and the root directory node instance
 	auto fs = std::make_shared<RootFileSystem>(options.Flags & ~UAPI_MS_PERMOUNT_MASK);
+	auto rootdir = std::make_shared<RootFileSystem::node_t>(fs, 1, (mode & ~UAPI_S_IFMT) | UAPI_S_IFDIR, uid, gid);
 
-	// Construct the root directory node against the shared file system
-	auto rootdir = std::make_unique<RootFileSystem::Directory>(fs, (mode & ~UAPI_S_IFMT) | UAPI_S_IFDIR, uid, gid);
-
-	// Create and return the mount point instance to the caller
-	return std::make_unique<RootFileSystem::Mount>(fs, std::move(rootdir), options.Flags & UAPI_MS_PERMOUNT_MASK);
+	// Create and return the mount point instance to return to the caller
+	return std::make_unique<RootFileSystem::Mount>(fs, rootdir, options.Flags & UAPI_MS_PERMOUNT_MASK);
 }
 
 //---------------------------------------------------------------------------
@@ -101,6 +99,27 @@ RootFileSystem::RootFileSystem(uint32_t flags) : Flags(flags)
 }
 
 //
+// ROOTFILESYSTEM::NODE_T IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// RootFileSystem::node_t Constructor (protected)
+//
+// Arguments:
+//
+//	filesystem		- Shared file system instance
+//	nodeindex		- Node index value
+//	nodemode		- Initial type and permissions to assign to the node
+//	userid			- Initial owner UID to assign to the node
+//	groupid			- Initial owner GID to assign to the node
+
+RootFileSystem::node_t::node_t(std::shared_ptr<RootFileSystem> const& filesystem, intptr_t nodeindex, uapi_mode_t nodemode, uapi_uid_t userid, uapi_gid_t groupid) : 
+	fs(filesystem), index(nodeindex), atime(datetime::now()), ctime(atime), mtime(atime), mode(nodemode), uid(userid), gid(groupid)
+{
+	_ASSERTE(fs);
+}
+
+//
 // ROOTFILESYSTEM::DIRECTORY IMPLEMENTATION
 //
 
@@ -109,15 +128,11 @@ RootFileSystem::RootFileSystem(uint32_t flags) : Flags(flags)
 //
 // Arguments:
 //
-//	fs			- Shared file system instance
-//	mode		- Permission flags to assign to the directory node
-//	uid			- Owner UID of the directory node
-//	gid			- Owner GID of the directory node
+//	node		- Shared Node instance
 
-RootFileSystem::Directory::Directory(std::shared_ptr<RootFileSystem> const& fs, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) 
-	: m_fs(fs), m_mode(mode), m_uid(uid), m_gid(gid)
+RootFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : m_node(node)
 {
-	_ASSERTE(m_fs);
+	_ASSERTE(m_node);
 }
 
 //---------------------------------------------------------------------------
@@ -144,7 +159,7 @@ std::unique_ptr<VirtualMachine::Directory> RootFileSystem::Directory::CreateDire
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 
 	// Check that the provided mount is part of the same file system instance
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
 	// Verify that the file system was not mounted read-only
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
@@ -177,7 +192,7 @@ std::unique_ptr<VirtualMachine::File> RootFileSystem::Directory::CreateFile(Virt
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 
 	// Check that the provided mount is part of the same file system instance
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
 	// Verify that the file system was not mounted read-only
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
@@ -187,28 +202,23 @@ std::unique_ptr<VirtualMachine::File> RootFileSystem::Directory::CreateFile(Virt
 }
 
 //-----------------------------------------------------------------------------
-// RootFileSystem::Directory::Duplicate
-//
-// Duplicates this Node instance
-//
-// Arguments:
-//
-//	NONE
-
-std::unique_ptr<VirtualMachine::Node> RootFileSystem::Directory::Duplicate(void) const
-{
-	// todo
-	return nullptr;
-}
-
-//-----------------------------------------------------------------------------
 // RootFileSystem::Directory::getGroupId
 //
 // Gets the currently set owner group identifier for the directory
 
 uapi_gid_t RootFileSystem::Directory::getGroupId(void) const
 {
-	return m_gid;
+	return m_node->gid;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::getIndex
+//
+// Gets the node index within the file system (inode number)
+
+intptr_t RootFileSystem::Directory::getIndex(void) const
+{
+	return m_node->index;
 }
 
 //-----------------------------------------------------------------------------
@@ -249,16 +259,6 @@ std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Directory::OpenHandle(Vi
 }
 
 //---------------------------------------------------------------------------
-// RootFileSystem::Directory::getIndex
-//
-// Gets the node index within the file system (inode number)
-
-intptr_t RootFileSystem::Directory::getIndex(void) const
-{
-	return 1;			// todo
-}
-
-//---------------------------------------------------------------------------
 // RootFileSystem::Directory::getPermissions
 //
 // Gets the permissions mask assigned to this node
@@ -266,7 +266,7 @@ intptr_t RootFileSystem::Directory::getIndex(void) const
 uapi_mode_t RootFileSystem::Directory::getPermissions(void) const
 {
 	// Strip out S_IFMT flags from the mode mask
-	return m_mode & ~UAPI_S_IFMT;
+	return m_node->mode & ~UAPI_S_IFMT;
 }
 
 //---------------------------------------------------------------------------
@@ -286,14 +286,14 @@ VirtualMachine::NodeType RootFileSystem::Directory::getType(void) const
 
 uapi_uid_t RootFileSystem::Directory::getUserId(void) const
 {
-	return m_uid;
+	return m_node->uid;
 }
 
 //
 // ROOTFILESYSTEM::MOUNT IMPLEMENTATION
 //
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 // RootFileSystem::Mount Constructor
 //
 // Arguments:
@@ -302,8 +302,8 @@ uapi_uid_t RootFileSystem::Directory::getUserId(void) const
 //	rootdir		- Root directory node instance
 //	flags		- Mount-specific flags
 
-RootFileSystem::Mount::Mount(std::shared_ptr<RootFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags) : 
-	m_fs(fs), m_rootdir(std::move(rootdir)), m_flags(flags)
+RootFileSystem::Mount::Mount(std::shared_ptr<RootFileSystem> const& fs, std::shared_ptr<node_t> const& rootdir, uint32_t flags) : 
+	m_fs(fs), m_rootdir(rootdir), m_flags(flags)
 {
 	_ASSERTE(m_fs);
 
@@ -364,22 +364,18 @@ uint32_t RootFileSystem::Mount::getFlags(void) const
 	return m_fs->Flags | m_flags;
 }
 
-// todo: test
-//
-std::unique_ptr<VirtualMachine::Node> RootFileSystem::Mount::GetRootNode(void) const
-{
-	return std::make_unique<Directory>(m_fs, 0, 0, 0);	// todo: temporary
-	//return nullptr;
-}
-
 //---------------------------------------------------------------------------
-// RootFileSystem::Mount::getRootNode
+// RootFileSystem::Mount::GetRootNode
 //
 // Gets the root node of the mount point
+//
+// Arguments:
+//
+//	NONE
 
-VirtualMachine::Node* RootFileSystem::Mount::getRootNode(void) const
+std::unique_ptr<VirtualMachine::Node> RootFileSystem::Mount::GetRootNode(void) const
 {
-	return m_rootdir.get();
+	return std::make_unique<RootFileSystem::Directory>(m_rootdir);
 }
 
 //---------------------------------------------------------------------------

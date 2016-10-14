@@ -179,7 +179,7 @@ std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source,
 	// Construct the root directory node on the file system heap using the specified attributes
 	auto rootdir = TempFileSystem::directory_node_t::allocate_shared(fs, (mode & ~UAPI_S_IFMT) | UAPI_S_IFDIR, uid, gid);
 
-	// Create and return the mount point instance, transferring ownership of the root node
+	// Create and return the mount point instance to return to the caller
 	return std::make_unique<TempFileSystem::Mount>(fs, rootdir, options.Flags & UAPI_MS_PERMOUNT_MASK);
 }
 
@@ -560,20 +560,6 @@ std::unique_ptr<VirtualMachine::File> TempFileSystem::Directory::CreateFile(Virt
 	return std::make_unique<File>(node);
 }
 
-//-----------------------------------------------------------------------------
-// TempFileSystem::Directory::Duplicate
-//
-// Duplicates this Node instance
-//
-// Arguments:
-//
-//	NONE
-
-std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Duplicate(void) const
-{
-	return std::make_unique<Directory>(m_node);
-}
-
 //---------------------------------------------------------------------------
 // TempFileSystem::Directory::getGroupId
 //
@@ -692,20 +678,6 @@ TempFileSystem::File::File(std::shared_ptr<node_t> const& node) : m_node(std::dy
 {
 	_ASSERTE(m_node);
 	_ASSERTE((m_node->mode & UAPI_S_IFMT) == UAPI_S_IFREG);
-}
-
-//-----------------------------------------------------------------------------
-// TempFileSystem::File::Duplicate
-//
-// Duplicates this Node instance
-//
-// Arguments:
-//
-//	NONE
-
-std::unique_ptr<VirtualMachine::Node> TempFileSystem::File::Duplicate(void) const
-{
-	return std::make_unique<File>(m_node);
 }
 
 //---------------------------------------------------------------------------
@@ -1198,25 +1170,18 @@ uint32_t TempFileSystem::Mount::getFlags(void) const
 	return m_fs->Flags | m_flags;
 }
 
-// todo: test
+//---------------------------------------------------------------------------
+// TempFileSystem::Mount::GetRootNode
 //
-TempFileSystem::Directory::Directory(std::unique_ptr<TempFileSystem::Directory> const& rhs) : m_node(rhs->m_node)
-{
-}
+// Gets the root node of the mount point
+//
+// Arguments:
+//
+//	NONE
 
 std::unique_ptr<VirtualMachine::Node> TempFileSystem::Mount::GetRootNode(void) const
 {
 	return std::make_unique<TempFileSystem::Directory>(m_rootdir);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::Mount::getRootNode
-//
-// Gets the root node of the mount point
-
-VirtualMachine::Node* TempFileSystem::Mount::getRootNode(void) const
-{
-	return nullptr; // m_rootdir.get();  todo
 }
 
 //---------------------------------------------------------------------------

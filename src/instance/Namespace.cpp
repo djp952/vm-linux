@@ -69,7 +69,7 @@ Namespace::Namespace(Namespace const* rhs, uint32_t flags)
 	UNREFERENCED_PARAMETER(rhs);
 	UNREFERENCED_PARAMETER(flags);
 
-	// todo: clone the namespace(s)
+	// todo: clone the internal namespace(s)
 }
 
 //---------------------------------------------------------------------------
@@ -103,7 +103,8 @@ std::unique_ptr<Namespace::Path> Namespace::AddMount(std::unique_ptr<VirtualMach
 	if(!result.second) throw LinuxException(UAPI_ENOMEM);
 
 	// Return the newly constructed path_t to the caller as a Path instance
-	return std::make_unique<Path>(mountpath);
+	//return std::make_unique<Path>(mountpath);
+	return std::unique_ptr<Path>(new Path(mountpath));
 }
 
 //---------------------------------------------------------------------------
@@ -118,7 +119,7 @@ std::unique_ptr<Namespace::Path> Namespace::AddMount(std::unique_ptr<VirtualMach
 std::unique_ptr<Namespace::Path> Namespace::GetRootPath(void) const
 {
 	sync::reader_writer_lock::scoped_lock_read reader(m_mountslock);
-	return std::make_unique<Path>(m_rootpath);
+	return std::unique_ptr<Path>(new Path(m_rootpath));
 }
 
 //---------------------------------------------------------------------------
@@ -130,8 +131,9 @@ std::unique_ptr<Namespace::Path> Namespace::GetRootPath(void) const
 //
 //	working			- Current working directory path
 //	path			- Path to be looked up
+//	flags			- Lookup flags (O_DIRECTORY, O_NOFOLLOW, etc)
 
-std::unique_ptr<Namespace::Path> Namespace::LookupPath(Path const* working, char_t const* path) const
+std::unique_ptr<Namespace::Path> Namespace::LookupPath(Path const* working, char_t const* path, uint32_t flags) const
 {
 	int numlinks = 0;							// Number of encountered symbolic links
 
@@ -141,7 +143,7 @@ std::unique_ptr<Namespace::Path> Namespace::LookupPath(Path const* working, char
 	sync::reader_writer_lock::scoped_lock_read reader(m_mountslock);
 
 	// Hit the internal version of LookupPath that accepts shared_ptr<path_t>
-	return std::make_unique<Path>(LookupPath(reader, working->m_path, path, &numlinks));
+	return std::unique_ptr<Path>(new Path(LookupPath(reader, working->m_path, path, flags, &numlinks)));
 }
 
 //---------------------------------------------------------------------------
@@ -155,10 +157,11 @@ std::unique_ptr<Namespace::Path> Namespace::LookupPath(Path const* working, char
 //	lock		- Ensures that the caller holds a lock against the mounts
 //	current		- Reference to the current path_t
 //	path		- Remaining path to be looked up
+//	flags		- Lookup operation flags (O_DIRECTORY, O_NOFOLLOW, etc)
 //	numlinks	- Running count of symbolic links encountered
 
 std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_lock::scoped_lock& lock, std::shared_ptr<path_t> const& working, 
-	char_t const* path, int* numlinks) const
+	char_t const* path, uint32_t flags, int* numlinks) const
 {
 	mountmap_t::const_iterator		mountpoint;			// Mount collection iterator
 	posix_path						lookuppath(path);	// Convert into a posix_path
@@ -196,8 +199,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 		// DIRECTORY LOOKUP
 		else if(current->node->Type == VirtualMachine::NodeType::Directory) {
 
-			// The node is stored as a unique_ptr<>, dynamic cast it into a Directory instance
-			auto directory = dynamic_cast<VirtualMachine::Directory*>(current->node.get());
+			auto directory = std::dynamic_pointer_cast<VirtualMachine::Directory>(current->node);
 			if(directory == nullptr) throw LinuxException(UAPI_ENOTDIR);
 
 			// Create a new path_t for the child that uses the directory as its parent
@@ -213,8 +215,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 		// FOLLOW SYMBOLIC LINK
 		else if(current->node->Type == VirtualMachine::NodeType::SymbolicLink) {
 		
-			// The node is stored as a unique_ptr<>, dynamic cast it into a SymbolicLink instance
-			auto symlink = dynamic_cast<VirtualMachine::SymbolicLink*>(current->node.get());
+			auto symlink = std::dynamic_pointer_cast<VirtualMachine::SymbolicLink>(current->node);
 			if(symlink == nullptr) throw LinuxException(UAPI_ENOTDIR);
 
 			// Ensure that the maximum number of symbolic links has not been reached
@@ -223,7 +224,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 			// Move current to the target of the symbolic link; note that the lookup is
 			// relative to the symbolic link's parent, not the symbolic link itself
 			_ASSERTE(current->parent);
-			current = LookupPath(lock, current->parent, symlink->Target, numlinks);
+			current = LookupPath(lock, current->parent, symlink->Target, flags, numlinks);
 		}
 
 		// LOOKUP ERROR
@@ -239,8 +240,26 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 		}
 	}
 
-	// todo: need flags to check if final node was a directory, if it should 
-	// follow a symbolic link or not, etc.
+	// If the final node is a symbolic link, follow it unless O_NOFOLLOW was specified
+	if((current->node->Type == VirtualMachine::NodeType::SymbolicLink) && ((flags & UAPI_O_NOFOLLOW) == 0)) {
+
+		auto symlink = std::dynamic_pointer_cast<VirtualMachine::SymbolicLink>(current->node);
+		if(symlink == nullptr) throw LinuxException(UAPI_ENOTDIR);
+
+		// Ensure that the maximum number of symbolic links has not been reached
+		if(++(*numlinks) > VirtualMachine::MaxSymbolicLinks) throw LinuxException(UAPI_ELOOP);
+
+		// Move current to the target of the symbolic link; note that the lookup is
+		// relative to the symbolic link's parent, not the symbolic link itself
+		_ASSERTE(current->parent);
+		current = LookupPath(lock, current->parent, symlink->Target, flags, numlinks);
+	}
+
+	// If O_DIRECTORY has been specified the final path component must be a directory node
+	if((flags & UAPI_O_DIRECTORY) == UAPI_O_DIRECTORY) {
+
+		if(current->node->Type != VirtualMachine::NodeType::Directory) throw LinuxException(UAPI_ENOTDIR);
+	}
 
 	return current;
 }
@@ -250,7 +269,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 //
 
 //---------------------------------------------------------------------------
-// Namespace::Path Constructor
+// Namespace::Path Constructor (private)
 //
 // Arguments:
 //
@@ -301,8 +320,7 @@ VirtualMachine::NodeType Namespace::Path::getType(void) const
 //
 //	rhs		- Right-hand shared_ptr<path_t> to clone into this path_t
 
-Namespace::path_t::path_t(std::shared_ptr<path_t> const& rhs) : mount(rhs->mount), name(rhs->name), 
-	node(rhs->node->Duplicate()), parent(rhs->parent)
+Namespace::path_t::path_t(std::shared_ptr<path_t> const& rhs) : mount(rhs->mount), name(rhs->name), node(rhs->node), parent(rhs->parent)
 {
 }
 

@@ -132,8 +132,9 @@ private:
 		// Duplicates this mount instance
 		virtual std::unique_ptr<VirtualMachine::Mount> Duplicate(void) const override;
 
-		// todo:test
+		// GetRootNode (VirtualMachine::Mount)
 		//
+		// Gets the root node of the mount point
 		virtual std::unique_ptr<VirtualMachine::Node> GetRootNode(void) const override;
 
 		//-------------------------------------------------------------------
@@ -150,12 +151,6 @@ private:
 		// Gets the mount point flags
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
-
-		// RootNode (VirtualMachine::Mount)
-		//
-		// Gets the root node of the mount point
-		__declspec(property(get=getRootNode)) VirtualMachine::Node* RootNode;
-		virtual VirtualMachine::Node* getRootNode(void) const override;
 
 	private:
 

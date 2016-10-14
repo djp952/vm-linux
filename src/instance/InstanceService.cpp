@@ -96,45 +96,46 @@ void InstanceService::LoadInitialRamFileSystem(Namespace const* ns, Namespace::P
 	CpioArchive::EnumerateFiles(CompressedFileReader(initramfs.c_str()), [=](CpioFile const& file) -> void {
 
 		posix_path filepath(file.Path);
-		auto fp = filepath.operator const char *();
-
-		OutputDebugStringA(fp);
-		OutputDebugStringA("\r\n");
 		
 		// initramfs does not automatically create branch directory objects, they have to exist
-		auto branchpath = ns->LookupPath(current, filepath.branch());
-		if(branchpath->Type != VirtualMachine::NodeType::Directory) throw LinuxException(UAPI_ENOTDIR);
+		auto branchpath = ns->LookupPath(current, filepath.branch(), UAPI_O_DIRECTORY);
 
 		// Get a pointer to the Directory instance pointed to by the branch path
 		VirtualMachine::Directory* branchdir = dynamic_cast<VirtualMachine::Directory*>(branchpath->Node);
 		if(branchdir == nullptr) throw LinuxException(UAPI_ENOTDIR);
 
-		// todo -----------------
-		// todo change this to if/else and get rid of the scope currently under UAPI_S_IFREG
-		switch(file.Mode & UAPI_S_IFMT) {
+		// S_IFDIR - Create and/or replace the permissions of the target directory
+		if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
 
-			case UAPI_S_IFDIR: 
-				branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
-				break;
-
-			case UAPI_S_IFREG:
-			{
-				auto handle = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId)->OpenHandle(branchpath->Mount, UAPI_O_RDWR);
-				handle->SetLength(file.Data.Length);
-				std::vector<uint8_t> buffer(81920);
-				auto read = file.Data.Read(&buffer[0], 81920);
-				while(read) {
-
-					handle->Write(&buffer[0], read);
-					read = file.Data.Read(&buffer[0], 81920);
-				}
-			}
-
-			default:
-				// todo
-				break;
+			// todo: should be "Open" with O_CREAT in the flags ... 
+			auto dir = branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+			//dir->SetMode(file.Mode);
+			//dir->SetUserId(file.UserId);
+			//dir->getGroupId(file.GroupId);
 		}
-		// todo ----------------------
+
+		// S_IFREG - Create and/or replace the target file
+		else if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFREG) {
+
+			// todo: should be "Open" with O_CREAT in the flags ....
+			auto f = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+			auto handle = f->OpenHandle(branchpath->Mount, UAPI_O_RDWR);
+			handle->SetLength(file.Data.Length);
+
+			std::vector<uint8_t> buffer(81920);
+			auto read = file.Data.Read(&buffer[0], 81920);
+			while(read) {
+
+				handle->Write(&buffer[0], read);
+				read = file.Data.Read(&buffer[0], 81920);
+			}
+		}
+
+		// S_IFLNK - Create and/or replace the target symbolic link
+		//else if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFLNK) {
+		//}
+
+		// todo: remaining node types
 	});
 }
 	

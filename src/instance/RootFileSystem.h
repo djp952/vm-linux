@@ -25,6 +25,7 @@
 #pragma once
 
 #include <atomic>
+#include <datetime.h>
 #include <memory>
 #include <text.h>
 
@@ -109,6 +110,70 @@ private:
 	RootFileSystem(RootFileSystem const&)=delete;
 	RootFileSystem& operator=(RootFileSystem const&)=delete;
 
+	// node_t
+	//
+	// Internal file system node representation
+	class node_t
+	{
+	public:
+
+		// Instance Constructor
+		//
+		node_t(std::shared_ptr<RootFileSystem> const& filesystem, intptr_t nodeindex, uapi_mode_t nodemode, uapi_uid_t userid, uapi_gid_t groupid);
+
+		// Destructor
+		//
+		virtual ~node_t()=default;
+
+		//-------------------------------------------------------------------
+		// Fields
+
+		// atime
+		//
+		// Date/time that the node was last accessed
+		datetime atime;
+
+		// ctime
+		//
+		// Date/time that the node metadata was last changed
+		datetime ctime;
+
+		// fs
+		//
+		// Shared pointer to the parent file system
+		std::shared_ptr<RootFileSystem> const fs;
+
+		// gid
+		//
+		// Node owner group identifier
+		std::atomic<uapi_gid_t> gid;
+
+		// index
+		//
+		// The node index value
+		intptr_t const index;
+
+		// mode
+		//
+		// The node type and permission flags
+		std::atomic<uapi_mode_t> mode;
+
+		// mtime
+		//
+		// Date/time that the node data was last changed
+		datetime mtime;
+
+		// uid
+		//
+		// Node owner user identifier
+		std::atomic<uapi_uid_t> uid;
+
+	private:
+
+		node_t(node_t const&)=delete;
+		node_t& operator=(node_t const&)=delete;
+	};
+
 	// Directory
 	//
 	// Implements a directory node for this file system
@@ -118,7 +183,7 @@ private:
 
 		// Instance Constructor
 		//
-		Directory(std::shared_ptr<RootFileSystem> const& fs, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid);
+		Directory(std::shared_ptr<node_t> const& node);
 
 		// Destructor
 		//
@@ -136,11 +201,6 @@ private:
 		//
 		// Creates a new regular file node as a child of this directory
 		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
-
-		// Duplicate (VirtualMachine::Node)
-		//
-		// Duplicates this Node instance
-		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
 
 		// Lookup (VirtualMachine::Directory)
 		//
@@ -193,10 +253,7 @@ private:
 		//---------------------------------------------------------------------
 		// Member Variables
 
-		std::shared_ptr<RootFileSystem>		m_fs;		// File system instance
-		std::atomic<uapi_mode_t>			m_mode;		// Permission mask
-		std::atomic<uapi_uid_t>				m_uid;		// Owner id
-		std::atomic<uapi_gid_t>				m_gid;		// Owner group id
+		std::shared_ptr<node_t>			m_node;		// Shared node instance
 	};
 
 	// Mount
@@ -208,7 +265,7 @@ private:
 
 		// Instance Constructor
 		//
-		Mount(std::shared_ptr<RootFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags);
+		Mount(std::shared_ptr<RootFileSystem> const& fs, std::shared_ptr<node_t> const& rootdir, uint32_t flags);
 
 		// Copy Constructor
 		//
@@ -226,8 +283,9 @@ private:
 		// Duplicates this mount instance
 		virtual std::unique_ptr<VirtualMachine::Mount> Duplicate(void) const override;
 
-		// todo:test
+		// GetRootNode (VirtualMachine::Mount)
 		//
+		// Gets the root node of the mount point
 		virtual std::unique_ptr<VirtualMachine::Node> GetRootNode(void) const override;
 
 		//-------------------------------------------------------------------
@@ -245,12 +303,6 @@ private:
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
 
-		// RootNode (VirtualMachine::Mount)
-		//
-		// Gets the root node of the mount point
-		__declspec(property(get=getRootNode)) VirtualMachine::Node* RootNode;
-		virtual VirtualMachine::Node* getRootNode(void) const override;
-
 	private:
 
 		Mount& operator=(Mount const&)=delete;
@@ -259,7 +311,7 @@ private:
 		// Member Variables
 
 		std::shared_ptr<RootFileSystem>		m_fs;		// File system instance
-		std::shared_ptr<Directory>			m_rootdir;	// Root node instance
+		std::shared_ptr<node_t>				m_rootdir;	// Root node instance
 		std::atomic<uint32_t>				m_flags;	// Mount-level flags
 	};
 };

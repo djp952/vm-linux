@@ -67,16 +67,11 @@ public:
 
 	// Path
 	//
-	// todo words
+	// Represents a file system path within the namespace
 	class Path
 	{
 	friend class Namespace;
 	public:
-
-		// Instance Constructor
-		// todo: this should be private but I don't want to use friend make_unique<> functions
-		//
-		Path(std::shared_ptr<path_t> const& path);
 
 		// Destructor
 		//
@@ -108,6 +103,10 @@ public:
 		Path(Path const&)=delete;
 		Path& operator=(Path const&)=delete;
 
+		// Instance Constructor
+		//
+		Path(std::shared_ptr<path_t> const& path);
+
 		//---------------------------------------------------------------------
 		// Member Variables
 
@@ -131,7 +130,7 @@ public:
 	// LookupPath
 	//
 	// Performs a path name lookup operation
-	std::unique_ptr<Path> LookupPath(Path const* working, char_t const* path) const;
+	std::unique_ptr<Path> LookupPath(Path const* working, char_t const* path, uint32_t flags) const;
 
 private:
 
@@ -164,7 +163,7 @@ private:
 		// node
 		//
 		// Pointer to the node that the path references
-		std::unique_ptr<VirtualMachine::Node> node;
+		std::shared_ptr<VirtualMachine::Node> node;
 
 		// parent
 		//
@@ -200,7 +199,7 @@ private:
 	//
 	// Performs a path name lookup operation
 	std::shared_ptr<path_t> LookupPath(sync::reader_writer_lock::scoped_lock& lock, std::shared_ptr<path_t> const& working, 
-		char_t const* path, int* numlinks) const;
+		char_t const* path, uint32_t flags, int* numlinks) const;
 
 	//-------------------------------------------------------------------------
 	// Member Variables

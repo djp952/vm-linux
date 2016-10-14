@@ -64,7 +64,6 @@ public:
 	// MaxSymbolicLinks
 	//
 	// Constant indicating the maximum recursion depth of a path lookup
-	// todo: move to namespace?
 	static const int MaxSymbolicLinks = 40;
 
 	//
@@ -209,7 +208,6 @@ public:
 		// SetLength
 		//
 		// Sets the length of the file
-		// todo: I think this should be on File, not on Handle, it only applies to files?
 		virtual size_t SetLength(size_t length) = 0;
 
 		// Sync
@@ -259,8 +257,9 @@ public:
 		// Duplicates the Mount instance
 		virtual std::unique_ptr<Mount> Duplicate(void) const = 0;
 
-		// todo:test
+		// GetRootNode
 		//
+		// Gets a pointer to the mount point root node instance
 		virtual std::unique_ptr<Node> GetRootNode(void) const = 0;
 
 		// FileSystem
@@ -274,12 +273,6 @@ public:
 		// Gets the mount point flags
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const = 0;
-
-		// RootNode
-		//
-		// Gets the root node of the mount point
-		__declspec(property(get=getRootNode)) Node* RootNode;
-		virtual Node* getRootNode(void) const = 0;
 	};
 
 	// Node
@@ -290,11 +283,6 @@ public:
 		// Destructor
 		//
 		virtual ~Node()=default;
-
-		// Duplicate
-		//
-		// Duplicates this Node instance
-		virtual std::unique_ptr<Node> Duplicate(void) const = 0;
 
 		// OpenHandle
 		//
