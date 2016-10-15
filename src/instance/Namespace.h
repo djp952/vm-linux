@@ -92,12 +92,6 @@ public:
 		__declspec(property(get=getNode)) VirtualMachine::Node* Node;
 		VirtualMachine::Node* getNode(void) const;
 
-		// Type
-		//
-		// The type of node represented by the path
-		__declspec(property(get=getType)) VirtualMachine::NodeType Type;
-		VirtualMachine::NodeType getType(void) const;
-
 	private:
 
 		Path(Path const&)=delete;

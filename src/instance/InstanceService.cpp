@@ -107,18 +107,29 @@ void InstanceService::LoadInitialRamFileSystem(Namespace const* ns, Namespace::P
 		// S_IFDIR - Create and/or replace the permissions of the target directory
 		if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
 
-			// todo: should be "Open" with O_CREAT in the flags ... 
-			auto dir = branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
-			//dir->SetMode(file.Mode);
-			//dir->SetUserId(file.UserId);
-			//dir->getGroupId(file.GroupId);
+			// Attempt to open/create the target directory node object in the file system
+			auto dir = branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), UAPI_O_CREAT, file.Mode, file.UserId, file.GroupId);
+
+			// Replace the mode flags and owner ids of the directory node based on the archive
+			// todo this should be a helper function that accepts (Mount const*, Node*) -- called for all node types?
+			dir->SetMode(branchpath->Mount, file.Mode);
+			dir->SetUserId(branchpath->Mount, file.UserId);
+			dir->SetGroupId(branchpath->Mount, file.GroupId);
+			// todo: mtime (and ctime)
 		}
 
 		// S_IFREG - Create and/or replace the target file
 		else if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFREG) {
 
 			// todo: should be "Open" with O_CREAT in the flags ....
-			auto f = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+			auto f = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), UAPI_O_CREAT, file.Mode, file.UserId, file.GroupId);
+
+			// this is only necessary if the file was opened rather than created
+			f->SetMode(branchpath->Mount, file.Mode);
+			f->SetUserId(branchpath->Mount, file.UserId);
+			f->SetGroupId(branchpath->Mount, file.GroupId);
+			// todo: mtime (and ctime)
+
 			auto handle = f->OpenHandle(branchpath->Mount, UAPI_O_RDWR);
 			handle->SetLength(file.Data.Length);
 
@@ -266,6 +277,9 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		try { m_rootns = std::make_unique<Namespace>(std::move(rootmount)); }
 		catch(std::exception& ex) { throw CreateRootNamespaceException(ex.what()); }
 
+		// Get a pointer to the namespace root path for lookups
+		auto rootpath = m_rootns->GetRootPath();
+
 		//
 		// EXTRACT INITRAMFS INTO ROOT FILE SYSTEM
 		//
@@ -273,7 +287,6 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		if(param_initrd) {
 
 			std::tstring initrd = param_initrd;				// Pull out the param_initrd string
-			auto rootpath = m_rootns->GetRootPath();		// Get the namespace root path
 
 			// Attempt to extract the contents of the initramfs archive into the root file system
 			try { LoadInitialRamFileSystem(m_rootns.get(), rootpath.get(), initrd); }
@@ -284,9 +297,20 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// LAUNCH INIT PROCESS
 		//
 
-		//auto initexe = std::make_unique<Executable>(TEXT("D:\\Linux Stuff\\android-5.0.2_r1-x86\\root\\init"));
-		//m_initprocess = std::make_unique<Process>();
-		//m_initprocess->Load(initexe.get());
+		std::string init = std::to_string(param_init);				// Pull out the param_init string
+
+		try {
+			
+			// Look up the path to the init binary and attempt to open an execute handle against it
+			auto initpath = m_rootns->LookupPath(rootpath.get(), init.c_str(), 0);
+			//auto exechandle = initpath->Node->OpenExecute(...);
+
+			//auto initexe = std::make_unique<Executable>(TEXT("D:\\Linux Stuff\\android-5.0.2_r1-x86\\root\\init"));
+			//m_initprocess = std::make_unique<Process>();
+			//m_initprocess->Load(initexe.get());
+		}
+
+		catch(std::exception& ex) { throw LaunchInitException(init.c_str(), ex.what()); }
 	}
 
 	catch(std::exception& ex) {

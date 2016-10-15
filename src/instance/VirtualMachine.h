@@ -112,20 +112,6 @@ public:
 	// Function signature for a file system's Mount() implementation
 	using MountFileSystem = std::function<std::unique_ptr<Mount>(char_t const* source, uint32_t flags, void const* data, size_t datalength)>;
 
-	// NodeType
-	//
-	// Strogly typed enumeration for the S_IFxxx inode type constants
-	enum class NodeType
-	{
-		BlockDevice			= UAPI_S_IFBLK,
-		CharacterDevice		= UAPI_S_IFCHR,
-		Directory			= UAPI_S_IFDIR,
-		File				= UAPI_S_IFREG,
-		Pipe				= UAPI_S_IFIFO,
-		Socket				= UAPI_S_IFSOCK,
-		SymbolicLink		= UAPI_S_IFLNK,
-	};
-
 	// ProtectionFlags
 	//
 	// Generalized protection flags used with memory operations
@@ -289,6 +275,21 @@ public:
 		// Opens a handle against this node
 		virtual std::unique_ptr<struct Handle> OpenHandle(Mount const* mount, uint32_t flags) = 0;
 
+		// SetGroupId
+		//
+		// Changes the owner group id for this node
+		virtual uapi_gid_t SetGroupId(Mount const* mount, uapi_gid_t gid) = 0;
+
+		// SetMode
+		//
+		// Changes the mode flags for this node
+		virtual uapi_mode_t SetMode(Mount const* mount, uapi_mode_t mode) = 0;
+
+		// SetUserId
+		//
+		// Changes the owner user id for this node
+		virtual uapi_uid_t SetUserId(Mount const* mount, uapi_uid_t uid) = 0;
+
 		// GroupId
 		//
 		// Gets the node owner group identifier
@@ -301,17 +302,11 @@ public:
 		__declspec(property(get=getIndex)) intptr_t Index;
 		virtual intptr_t getIndex(void) const = 0;
 
-		// Permissions
+		// Mode
 		//
-		// Gets the permissions mask assigned to this node
-		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
-		virtual uapi_mode_t getPermissions(void) const = 0;
-
-		// Type
-		//
-		// Gets the type of file system node being represented
-		__declspec(property(get=getType)) NodeType Type;
-		virtual NodeType getType(void) const = 0;
+		// Gets the type and permission masks from the node
+		__declspec(property(get=getMode)) uapi_mode_t Mode;
+		virtual uapi_mode_t getMode(void) const = 0;
 
 		// UserId
 		//
@@ -331,13 +326,13 @@ public:
 
 		// CreateDirectory
 		//
-		// Creates a new directory node as a child of this directory
-		virtual std::unique_ptr<Directory> CreateDirectory(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
+		// Creates or opens a directory node as a child of this directory
+		virtual std::unique_ptr<Directory> CreateDirectory(Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 
 		// CreateFile
 		//
-		// Creates a new regular file node as a child of this directory
-		virtual std::unique_ptr<File> CreateFile(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
+		// Creates or opens a regular file node as a child of this directory
+		virtual std::unique_ptr<File> CreateFile(Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 
 		// Lookup
 		//

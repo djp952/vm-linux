@@ -538,13 +538,13 @@ private:
 
 		// CreateDirectory (VirtualMachine::Directory)
 		//
-		// Creates a new directory node as a child of this directory
-		virtual std::unique_ptr<VirtualMachine::Directory> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+		// Creates or opens a directory node as a child of this directory
+		virtual std::unique_ptr<VirtualMachine::Directory> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
 		// CreateFile (VirtualMachine::Directory)
 		//
-		// Creates a new regular file node as a child of this directory
-		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+		// Creates or opens a regular file node as a child of this directory
+		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
 		// Lookup (VirtualMachine::Directory)
 		//
@@ -555,6 +555,21 @@ private:
 		//
 		// Opens a handle against this node
 		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
+
+		// SetGroupId (VirtualMachine::Node)
+		//
+		// Changes the owner group id for this node
+		virtual uapi_gid_t SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid) override;
+
+		// SetMode (VirtualMachine::Node)
+		//
+		// Changes the mode flags for this node
+		virtual uapi_mode_t SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode) override;
+
+		// SetUserId (VirtualMachine::Node)
+		//
+		// Changes the owner user id for this node
+		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
 
 		//-------------------------------------------------------------------
 		// Properties
@@ -571,17 +586,11 @@ private:
 		__declspec(property(get=getIndex)) intptr_t Index;
 		virtual intptr_t getIndex(void) const override;
 
-		// Permissions (VirtualMachine::Node)
+		// Mode (VirtualMachine::Node)
 		//
-		// Gets the permissions mask assigned to this node
-		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
-		virtual uapi_mode_t getPermissions(void) const override;
-
-		// Type (VirtualMachine::Node)
-		//
-		// Gets the type of file system node being represented
-		__declspec(property(get=getType)) VirtualMachine::NodeType Type;
-		virtual VirtualMachine::NodeType getType(void) const override;
+		// Gets the node type and permission mask for the node
+		__declspec(property(get=getMode)) uapi_mode_t Mode;
+		virtual uapi_mode_t getMode(void) const override;
 
 		// UserId (VirtualMachine::Node)
 		//
@@ -623,6 +632,21 @@ private:
 		// Opens a handle against this node
 		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
 
+		// SetGroupId (VirtualMachine::Node)
+		//
+		// Changes the owner group id for this node
+		virtual uapi_gid_t SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid) override;
+
+		// SetMode (VirtualMachine::Node)
+		//
+		// Changes the mode flags for this node
+		virtual uapi_mode_t SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode) override;
+
+		// SetUserId (VirtualMachine::Node)
+		//
+		// Changes the owner user id for this node
+		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
+
 		//---------------------------------------------------------------------
 		// Properties
 
@@ -638,17 +662,11 @@ private:
 		__declspec(property(get=getIndex)) intptr_t Index;
 		virtual intptr_t getIndex(void) const override;
 
-		// Permissions (VirtualMachine::Node)
+		// Mode (VirtualMachine::Node)
 		//
-		// Gets the permissions mask assigned to this node
-		__declspec(property(get=getPermissions)) uapi_mode_t Permissions;
-		virtual uapi_mode_t getPermissions(void) const override;
-
-		// Type (VirtualMachine::Node)
-		//
-		// Gets the type of file system node being represented
-		__declspec(property(get=getType)) VirtualMachine::NodeType Type;
-		virtual VirtualMachine::NodeType getType(void) const override;
+		// Gets the node type and permission mask for the node
+		__declspec(property(get=getMode)) uapi_mode_t Mode;
+		virtual uapi_mode_t getMode(void) const override;
 
 		// UserId (VirtualMachine::Node)
 		//

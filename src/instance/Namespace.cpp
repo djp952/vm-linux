@@ -197,7 +197,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 		else if(strcmp(iterator, "/") == 0) current = m_rootpath;
 
 		// DIRECTORY LOOKUP
-		else if(current->node->Type == VirtualMachine::NodeType::Directory) {
+		else if((current->node->Mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
 
 			auto directory = std::dynamic_pointer_cast<VirtualMachine::Directory>(current->node);
 			if(directory == nullptr) throw LinuxException(UAPI_ENOTDIR);
@@ -213,7 +213,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 		}
 
 		// FOLLOW SYMBOLIC LINK
-		else if(current->node->Type == VirtualMachine::NodeType::SymbolicLink) {
+		else if((current->node->Mode & UAPI_S_IFMT) == UAPI_S_IFLNK) {
 		
 			auto symlink = std::dynamic_pointer_cast<VirtualMachine::SymbolicLink>(current->node);
 			if(symlink == nullptr) throw LinuxException(UAPI_ENOTDIR);
@@ -241,7 +241,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 	}
 
 	// If the final node is a symbolic link, follow it unless O_NOFOLLOW was specified
-	if((current->node->Type == VirtualMachine::NodeType::SymbolicLink) && ((flags & UAPI_O_NOFOLLOW) == 0)) {
+	if(((current->node->Mode & UAPI_S_IFMT) == UAPI_S_IFLNK) && ((flags & UAPI_O_NOFOLLOW) == 0)) {
 
 		auto symlink = std::dynamic_pointer_cast<VirtualMachine::SymbolicLink>(current->node);
 		if(symlink == nullptr) throw LinuxException(UAPI_ENOTDIR);
@@ -258,7 +258,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 	// If O_DIRECTORY has been specified the final path component must be a directory node
 	if((flags & UAPI_O_DIRECTORY) == UAPI_O_DIRECTORY) {
 
-		if(current->node->Type != VirtualMachine::NodeType::Directory) throw LinuxException(UAPI_ENOTDIR);
+		if((current->node->Mode & UAPI_S_IFMT) != UAPI_S_IFDIR) throw LinuxException(UAPI_ENOTDIR);
 	}
 
 	return current;
@@ -297,16 +297,6 @@ VirtualMachine::Mount* Namespace::Path::getMount(void) const
 VirtualMachine::Node* Namespace::Path::getNode(void) const
 {
 	return m_path->node.get();
-}
-		
-//---------------------------------------------------------------------------
-// Namespace::Path::getType
-//
-// Gets the type of node represented by the path
-
-VirtualMachine::NodeType Namespace::Path::getType(void) const
-{
-	return m_path->node->Type;
 }
 		
 //

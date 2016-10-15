@@ -116,7 +116,15 @@ MessageId=
 Severity=Error
 SymbolicName=E_INITRAMFSNOTFOUND
 Language=English
-The specified initial RAM file system (initramfs) archive %1!s! could be processed - %2!S!
+The specified initial RAM file system (initramfs) archive %1!s! could not be processed - %2!S!
+.
+
+MessageId=
+;//ExceptionName=LaunchInitException,path,errormessage
+Severity=Error
+SymbolicName=E_LAUNCHINIT
+Language=English
+The specified init process %1!S! could be not be launched - %2!S!
 .
 
 ;//----------------------------------------------------------------------------

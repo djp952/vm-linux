@@ -138,18 +138,19 @@ RootFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : m_no
 //---------------------------------------------------------------------------
 // RootFileSystem::Directory::CreateDirectory
 //
-// Creates a new directory node as a child of this directory
+// Creates or opens a directory node as a child of this directory
 //
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
 //	name		- Name to assign to the new node
 //	mode		- Initial permissions to assign to the node
+//	flags		- Flags to use when opening/creating the directory
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
 std::unique_ptr<VirtualMachine::Directory> RootFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name,
-	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+	uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
 	UNREFERENCED_PARAMETER(mode);
 	UNREFERENCED_PARAMETER(uid);
@@ -177,12 +178,13 @@ std::unique_ptr<VirtualMachine::Directory> RootFileSystem::Directory::CreateDire
 //
 //	mount		- Mount point on which to perform the operation
 //	name		- Name to assign to the new node
+//	flags		- Flags to use when opening/creating the file
 //	mode		- Initial permissions to assign to the node
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
 std::unique_ptr<VirtualMachine::File> RootFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, char_t const* name,
-	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+	uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
 	UNREFERENCED_PARAMETER(mode);
 	UNREFERENCED_PARAMETER(uid);
@@ -259,24 +261,89 @@ std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Directory::OpenHandle(Vi
 }
 
 //---------------------------------------------------------------------------
-// RootFileSystem::Directory::getPermissions
+// RootFileSystem::Directory::getMode
 //
-// Gets the permissions mask assigned to this node
+// Gets the type and permissions mask for the node
 
-uapi_mode_t RootFileSystem::Directory::getPermissions(void) const
+uapi_mode_t RootFileSystem::Directory::getMode(void) const
 {
-	// Strip out S_IFMT flags from the mode mask
-	return m_node->mode & ~UAPI_S_IFMT;
+	return m_node->mode;
 }
 
 //---------------------------------------------------------------------------
-// RootFileSystem::Directory::getType
+// RootFileSystem::Directory:SetGroupId
 //
-// Gets the type of file system node being represented
+// Changes the owner group id for this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	gid			- New owner group id to be set
 
-VirtualMachine::NodeType RootFileSystem::Directory::getType(void) const
+uapi_gid_t RootFileSystem::Directory::SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid)
 {
-	return VirtualMachine::NodeType::Directory;
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->gid = gid;							// Update the node gid
+	m_node->ctime = datetime::now();			// Update change time
+
+	return gid;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory:SetMode
+//
+// Changes the mode flags for this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	mode		- New mode flags to be set
+
+uapi_mode_t RootFileSystem::Directory::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// Strip out all but the permissions from the provided mode; the type
+	// cannot be changed after a node has been created
+	mode = ((mode & UAPI_S_IALLUGO) | (m_node->mode & ~UAPI_S_IALLUGO));
+
+	m_node->mode = mode;						// Update the node mode
+	m_node->ctime = datetime::now();			// Update change time
+
+	return mode;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory:SetUserId
+//
+// Changes the owner user id for this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	uid			- New owner user id to be set
+
+uapi_uid_t RootFileSystem::Directory::SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->uid = uid;							// Update the node uid
+	m_node->ctime = datetime::now();			// Update change time
+
+	return uid;
 }
 
 //-----------------------------------------------------------------------------
