@@ -174,7 +174,10 @@ datetime datetime::now(void)
 {
 	FILETIME filetime;
 	GetSystemTimeAsFileTime(&filetime);
-	return datetime(*reinterpret_cast<uint64_t*>(&filetime));
+
+	// Microsoft specifically cautions against casting FILETIME as a uint64_t as it may
+	// cause alignment faults on 64-bit platforms -- convert it via a temporary variable
+	return datetime((static_cast<uint64_t>(filetime.dwHighDateTime) << 32) | filetime.dwLowDateTime);
 }
 
 //-----------------------------------------------------------------------------
