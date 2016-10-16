@@ -23,6 +23,7 @@
 #include "stdafx.h"
 #include "TempFileSystem.h"
 
+#include <convert.h>
 #include <SystemInformation.h>
 #include <Win32Exception.h>
 
@@ -42,6 +43,29 @@ static size_t g_maxmemory = []() -> size_t {
 	uint64_t accessiblemem = std::min(SystemInformation::TotalPhysicalMemory, SystemInformation::TotalVirtualMemory);
 	return static_cast<size_t>(std::min(accessiblemem, static_cast<uint64_t>(std::numeric_limits<size_t>::max())));
 }();
+
+// conversion: datetime --> uapi_timespec
+//
+template<> uapi_timespec convert<uapi_timespec>(const datetime& rhs)
+{
+	int64_t unixtime = (static_cast<uint64_t>(rhs) - 116444736000000000i64);
+	
+	// Convert the timespec components individually so they can be range checked
+	int64_t tv_sec = unixtime / 10000000i64;
+	int64_t tv_nsec = (unixtime * 100ui64) % 1000000000i64;
+
+	if(tv_sec > std::numeric_limits<uapi___kernel_time_t>::max()) throw std::out_of_range("tv_sec");
+	if(tv_nsec > std::numeric_limits<long>::max()) throw std::out_of_range("tv_nsec");
+
+	return{ static_cast<uapi___kernel_time_t>(tv_sec), static_cast<long>(tv_nsec) };
+}
+
+// conversion: uapi_timespec --> datetime
+//
+template<> datetime convert<datetime>(const uapi_timespec& rhs)
+{
+	return datetime((rhs.tv_sec * 10000000i64) + (rhs.tv_nsec / 100i64) + 116444736000000000i64);
+}
 
 //---------------------------------------------------------------------------
 // ParseScaledInteger (local)
@@ -314,9 +338,13 @@ void TempFileSystem::ReleaseHeap(void* ptr)
 //	groupid			- Initial owner GID to assign to the node
 
 TempFileSystem::node_t::node_t(std::shared_ptr<TempFileSystem> const& filesystem, uapi_mode_t nodemode, uapi_uid_t userid, uapi_gid_t groupid) : 
-	fs(filesystem), index(filesystem->NodeIndexPool.Allocate()), atime(datetime::now()), ctime(atime), mtime(atime), mode(nodemode), uid(userid), gid(groupid)
+	fs(filesystem), index(filesystem->NodeIndexPool.Allocate()), mode(nodemode), uid(userid), gid(groupid)
 {
 	_ASSERTE(fs);
+
+	// Set the access time, change time and modification time to now
+	uapi_timespec now = convert<uapi_timespec>(datetime::now());
+	atime = ctime = mtime = now;
 }
 
 //---------------------------------------------------------------------------
@@ -662,8 +690,8 @@ uapi_gid_t TempFileSystem::Directory::SetGroupId(VirtualMachine::Mount const* mo
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->gid = gid;							// Update the node gid
-	m_node->ctime = datetime::now();			// Update change time
+	m_node->gid = gid;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return gid;
 }
@@ -690,8 +718,8 @@ uapi_mode_t TempFileSystem::Directory::SetMode(VirtualMachine::Mount const* moun
 	// cannot be changed after a node has been created
 	mode = ((mode & UAPI_S_IALLUGO) | (m_node->mode & ~UAPI_S_IALLUGO));
 
-	m_node->mode = mode;						// Update the node mode
-	m_node->ctime = datetime::now();			// Update change time
+	m_node->mode = mode;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return mode;
 }
@@ -714,8 +742,8 @@ uapi_uid_t TempFileSystem::Directory::SetUserId(VirtualMachine::Mount const* mou
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->uid = uid;							// Update the node uid
-	m_node->ctime = datetime::now();			// Update change time
+	m_node->uid = uid;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return uid;
 }
@@ -818,8 +846,8 @@ uapi_gid_t TempFileSystem::File::SetGroupId(VirtualMachine::Mount const* mount, 
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->gid = gid;							// Update the node gid
-	m_node->ctime = datetime::now();			// Update change time
+	m_node->gid = gid;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return gid;
 }
@@ -846,8 +874,8 @@ uapi_mode_t TempFileSystem::File::SetMode(VirtualMachine::Mount const* mount, ua
 	// cannot be changed after a node has been created
 	mode = ((mode & UAPI_S_IALLUGO) | (m_node->mode & ~UAPI_S_IALLUGO));
 
-	m_node->mode = mode;						// Update the node mode
-	m_node->ctime = datetime::now();			// Update change time
+	m_node->mode = mode;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return mode;
 }
@@ -870,8 +898,8 @@ uapi_uid_t TempFileSystem::File::SetUserId(VirtualMachine::Mount const* mount, u
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->uid = uid;							// Update the node uid
-	m_node->ctime = datetime::now();			// Update change time
+	m_node->uid = uid;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return uid;
 }
@@ -1107,7 +1135,7 @@ size_t TempFileSystem::FileHandle::SetLength(size_t length)
 	if(shrink) m_handle->node->data.shrink_to_fit();
 
 	// Update the modification and change times for the node
-	m_handle->node->mtime = m_handle->node->ctime = datetime::now();
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return m_handle->node->data.size();
 }
@@ -1178,7 +1206,7 @@ size_t TempFileSystem::FileHandle::Write(const void* buffer, size_t count)
 	m_handle->position += count;
 
 	// Update the modification and change times for the node
-	m_handle->node->mtime = m_handle->node->ctime = datetime::now();
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return count;
 }
@@ -1222,7 +1250,7 @@ size_t TempFileSystem::FileHandle::WriteAt(ssize_t offset, int whence, const voi
 	memcpy(&m_handle->node->data[pos], buffer, count);
 
 	// Update the modification and change times for the node
-	m_handle->node->mtime = m_handle->node->ctime = datetime::now();
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return count;
 }

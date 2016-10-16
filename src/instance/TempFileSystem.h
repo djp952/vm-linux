@@ -298,12 +298,12 @@ private:
 		// atime
 		//
 		// Date/time that the node was last accessed
-		datetime atime;
+		std::atomic<uapi_timespec> atime;
 
 		// ctime
 		//
 		// Date/time that the node metadata was last changed
-		datetime ctime;
+		std::atomic<uapi_timespec> ctime;
 
 		// fs
 		//
@@ -328,7 +328,7 @@ private:
 		// mtime
 		//
 		// Date/time that the node data was last changed
-		datetime mtime;
+		std::atomic<uapi_timespec> mtime;
 
 		// uid
 		//

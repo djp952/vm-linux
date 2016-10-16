@@ -23,6 +23,8 @@
 #include "stdafx.h"
 #include "RootFileSystem.h"
 
+#include <convert.h>
+
 #include "LinuxException.h"
 #include "MountOptions.h"
 
@@ -114,9 +116,13 @@ RootFileSystem::RootFileSystem(uint32_t flags) : Flags(flags)
 //	groupid			- Initial owner GID to assign to the node
 
 RootFileSystem::node_t::node_t(std::shared_ptr<RootFileSystem> const& filesystem, intptr_t nodeindex, uapi_mode_t nodemode, uapi_uid_t userid, uapi_gid_t groupid) : 
-	fs(filesystem), index(nodeindex), atime(datetime::now()), ctime(atime), mtime(atime), mode(nodemode), uid(userid), gid(groupid)
+	fs(filesystem), index(nodeindex), mode(nodemode), uid(userid), gid(groupid)
 {
 	_ASSERTE(fs);
+	
+	// Set the access time, change time and modification time to now
+	uapi_timespec now = convert<uapi_timespec>(datetime::now());
+	atime = ctime = mtime = now;
 }
 
 //
@@ -288,8 +294,8 @@ uapi_gid_t RootFileSystem::Directory::SetGroupId(VirtualMachine::Mount const* mo
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->gid = gid;							// Update the node gid
-	m_node->ctime = datetime::now();			// Update change time
+	m_node->gid = gid;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return gid;
 }
@@ -316,8 +322,8 @@ uapi_mode_t RootFileSystem::Directory::SetMode(VirtualMachine::Mount const* moun
 	// cannot be changed after a node has been created
 	mode = ((mode & UAPI_S_IALLUGO) | (m_node->mode & ~UAPI_S_IALLUGO));
 
-	m_node->mode = mode;						// Update the node mode
-	m_node->ctime = datetime::now();			// Update change time
+	m_node->mode = mode;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return mode;
 }
@@ -340,8 +346,8 @@ uapi_uid_t RootFileSystem::Directory::SetUserId(VirtualMachine::Mount const* mou
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->uid = uid;							// Update the node uid
-	m_node->ctime = datetime::now();			// Update change time
+	m_node->uid = uid;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return uid;
 }

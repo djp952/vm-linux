@@ -33,6 +33,13 @@
 #define	_WIN32_IE				_WIN32_IE_IE100
 #define NOMINMAX
 
+// _ENABLE_ATOMIC_ALIGNMENT_FIX
+//
+// Allows std::atomic<> to be used on data types that don't have 8-byte alignment;
+// there was a bug in VS2015 prior to Update 2 and setting this implies that all
+// linked modules were built with VS2015 Update 2 or higher
+#define _ENABLE_ATOMIC_ALIGNMENT_FIX
+
 // Windows / CRT
 //
 #include <Windows.h>

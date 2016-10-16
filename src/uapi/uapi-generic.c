@@ -36,6 +36,7 @@
 #include <linux/magic.h>
 #include <linux/sched.h>
 #include <linux/stat.h>
+#include <linux/time.h>
 #include <asm/stat.h>
 #include <asm/statfs.h>
 
