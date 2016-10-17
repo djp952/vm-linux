@@ -28,6 +28,7 @@
 #include <cctype>
 #include <cwctype>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <tchar.h>
@@ -60,6 +61,11 @@ namespace std {
 	// Typedef for a generic text std::[w]string
 	using tstring = std::conditional<sizeof(TCHAR) == sizeof(wchar_t), std::wstring, std::string>::type;
 
+	// std::tstringstream
+	//
+	// Typedef for a generic std::[w]stringstream
+	using tstringstream = std::conditional<sizeof(TCHAR) == sizeof(wchar_t), std::wstringstream, std::stringstream>::type;
+
 	// std::to_string (conversion)
 	//
 	inline std::string to_string(const wchar_t* psz, int cch)
@@ -82,6 +88,8 @@ namespace std {
 	inline std::string to_string(const char_t* psz, int cch) { return std::string(psz, cch); }
 	inline std::string to_string(const char_t* psz) { return std::string(psz); }
 	inline std::string to_string(const std::wstring& str) { return to_string(str.data(), static_cast<int>(str.size())); }
+	inline std::string to_string(const std::stringstream& stm) { return stm.str(); }
+	inline std::string to_string(const std::wstringstream& stm) { return to_string(stm.str()); }
 
 	// std::to_wstring (conversion)
 	//
@@ -105,6 +113,8 @@ namespace std {
 	inline std::wstring to_wstring(const wchar_t* psz, int cch) { return std::wstring(psz, cch); }
 	inline std::wstring to_wstring(const wchar_t* psz) { return std::wstring(psz); }
 	inline std::wstring to_wstring(const std::string& str) { return to_wstring(str.data(), static_cast<int>(str.size())); }
+	inline std::wstring to_wstring(const std::wstringstream& stm) { return stm.str(); }
+	inline std::wstring to_wstring(const std::stringstream& stm) { return to_wstring(stm.str()); }
 
 	// std::to_tstring
 	//
