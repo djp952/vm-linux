@@ -140,7 +140,7 @@ private:
 	// LoadInitialRamFileSystem
 	//
 	// Loads the contents of an initramfs file into the root file system
-	static void LoadInitialRamFileSystem(Namespace const* ns, Namespace::Path const* current, std::tstring const& initramfs);
+	void LoadInitialRamFileSystem(Namespace const* ns, Namespace::Path const* current, std::tstring const& initramfs);
 	
 	// OnStart (Service)
 	//

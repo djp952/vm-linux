@@ -24,6 +24,8 @@
 #include "InstanceService.h"
 
 #include <algorithm>
+#include <convert.h>
+#include <iomanip>
 #include <messages.h>
 #include <path.h>
 
@@ -38,6 +40,7 @@
 #include "LinuxException.h"
 #include "Process.h"
 #include "RootFileSystem.h"
+#include "SystemInformation.h"
 #include "SystemLog.h"
 #include "TempFileSystem.h"
 
@@ -77,7 +80,7 @@ InstanceService::InstanceService()
 }
 
 //---------------------------------------------------------------------------
-// InstanceService::LoadInitialRamFileSystem (static)
+// InstanceService::LoadInitialRamFileSystem
 //
 // Loads the contents of an initramfs file into the root file system
 //
@@ -91,11 +94,27 @@ void InstanceService::LoadInitialRamFileSystem(Namespace const* ns, Namespace::P
 	if(ns == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(current == nullptr) throw LinuxException(UAPI_EFAULT);
 
+	// sets a node's attributes after it's been created from the CPIO archive
+	auto SetNodeAttributes = [](VirtualMachine::Mount const* mount, VirtualMachine::Node* node, CpioFile const& file) -> void 
+	{ 
+		node->SetMode(mount, file.Mode);
+		node->SetUserId(mount, file.UserId);
+		node->SetGroupId(mount, file.GroupId);
+		node->SetModificationTime(mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
+	};
+
+	LogMessage(VirtualMachine::LogLevel::Informational, TEXT("Extracting initramfs archive "), initramfs.c_str());
+
 	// initramfs is stored in a CPIO archive that may be compressed via a variety of different
 	// mechanisms. Wrap the file itself in a generic CompressedStreamReader to handle that
 	CpioArchive::EnumerateFiles(CompressedFileReader(initramfs.c_str()), [=](CpioFile const& file) -> void {
 
-		posix_path filepath(file.Path);
+		std::tstringstream message;						// Log message stream instance
+		posix_path filepath(file.Path);					// Convert the path into a posix_path
+
+		// Indicate the node being processed as an informational log message
+		message << std::setw(6) << std::setfill(TEXT(' ')) << std::oct << file.Mode << TEXT(" ") << file.Path;
+		LogMessage(VirtualMachine::LogLevel::Informational, message);
 		
 		// initramfs does not automatically create branch directory objects, they have to exist
 		auto branchpath = ns->LookupPath(current, filepath.branch(), UAPI_O_DIRECTORY);
@@ -104,49 +123,49 @@ void InstanceService::LoadInitialRamFileSystem(Namespace const* ns, Namespace::P
 		VirtualMachine::Directory* branchdir = dynamic_cast<VirtualMachine::Directory*>(branchpath->Node);
 		if(branchdir == nullptr) throw LinuxException(UAPI_ENOTDIR);
 
-		// S_IFDIR - Create and/or replace the permissions of the target directory
+		// S_IFDIR - Create and/or replace the target directory
 		if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
 
-			// Attempt to open/create the target directory node object in the file system
-			auto dir = branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), UAPI_O_CREAT, file.Mode, file.UserId, file.GroupId);
-
-			// Replace the mode flags and owner ids of the directory node based on the archive
-			// todo this should be a helper function that accepts (Mount const*, Node*) -- called for all node types?
-			dir->SetMode(branchpath->Mount, file.Mode);
-			dir->SetUserId(branchpath->Mount, file.UserId);
-			dir->SetGroupId(branchpath->Mount, file.GroupId);
-			// todo: mtime (and ctime)
+			// Attempt to create the target directory node object in the file system
+			auto node = branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), UAPI_O_CREAT, file.Mode, file.UserId, file.GroupId);
+			SetNodeAttributes(branchpath->Mount, node.get(), file);
 		}
 
 		// S_IFREG - Create and/or replace the target file
 		else if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFREG) {
 
-			// todo: should be "Open" with O_CREAT in the flags ....
-			auto f = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), UAPI_O_CREAT, file.Mode, file.UserId, file.GroupId);
+			// Attempt to create the target file node object in the file system and open a handle against it
+			auto node = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), UAPI_O_CREAT, file.Mode, file.UserId, file.GroupId);
+			auto handle = node->OpenHandle(branchpath->Mount, UAPI_O_RDWR);
 
-			// this is only necessary if the file was opened rather than created
-			f->SetMode(branchpath->Mount, file.Mode);
-			f->SetUserId(branchpath->Mount, file.UserId);
-			f->SetGroupId(branchpath->Mount, file.GroupId);
-			// todo: mtime (and ctime)
-
-			auto handle = f->OpenHandle(branchpath->Mount, UAPI_O_RDWR);
+			// The file system can work more efficiently if the file size is set in advance
 			handle->SetLength(file.Data.Length);
 
-			std::vector<uint8_t> buffer(81920);
-			auto read = file.Data.Read(&buffer[0], 81920);
+			// Extract the data from the CPIO archive into the target file instance
+			std::vector<uint8_t> buffer(SystemInformation::PageSize << 2);
+			auto read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2);
 			while(read) {
 
 				handle->Write(&buffer[0], read);
-				read = file.Data.Read(&buffer[0], 81920);
+				read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2);
 			}
+
+			// Set the node's attributes to match those speciifed in the CPIO archive
+			SetNodeAttributes(branchpath->Mount, node.get(), file);
 		}
 
 		// S_IFLNK - Create and/or replace the target symbolic link
-		//else if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFLNK) {
-		//}
+		else if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFLNK) {
 
-		// todo: remaining node types
+			// Convert the file data into a null terminated C-style string
+			auto target = std::make_unique<char_t[]>(file.Data.Length + 1);
+			file.Data.Read(target.get(), file.Data.Length);
+			target[file.Data.Length] = '\0';
+
+			// Attempt to create the target symbolic link node object in the file system
+			auto node = branchdir->CreateSymbolicLink(branchpath->Mount, filepath.leaf(), target.get(), file.UserId, file.GroupId);
+			SetNodeAttributes(branchpath->Mount, node.get(), file);
+		}
 	});
 }
 	
@@ -222,7 +241,7 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 
 		// Create the system log instance, enforce a minimum size of 128KiB
 		param_log_buf_len = std::max<size_t>(128 KiB, param_log_buf_len);
-		try { m_syslog = std::make_unique<SystemLog>(param_log_buf_len); }
+		try { m_syslog = std::make_unique<SystemLog>(param_log_buf_len, param_loglevel); }
 		catch(std::exception& ex) { throw CreateSystemLogException(ex.what()); }
 
 		// Dump the arguments that couldn't be parsed as warnings into the system log

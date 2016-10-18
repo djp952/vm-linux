@@ -275,6 +275,16 @@ public:
 		// Opens a handle against this node
 		virtual std::unique_ptr<struct Handle> OpenHandle(Mount const* mount, uint32_t flags) = 0;
 
+		// SetAccessTime
+		//
+		// Changes the access time of this node
+		virtual uapi_timespec SetAccessTime(Mount const* mount, uapi_timespec atime) = 0;
+
+		// SetChangeTime
+		//
+		// Changes the change time of this node
+		virtual uapi_timespec SetChangeTime(Mount const* mount, uapi_timespec ctime) = 0;
+
 		// SetGroupId
 		//
 		// Changes the owner group id for this node
@@ -285,10 +295,27 @@ public:
 		// Changes the mode flags for this node
 		virtual uapi_mode_t SetMode(Mount const* mount, uapi_mode_t mode) = 0;
 
+		// SetModificationTime
+		//
+		// Changes the modification time of this node
+		virtual uapi_timespec SetModificationTime(Mount const* mount, uapi_timespec mtime) = 0;
+
 		// SetUserId
 		//
 		// Changes the owner user id for this node
 		virtual uapi_uid_t SetUserId(Mount const* mount, uapi_uid_t uid) = 0;
+
+		// AccessTime
+		//
+		// Gets the access time of the node
+		__declspec(property(get=getAccessTime)) uapi_timespec AccessTime;
+		virtual uapi_timespec getAccessTime(void) const = 0;
+
+		// ChangeTime
+		//
+		// Gets the change time of the node
+		__declspec(property(get=getChangeTime)) uapi_timespec ChangeTime;
+		virtual uapi_timespec getChangeTime(void) const = 0;
 
 		// GroupId
 		//
@@ -307,6 +334,12 @@ public:
 		// Gets the type and permission masks from the node
 		__declspec(property(get=getMode)) uapi_mode_t Mode;
 		virtual uapi_mode_t getMode(void) const = 0;
+
+		// ModificationTime
+		//
+		// Gets the modification time of the node
+		__declspec(property(get=getModificationTime)) uapi_timespec ModificationTime;
+		virtual uapi_timespec getModificationTime(void) const = 0;
 
 		// UserId
 		//
@@ -334,10 +367,25 @@ public:
 		// Creates or opens a regular file node as a child of this directory
 		virtual std::unique_ptr<File> CreateFile(Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 
+		// CreateSymbolicLink
+		//
+		// Creates or opens a symbolic link as a child of this directory
+		virtual std::unique_ptr<SymbolicLink> CreateSymbolicLink(Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_uid_t gid) = 0;
+
+		// LinkNode
+		//
+		// Links an existing node as a child of this directory
+		virtual void LinkNode(Mount const* mount, Node const* node, char_t const* name) = 0;
+
 		// Lookup
 		//
 		// Accesses a child node of this directory by name
 		virtual std::unique_ptr<Node> Lookup(Mount const* mount, char_t const* name) const = 0;
+
+		// UnlinkNode
+		//
+		// Unlinks a child node from this directory
+		virtual void UnlinkNode(Mount const* mount, char_t const* name) = 0;
 	};
 
 	// File
@@ -358,6 +406,11 @@ public:
 		// Destructor
 		//
 		virtual ~SymbolicLink()=default;
+
+		// ReadTarget
+		//
+		// Reads the target of the symbolic link
+		virtual size_t ReadTarget(char_t* buffer, size_t length) const = 0;
 
 		// Target
 		//

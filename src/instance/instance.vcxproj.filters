@@ -460,6 +460,9 @@
     <ClCompile Include="..\common\timespan.cpp">
       <Filter>Source Files\common</Filter>
     </ClCompile>
+    <ClCompile Include="convert.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\tmp\version\version.rc">

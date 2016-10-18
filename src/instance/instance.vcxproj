@@ -505,6 +505,7 @@
     <ClCompile Include="..\common\XzStreamReader.cpp" />
     <ClCompile Include="Capability.cpp" />
     <ClCompile Include="CompressedFileReader.cpp" />
+    <ClCompile Include="convert.cpp" />
     <ClCompile Include="CpioArchive.cpp" />
     <ClCompile Include="Executable.cpp" />
     <ClCompile Include="HostFileSystem.cpp" />

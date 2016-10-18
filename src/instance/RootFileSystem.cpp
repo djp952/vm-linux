@@ -142,6 +142,26 @@ RootFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : m_no
 }
 
 //---------------------------------------------------------------------------
+// RootFileSystem::Directory::getAccessTime
+//
+// Gets the access time of the node
+
+uapi_timespec RootFileSystem::Directory::getAccessTime(void) const
+{
+	return m_node->atime;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::getChangeTime
+//
+// Gets the change time of the node
+
+uapi_timespec RootFileSystem::Directory::getChangeTime(void) const
+{
+	return m_node->ctime;
+}
+		
+//---------------------------------------------------------------------------
 // RootFileSystem::Directory::CreateDirectory
 //
 // Creates or opens a directory node as a child of this directory
@@ -165,12 +185,10 @@ std::unique_ptr<VirtualMachine::Directory> RootFileSystem::Directory::CreateDire
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	// Check that the provided mount is part of the same file system instance
+	// Check that the mount is for this file system and it's not read-only
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-
-	// Verify that the file system was not mounted read-only
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
+	
 	// RootFileSystem does not allow creation of child nodes
 	throw LinuxException(UAPI_EPERM);
 }
@@ -199,12 +217,41 @@ std::unique_ptr<VirtualMachine::File> RootFileSystem::Directory::CreateFile(Virt
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	// Check that the provided mount is part of the same file system instance
+	// Check that the mount is for this file system and it's not read-only
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-
-	// Verify that the file system was not mounted read-only
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	
+	// RootFileSystem does not allow creation of child nodes
+	throw LinuxException(UAPI_EPERM);
+}
 
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::CreateSymbolicLink
+//
+// Creates or opens a symbolic link as a child of this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	name		- Name to assign to the new node
+//	target		- Target to assign to the symbolic link
+//	uid			- Initial owner user id to assign to the node
+//	gid			- Initial owner group id to assign to the node
+
+std::unique_ptr<VirtualMachine::SymbolicLink> RootFileSystem::Directory::CreateSymbolicLink(VirtualMachine::Mount const* mount, 
+	char_t const* name, char_t const* target, uapi_uid_t uid, uapi_uid_t gid)
+{
+	UNREFERENCED_PARAMETER(uid);
+	UNREFERENCED_PARAMETER(gid);
+
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(target == nullptr) throw LinuxException(UAPI_EFAULT);
+	
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	
 	// RootFileSystem does not allow creation of child nodes
 	throw LinuxException(UAPI_EPERM);
 }
@@ -229,6 +276,31 @@ intptr_t RootFileSystem::Directory::getIndex(void) const
 	return m_node->index;
 }
 
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::LinkNode
+//
+// Links an existing node as a child of this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	node		- Node to be linked into this directory
+//	name		- Name to assign to the new link
+
+void RootFileSystem::Directory::LinkNode(VirtualMachine::Mount const* mount, VirtualMachine::Node const* node, char_t const* name)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(node == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+	
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	
+	// RootFileSystem does not allow linking nodes into a directory
+	throw LinuxException(UAPI_EPERM);
+}
+
 //-----------------------------------------------------------------------------
 // RootFileSystem::Directory::Lookup
 //
@@ -247,6 +319,26 @@ std::unique_ptr<VirtualMachine::Node> RootFileSystem::Directory::Lookup(VirtualM
 	throw LinuxException(UAPI_ENOENT);
 }
 
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::getMode
+//
+// Gets the type and permissions mask for the node
+
+uapi_mode_t RootFileSystem::Directory::getMode(void) const
+{
+	return m_node->mode;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::getModificationTime
+//
+// Gets the modification time of the node
+
+uapi_timespec RootFileSystem::Directory::getModificationTime(void) const
+{
+	return m_node->mtime;
+}
+		
 //---------------------------------------------------------------------------
 // RootFileSystem::Directory::OpenHandle
 //
@@ -267,17 +359,51 @@ std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Directory::OpenHandle(Vi
 }
 
 //---------------------------------------------------------------------------
-// RootFileSystem::Directory::getMode
+// RootFileSystem::Directory::SetAccessTime
 //
-// Gets the type and permissions mask for the node
+// Changes the access time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	atime		- New access time to be set
 
-uapi_mode_t RootFileSystem::Directory::getMode(void) const
+uapi_timespec RootFileSystem::Directory::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
 {
-	return m_node->mode;
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->atime = atime;
+	return atime;
 }
 
 //---------------------------------------------------------------------------
-// RootFileSystem::Directory:SetGroupId
+// RootFileSystem::Directory::SetChangeTime
+//
+// Changes the change time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	ctime		- New change time to be set
+
+uapi_timespec RootFileSystem::Directory::SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->ctime = ctime;
+	return ctime;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::SetGroupId
 //
 // Changes the owner group id for this node
 //
@@ -301,7 +427,7 @@ uapi_gid_t RootFileSystem::Directory::SetGroupId(VirtualMachine::Mount const* mo
 }
 
 //---------------------------------------------------------------------------
-// RootFileSystem::Directory:SetMode
+// RootFileSystem::Directory::SetMode
 //
 // Changes the mode flags for this node
 //
@@ -329,7 +455,29 @@ uapi_mode_t RootFileSystem::Directory::SetMode(VirtualMachine::Mount const* moun
 }
 
 //---------------------------------------------------------------------------
-// RootFileSystem::Directory:SetUserId
+// RootFileSystem::Directory::SetModificationTime
+//
+// Changes the modification time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	mtime		- New modification time to be set
+
+uapi_timespec RootFileSystem::Directory::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->mtime = m_node->ctime = mtime;
+	return mtime;
+}
+		
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::SetUserId
 //
 // Changes the owner user id for this node
 //
@@ -350,6 +498,29 @@ uapi_uid_t RootFileSystem::Directory::SetUserId(VirtualMachine::Mount const* mou
 	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return uid;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::UnlinkNode
+//
+// Unlinks a child node from this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	name		- Name of the node to be unlinked
+
+void RootFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, char_t const* name)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+	
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// RootFileSystem does not allow unlinking of child nodes
+	throw LinuxException(UAPI_EPERM);
 }
 
 //-----------------------------------------------------------------------------

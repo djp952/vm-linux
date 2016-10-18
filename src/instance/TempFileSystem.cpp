@@ -44,29 +44,6 @@ static size_t g_maxmemory = []() -> size_t {
 	return static_cast<size_t>(std::min(accessiblemem, static_cast<uint64_t>(std::numeric_limits<size_t>::max())));
 }();
 
-// conversion: datetime --> uapi_timespec
-//
-template<> uapi_timespec convert<uapi_timespec>(const datetime& rhs)
-{
-	int64_t unixtime = (static_cast<uint64_t>(rhs) - 116444736000000000i64);
-	
-	// Convert the timespec components individually so they can be range checked
-	int64_t tv_sec = unixtime / 10000000i64;
-	int64_t tv_nsec = (unixtime * 100ui64) % 1000000000i64;
-
-	if(tv_sec > std::numeric_limits<uapi___kernel_time_t>::max()) throw std::out_of_range("tv_sec");
-	if(tv_nsec > std::numeric_limits<long>::max()) throw std::out_of_range("tv_nsec");
-
-	return{ static_cast<uapi___kernel_time_t>(tv_sec), static_cast<long>(tv_nsec) };
-}
-
-// conversion: uapi_timespec --> datetime
-//
-template<> datetime convert<datetime>(const uapi_timespec& rhs)
-{
-	return datetime((rhs.tv_sec * 10000000i64) + (rhs.tv_nsec / 100i64) + 116444736000000000i64);
-}
-
 //---------------------------------------------------------------------------
 // ParseScaledInteger (local)
 //
@@ -507,6 +484,26 @@ TempFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : m_no
 }
 
 //---------------------------------------------------------------------------
+// TempFileSystem::Directory::getAccessTime
+//
+// Gets the access time of the node
+
+uapi_timespec TempFileSystem::Directory::getAccessTime(void) const
+{
+	return m_node->atime;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::getChangeTime
+//
+// Gets the change time of the node
+
+uapi_timespec TempFileSystem::Directory::getChangeTime(void) const
+{
+	return m_node->ctime;
+}
+		
+//---------------------------------------------------------------------------
 // TempFileSystem::Directory::CreateDirectory
 //
 // Creates or opens a directory node as a child of this directory
@@ -526,14 +523,12 @@ std::unique_ptr<VirtualMachine::Directory> TempFileSystem::Directory::CreateDire
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	// Check that the provided mount is part of the same file system instance
+	// Check that the mount is for this file system and it's not read-only
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	
 	// Check that the proper node type has been specified in the mode flags
 	if((mode & UAPI_S_IFMT) != UAPI_S_IFDIR) throw LinuxException(UAPI_EINVAL);
-
-	// Verify that the file system was not mounted read-only
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	// Construct the new node on the file system heap using the specified attributes
 	auto node = directory_node_t::allocate_shared(m_node->fs, mode, uid, gid);
@@ -568,14 +563,12 @@ std::unique_ptr<VirtualMachine::File> TempFileSystem::Directory::CreateFile(Virt
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	// Check that the provided mount is part of the same file system instance
+	// Check that the mount is for this file system and it's not read-only
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	
 	// Check that the proper node type has been specified in the mode flags
 	if((mode & UAPI_S_IFMT) != UAPI_S_IFREG) throw LinuxException(UAPI_EINVAL);
-
-	// Verify that the file system was not mounted read-only
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	// Construct the new node on the file system heap using the specified attributes
 	auto node = file_node_t::allocate_shared(m_node->fs, mode, uid, gid);
@@ -591,6 +584,43 @@ std::unique_ptr<VirtualMachine::File> TempFileSystem::Directory::CreateFile(Virt
 }
 
 //---------------------------------------------------------------------------
+// TempFileSystem::Directory::CreateSymbolicLink
+//
+// Creates or opens a symbolic link as a child of this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	name		- Name to assign to the new node
+//	target		- Target to assign to the symbolic link
+//	uid			- Initial owner user id to assign to the node
+//	gid			- Initial owner group id to assign to the node
+
+std::unique_ptr<VirtualMachine::SymbolicLink> TempFileSystem::Directory::CreateSymbolicLink(VirtualMachine::Mount const* mount, 
+	char_t const* name, char_t const* target, uapi_uid_t uid, uapi_gid_t gid)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(target == nullptr) throw LinuxException(UAPI_EFAULT);
+	
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	
+	// Construct the new node on the file system heap using the specified attributes
+	auto node = symlink_node_t::allocate_shared(m_node->fs, target, uid, gid);
+
+	// Lock the nodes collection for exclusive access
+	sync::reader_writer_lock::scoped_lock_write writer(m_node->nodeslock);
+
+	// Attempt to insert the new node into the collection
+	auto result = m_node->nodes.emplace(name, node);
+	if(result.second == false) throw LinuxException(UAPI_EEXIST);
+
+	return std::make_unique<SymbolicLink>(node);
+}
+
+//---------------------------------------------------------------------------
 // TempFileSystem::Directory::getGroupId
 //
 // Gets the currently set owner group identifier for the directory
@@ -598,6 +628,65 @@ std::unique_ptr<VirtualMachine::File> TempFileSystem::Directory::CreateFile(Virt
 uapi_gid_t TempFileSystem::Directory::getGroupId(void) const
 {
 	return m_node->gid;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::getIndex
+//
+// Gets the node index within the file system (inode number)
+
+intptr_t TempFileSystem::Directory::getIndex(void) const
+{
+	return m_node->index;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::LinkNode
+//
+// Links an existing node as a child of this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	node		- Node to be linked into this directory
+//	name		- Name to assign to the new link
+
+void TempFileSystem::Directory::LinkNode(VirtualMachine::Mount const* mount, VirtualMachine::Node const* node, char_t const* name)
+{
+	std::shared_ptr<node_t>			nodeptr;			// The node_t shared pointer to be linked
+
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(node == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+	
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// S_IFREG - File node instance
+	if((node->Mode & UAPI_S_IFMT) == UAPI_S_IFREG) {
+		if(File const* file = dynamic_cast<File const*>(node)) nodeptr = std::dynamic_pointer_cast<node_t>(file->m_node);
+	}
+
+	// S_IFDIR - Directory node instance
+	else if((node->Mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
+		if(Directory const* dir = dynamic_cast<Directory const*>(node)) nodeptr = std::dynamic_pointer_cast<node_t>(dir->m_node);
+	}
+
+	// S_IFLNK - SymbolicLink node instance
+	else if((node->Mode & UAPI_S_IFMT) == UAPI_S_IFLNK) {
+		if(SymbolicLink const* symlink = dynamic_cast<SymbolicLink const*>(node)) nodeptr = std::dynamic_pointer_cast<node_t>(symlink->m_node);
+	}
+
+	// Any other node type results in ENXIO for now
+	if(!nodeptr) throw LinuxException(UAPI_ENXIO);
+
+	// Lock the nodes collection for exclusive access
+	sync::reader_writer_lock::scoped_lock_write writer(m_node->nodeslock);
+
+	// Attempt to insert the node into the collection with the new name
+	auto result = m_node->nodes.emplace(name, nodeptr);
+	if(result.second == false) throw LinuxException(UAPI_EEXIST);
 }
 
 //-----------------------------------------------------------------------------
@@ -630,11 +719,32 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Lookup(VirtualM
 
 		case UAPI_S_IFDIR: return std::make_unique<Directory>(found->second);
 		case UAPI_S_IFREG: return std::make_unique<File>(found->second);
+		case UAPI_S_IFLNK: return std::make_unique<SymbolicLink>(found->second);
 	}
 
-	throw LinuxException(UAPI_ENOENT);	// <--- todo; need all the node types above
+	throw LinuxException(UAPI_ENXIO);
 }
 
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::getMode
+//
+// Gets the type and permissions mask for the node
+
+uapi_mode_t TempFileSystem::Directory::getMode(void) const
+{
+	return m_node->mode;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::getModificationTime
+//
+// Gets the modification time of the node
+
+uapi_timespec TempFileSystem::Directory::getModificationTime(void) const
+{
+	return m_node->mtime;
+}
+		
 //---------------------------------------------------------------------------
 // TempFileSystem::Directory::OpenHandle
 //
@@ -653,27 +763,51 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::Directory::OpenHandle(Vi
 }
 		
 //---------------------------------------------------------------------------
-// TempFileSystem::Directory::getIndex
+// TempFileSystem::Directory::SetAccessTime
 //
-// Gets the node index within the file system (inode number)
+// Changes the access time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	atime		- New access time to be set
 
-intptr_t TempFileSystem::Directory::getIndex(void) const
+uapi_timespec TempFileSystem::Directory::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
 {
-	return m_node->index;
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->atime = atime;
+	return atime;
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::Directory::getMode
+// TempFileSystem::Directory::SetChangeTime
 //
-// Gets the type and permissions mask for the node
+// Changes the change time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	ctime		- New change time to be set
 
-uapi_mode_t TempFileSystem::Directory::getMode(void) const
+uapi_timespec TempFileSystem::Directory::SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime)
 {
-	return m_node->mode;
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->ctime = ctime;
+	return ctime;
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::File:SetGroupId
+// TempFileSystem::File::SetGroupId
 //
 // Changes the owner group id for this node
 //
@@ -697,7 +831,7 @@ uapi_gid_t TempFileSystem::Directory::SetGroupId(VirtualMachine::Mount const* mo
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::File:SetMode
+// TempFileSystem::Directory::SetMode
 //
 // Changes the mode flags for this node
 //
@@ -725,7 +859,29 @@ uapi_mode_t TempFileSystem::Directory::SetMode(VirtualMachine::Mount const* moun
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::File:SetUserId
+// TempFileSystem::Directory::SetModificationTime
+//
+// Changes the modification time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	mtime		- New modification time to be set
+
+uapi_timespec TempFileSystem::Directory::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->mtime = m_node->ctime = mtime;
+	return mtime;
+}
+		
+//---------------------------------------------------------------------------
+// TempFileSystem::File::SetUserId
 //
 // Changes the owner user id for this node
 //
@@ -746,6 +902,53 @@ uapi_uid_t TempFileSystem::Directory::SetUserId(VirtualMachine::Mount const* mou
 	m_node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return uid;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::UnlinkNode
+//
+// Unlinks a child node from this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	name		- Name of the node to be unlinked
+
+void TempFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, char_t const* name)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+	
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	
+	// Lock the nodes collection for exclusive access
+	sync::reader_writer_lock::scoped_lock_write writer(m_node->nodeslock);
+
+	// Attempt to find the node in the collection, ENOENT if it doesn't exist
+	auto found = m_node->nodes.find(name);
+	if(found == m_node->nodes.end()) throw LinuxException(UAPI_ENOENT);
+
+	// Directory nodes are processed using different semantics than other nodes
+	if((found->second->mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
+
+		// Cast out a pointer to the child's directory_node_t and lock it
+		auto dir = std::dynamic_pointer_cast<directory_node_t>(found->second);
+		sync::reader_writer_lock::scoped_lock_read reader(dir->nodeslock);
+
+		// If the directory is not empty, it cannot be unlinked
+		if(dir->nodes.size() > 0) throw LinuxException(UAPI_ENOTEMPTY);
+
+		// If the directory is a mount point or the root of a process, it cannot be unlinked
+		// TODO: UAPI_EBUSY is the error code -- can the file system know this since those
+		// aspects are controlled externally by the Namespace?  Probably needs to be in the
+		// system call ...
+	}
+
+	// Unlink the node by removing it from this directory; the node itself will
+	// die off when it's no longer in use but this prevents it from being looked up
+	m_node->nodes.erase(found->first);
 }
 
 //---------------------------------------------------------------------------
@@ -776,6 +979,26 @@ TempFileSystem::File::File(std::shared_ptr<node_t> const& node) : m_node(std::dy
 }
 
 //---------------------------------------------------------------------------
+// TempFileSystem::File::getAccessTime
+//
+// Gets the access time of the node
+
+uapi_timespec TempFileSystem::File::getAccessTime(void) const
+{
+	return m_node->atime;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::getChangeTime
+//
+// Gets the change time of the node
+
+uapi_timespec TempFileSystem::File::getChangeTime(void) const
+{
+	return m_node->ctime;
+}
+		
+//---------------------------------------------------------------------------
 // TempFileSystem::File::getGroupId
 //
 // Gets the currently set owner group identifier for the file
@@ -785,6 +1008,36 @@ uapi_gid_t TempFileSystem::File::getGroupId(void) const
 	return m_node->gid;
 }
 
+//---------------------------------------------------------------------------
+// TempFileSystem::File::getIndex
+//
+// Gets the node index within the file system (inode number)
+
+intptr_t TempFileSystem::File::getIndex(void) const
+{
+	return m_node->index;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::getMode
+//
+// Gets the type and permissions mask for the node
+
+uapi_mode_t TempFileSystem::File::getMode(void) const
+{
+	return m_node->mode;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::getModificationTime
+//
+// Gets the modification time of the node
+
+uapi_timespec TempFileSystem::File::getModificationTime(void) const
+{
+	return m_node->mtime;
+}
+		
 //---------------------------------------------------------------------------
 // TempFileSystem::File::OpenHandle
 //
@@ -809,27 +1062,51 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::File::OpenHandle(Virtual
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::File::getIndex
+// TempFileSystem::File::SetAccessTime
 //
-// Gets the node index within the file system (inode number)
+// Changes the access time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	atime		- New access time to be set
 
-intptr_t TempFileSystem::File::getIndex(void) const
+uapi_timespec TempFileSystem::File::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
 {
-	return m_node->index;
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->atime = atime;
+	return atime;
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::File::getMode
+// TempFileSystem::File::SetChangeTime
 //
-// Gets the type and permissions mask for the node
+// Changes the change time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	ctime		- New change time to be set
 
-uapi_mode_t TempFileSystem::File::getMode(void) const
+uapi_timespec TempFileSystem::File::SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime)
 {
-	return m_node->mode;
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->ctime = ctime;
+	return ctime;
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::File:SetGroupId
+// TempFileSystem::File::SetGroupId
 //
 // Changes the owner group id for this node
 //
@@ -853,7 +1130,7 @@ uapi_gid_t TempFileSystem::File::SetGroupId(VirtualMachine::Mount const* mount, 
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::File:SetMode
+// TempFileSystem::File::SetMode
 //
 // Changes the mode flags for this node
 //
@@ -881,7 +1158,29 @@ uapi_mode_t TempFileSystem::File::SetMode(VirtualMachine::Mount const* mount, ua
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::File:SetUserId
+// TempFileSystem::File::SetModificationTime
+//
+// Changes the modification time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	mtime		- New modification time to be set
+
+uapi_timespec TempFileSystem::File::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->mtime = m_node->ctime = mtime;
+	return mtime;
+}
+		
+//---------------------------------------------------------------------------
+// TempFileSystem::File::SetUserId
 //
 // Changes the owner user id for this node
 //
@@ -1342,6 +1641,285 @@ uint32_t TempFileSystem::Mount::getFlags(void) const
 std::unique_ptr<VirtualMachine::Node> TempFileSystem::Mount::GetRootNode(void) const
 {
 	return std::make_unique<TempFileSystem::Directory>(m_rootdir);
+}
+
+//
+// TEMPFILESYSTEM::SYMBOLICLINK IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink Constructor
+//
+// Arguments:
+//
+//	node		- Shared Node instance
+
+TempFileSystem::SymbolicLink::SymbolicLink(std::shared_ptr<node_t> const& node) : m_node(std::dynamic_pointer_cast<symlink_node_t>(node))
+{
+	_ASSERTE(m_node);
+	_ASSERTE((m_node->mode & UAPI_S_IFMT) == UAPI_S_IFLNK);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::getAccessTime
+//
+// Gets the access time of the node
+
+uapi_timespec TempFileSystem::SymbolicLink::getAccessTime(void) const
+{
+	return m_node->atime;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::getChangeTime
+//
+// Gets the change time of the node
+
+uapi_timespec TempFileSystem::SymbolicLink::getChangeTime(void) const
+{
+	return m_node->ctime;
+}
+		
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::getGroupId
+//
+// Gets the currently set owner group identifier for the file
+
+uapi_gid_t TempFileSystem::SymbolicLink::getGroupId(void) const
+{
+	return m_node->gid;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::getIndex
+//
+// Gets the node index within the file system (inode number)
+
+intptr_t TempFileSystem::SymbolicLink::getIndex(void) const
+{
+	return m_node->index;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::getMode
+//
+// Gets the type and permissions mask for the node
+
+uapi_mode_t TempFileSystem::SymbolicLink::getMode(void) const
+{
+	return m_node->mode;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::getModificationTime
+//
+// Gets the modification time of the node
+
+uapi_timespec TempFileSystem::SymbolicLink::getModificationTime(void) const
+{
+	return m_node->mtime;
+}
+		
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::OpenHandle
+//
+// Opens a handle against this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	flags		- Handle flags
+
+std::unique_ptr<VirtualMachine::Handle> TempFileSystem::SymbolicLink::OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the provided mount is part of the same file system instance
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	throw LinuxException(UAPI_ELOOP);		// Can't open a symbolic link
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::ReadTarget
+//
+// Reads the target of the symbolic link into an output buffer
+//
+// Arguments:
+//
+//	buffer		- Buffer in which to store the link target string
+//	length		- Length of the target buffer, in bytes
+
+size_t TempFileSystem::SymbolicLink::ReadTarget(char_t* buffer, size_t length) const
+{
+	if(buffer == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Copy out the smaller of the target string length or the buffer length
+	length = std::min(m_node->target.length(), length);
+	memcpy(buffer, m_node->target.data(), length);
+
+	return length;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::SetAccessTime
+//
+// Changes the access time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	atime		- New access time to be set
+
+uapi_timespec TempFileSystem::SymbolicLink::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->atime = atime;
+	return atime;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::SetChangeTime
+//
+// Changes the change time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	ctime		- New change time to be set
+
+uapi_timespec TempFileSystem::SymbolicLink::SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->ctime = ctime;
+	return ctime;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::SetGroupId
+//
+// Changes the owner group id for this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	gid			- New owner group id to be set
+
+uapi_gid_t TempFileSystem::SymbolicLink::SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->gid = gid;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
+
+	return gid;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::SetMode
+//
+// Changes the mode flags for this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	mode		- New mode flags to be set
+
+uapi_mode_t TempFileSystem::SymbolicLink::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// Permissions are irrelevant for symbolic links and are always set to 0777
+	mode = (0777 | (m_node->mode & ~UAPI_S_IALLUGO));
+
+	m_node->mode = mode;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
+
+	return mode;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::SetModificationTime
+//
+// Changes the modification time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	mtime		- New modification time to be set
+
+uapi_timespec TempFileSystem::SymbolicLink::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->mtime = m_node->ctime = mtime;
+	return mtime;
+}
+		
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::SetUserId
+//
+// Changes the owner user id for this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	uid			- New owner user id to be set
+
+uapi_uid_t TempFileSystem::SymbolicLink::SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->uid = uid;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
+
+	return uid;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::getTarget
+//
+// Gets the symbolic link target as a null-terminated C style string
+
+char_t const* TempFileSystem::SymbolicLink::getTarget(void) const
+{
+	return m_node->target.c_str();
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::getUserId
+//
+// Gets the currently set owner user identifier for the file
+
+uapi_uid_t TempFileSystem::SymbolicLink::getUserId(void) const
+{
+	return m_node->uid;
 }
 
 //---------------------------------------------------------------------------
