@@ -190,7 +190,7 @@ private:
 	// SetExceptionMessage
 	//
 	// Variadic function used to process each message insert parameter
-	template<typename _first, typename... _insertions>
+	template <typename _first, typename... _insertions>
 	void SetExceptionMessage(HRESULT const& hresult, HMODULE module, std::vector<DWORD_PTR>& args, _first const& first, _insertions const&... remaining)
 	{
 		// FormatMessage() does not support floating-point values as insertion arguments

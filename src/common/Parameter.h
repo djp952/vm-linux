@@ -79,7 +79,7 @@ protected:
 // simply Parameter to indicate a 'switch', which is a named parameter that
 // has no parsable value and implicitly behaves like a boolean
 
-template<typename _type>
+template <typename _type>
 class Parameter : public ParameterBase
 {
 	// value_t -> underlying parameter value type
@@ -124,7 +124,7 @@ public:
 
 	// Assignment Operator (non-std::tstring)
 	//
-	template<typename _t = value_t>
+	template <typename _t = value_t>
 	typename std::enable_if<!std::is_same<_t, std::tstring>::value, Parameter&>::type operator=(const value_t& value)
 	{
 		m_value = value;
@@ -140,7 +140,7 @@ public:
 
 	// bool Conversion Operator (integral, non-bool, enum)
 	//
-	template<typename _t = value_t>
+	template <typename _t = value_t>
 	operator typename std::enable_if<(!std::is_same<_t, bool>::value && std::is_integral<_t>::value) || std::is_enum<_t>::value, bool>::type () const
 	{
 		return m_value != 0;
@@ -148,7 +148,7 @@ public:
 
 	// bool Conversion Operator (std::tstring)
 	//
-	template<typename _t = value_t>
+	template <typename _t = value_t>
 	operator typename std::enable_if<std::is_same<_t, std::tstring>::value, bool>::type () const
 	{
 		return m_value.length() > 0;
@@ -156,7 +156,7 @@ public:
 
 	// Logical Not Operator (bool)
 	//
-	template<typename _t = value_t>
+	template <typename _t = value_t>
 	typename std::enable_if<std::is_same<_t, bool>::value, bool>::type operator !() const
 	{
 		return m_value == false;
@@ -164,7 +164,7 @@ public:
 
 	// Logical Not Operator (integral, non-bool, enum)
 	//
-	template<typename _t = value_t>
+	template <typename _t = value_t>
 	typename std::enable_if<(!std::is_same<_t, bool>::value && std::is_integral<_t>::value) || std::is_enum<_t>::value, bool>::type operator !() const
 	{
 		return m_value == 0;
@@ -172,7 +172,7 @@ public:
 
 	// Logical Not Operator (std::tstring)
 	//
-	template<typename _t = value_t>
+	template <typename _t = value_t>
 	typename std::enable_if<std::is_same<_t, std::tstring>::value, bool>::type operator !() const
 	{
 		return m_value.length() == 0;
@@ -228,7 +228,7 @@ private:
 	// ParseInteger64 (int64_t)
 	//
 	// Parses a string into a signed 64-bit integer
-	template<typename _type>
+	template <typename _type>
 	static inline typename std::enable_if<std::is_same<_type, int64_t>::value, int64_t>::type ParseInteger64(const std::tstring& str, size_t* idx, int base)
 	{
 		return std::stoll(str, idx, base);
@@ -237,7 +237,7 @@ private:
 	// ParseInteger64 (uint64_t)
 	//
 	// Parses a string into an unsigned 64-bit integer
-	template<typename _type>
+	template <typename _type>
 	static inline typename std::enable_if<std::is_same<_type, uint64_t>::value, uint64_t>::type ParseInteger64(const std::tstring& str, size_t* idx, int base)
 	{
 		return std::stoull(str, idx, base);
@@ -246,7 +246,7 @@ private:
 	// Parse (Integer)
 	//
 	// Parses a string value into an integer value, optionally applying the K/M/G multiplier suffix
-	template<typename _t = _type>
+	template <typename _t = _type>
 	static typename std::enable_if<std::is_integral<_t>::value && !std::is_same<_t, bool>::value, void>::type Parse(const std::tstring& str, value_t& val)
 	{
 		// interim_t -> interim 64-bit value type used during conversion
@@ -290,7 +290,7 @@ private:
 	// Parse (enum)
 	//
 	// Parses a string value into an enumeration ordinal value
-	template<typename _t = _type>
+	template <typename _t = _type>
 	static typename std::enable_if<std::is_enum<_t>::value, void>::type Parse(const std::tstring& str, value_t& val)
 	{
 		// interim_t -> interim 64-bit value type used during conversion
@@ -310,7 +310,7 @@ private:
 	// Parse (std::tstring)
 	//
 	// Parses a string value
-	template<typename _t = _type> 
+	template <typename _t = _type> 
 	static typename std::enable_if<std::is_same<_t, std::tstring>::value, void>::type Parse(const std::tstring& str, value_t& val)
 	{
 		val = str;
@@ -319,7 +319,7 @@ private:
 	// Parse (bool)
 	//
 	// Parses a boolean value
-	template<typename _t = _type>
+	template <typename _t = _type>
 	static typename std::enable_if<std::is_same<_t, bool>::value, void>::type Parse(const std::tstring& str, value_t& val)
 	{
 		auto strlower = std::tolower(str);
@@ -333,7 +333,7 @@ private:
 	// Parse (void)
 	//
 	// Parses a void value which represents a switch that always evaluates to true
-	template<typename _t = _type>
+	template <typename _t = _type>
 	static typename std::enable_if<std::is_void<_t>::value, void>::type Parse(const std::tstring&, value_t& val)
 	{
 		val = true;

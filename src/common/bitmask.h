@@ -55,7 +55,7 @@
 // MyBitmask const MyBitmask::ValueOne { 0x01 };
 // MyBitmask const MyBitmask::ValueTwo { 0x02 };
 
-template<typename _derived, typename _basetype = decltype(uint32_t), _basetype _allowed = std::numeric_limits<_basetype>::max()>
+template <typename _derived, typename _basetype = decltype(uint32_t), _basetype _allowed = std::numeric_limits<_basetype>::max()>
 class bitmask
 {
 public:

@@ -302,7 +302,7 @@ namespace std {
 	// std::split
 	//
 	// Splits a tstring into a vector<> of delimited parts
-	template<typename _type = std::basic_string>
+	template <typename _type = std::basic_string>
 	std::vector<typename _type> split(const typename _type& str, const typename _type::value_type& delimiter)
 	{
 		std::vector<_type> parts;			// Resultant vector<>

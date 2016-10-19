@@ -52,7 +52,7 @@
 //	_to		- Destination data type
 //	_from	- Source data type value
 
-template<typename _to, typename _from> 
+template <typename _to, typename _from> 
 typename std::enable_if<std::is_integral<_from>::value, _to>::type convert(_from rhs);
 
 //-----------------------------------------------------------------------------
@@ -63,7 +63,7 @@ typename std::enable_if<std::is_integral<_from>::value, _to>::type convert(_from
 //	_to		- Destination data type
 //	_from	- Source data type const reference
 
-template<typename _to, typename _from> 
+template <typename _to, typename _from> 
 typename std::enable_if<!std::is_integral<_from>::value, _to>::type convert(const _from& rhs);
 
 //-----------------------------------------------------------------------------

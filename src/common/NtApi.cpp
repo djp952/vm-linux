@@ -42,7 +42,7 @@ static BOOL CALLBACK InitOnceLoadModule(PINIT_ONCE, PVOID, PVOID* context)
 // GetFunctionPointer (local)
 //
 // Retrieves a function pointer from the NTDLL.DLL module
-template<typename _funcptr> 
+template <typename _funcptr> 
 static _funcptr GetFunctionPointer(const char* name)
 {
 	HMODULE module;

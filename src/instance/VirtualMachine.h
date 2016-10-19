@@ -420,7 +420,7 @@ public:
 	// LogMessage
 	//
 	// Variadic template function to write a message to the system log
-	template<typename... _remaining>
+	template <typename... _remaining>
 	void LogMessage(LogLevel level, _remaining const&... remaining)
 	{
 		LogMessage(0, level, remaining...);
@@ -429,7 +429,7 @@ public:
 	// LogMessage
 	//
 	// Variadic template function to write a message to the system log
-	template<typename... _remaining>
+	template <typename... _remaining>
 	void LogMessage(uint8_t facility, LogLevel level, _remaining const&... remaining)
 	{
 		std::string message;
@@ -462,7 +462,7 @@ private:
 	// ConstructLogMessage
 	//
 	// Intermediate variadic overload; concatenates remaining message arguments
-	template<typename _first, typename... _remaining>
+	template <typename _first, typename... _remaining>
 	void ConstructLogMessage(std::string& message, _first const& first, _remaining const&... remaining)
 	{
 		ConstructLogMessage(message += std::to_string(first), remaining...);

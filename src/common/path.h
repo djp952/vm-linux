@@ -64,7 +64,7 @@ template<> struct path_operations<path_format::posix>
 	// append (const char*)
 	//
 	// Concatenates a path component to an existing string
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static void append(char* dest, size_t length, const char* next, const _arguments&... args)
 	{
 		*dest++ = delimiter;			// Append the delimiter character
@@ -80,7 +80,7 @@ template<> struct path_operations<path_format::posix>
 	// append (const wchar_t*)
 	//
 	// Concatenates a path component to an existing string
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static void append(char* dest, size_t length, const wchar_t* next, const _arguments&... args)
 	{
 		*dest++ = delimiter;			// Append the delimiter character
@@ -98,7 +98,7 @@ template<> struct path_operations<path_format::posix>
 	// append (const std::string&)
 	//
 	// Concatenates a path component to an existing string
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static void append(char* dest, size_t length, const std::string& next, const _arguments&... args)
 	{
 		*dest++ = delimiter;			// Append the delimiter character
@@ -115,7 +115,7 @@ template<> struct path_operations<path_format::posix>
 	// append (const std::wstring&)
 	//
 	// Concatenates a path component to an existing string
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static void append(char* dest, size_t length, const std::wstring& next, const _arguments&... args)
 	{
 		*dest++ = delimiter;			// Append the delimiter character
@@ -159,7 +159,7 @@ template<> struct path_operations<path_format::posix>
 	// count (const char*)
 	//
 	// Counts the number of characters in an input string; does not include null terminator
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static size_t count(const char* next, const _arguments&... args)
 	{
 		return /* delimiter */ 1 + length(next) + count(args...);
@@ -168,7 +168,7 @@ template<> struct path_operations<path_format::posix>
 	// count (const wchar_t*)
 	//
 	// Counts the number of characters in an input string; does not include null terminator
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static size_t count(const wchar_t* next, const _arguments&... args)
 	{
 		// Determine the number of UTF-8 characters required for the string
@@ -183,7 +183,7 @@ template<> struct path_operations<path_format::posix>
 	// count (const std::string&)
 	//
 	// Counts the number of characters in an input string; does not include null terminator
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static size_t count(const std::string& next, const _arguments&... args)
 	{
 		return /* delimiter */ 1 + next.length() + count(args...);
@@ -192,7 +192,7 @@ template<> struct path_operations<path_format::posix>
 	// count (const std::wstring&)
 	//
 	// Counts the number of characters in an input string; does not include null terminator
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static size_t count(const std::wstring& next, const _arguments&... args)
 	{
 		// Determine the number of UTF-8 characters required for the string
@@ -304,7 +304,7 @@ template<> struct path_operations<path_format::windows>
 	// append (const char*)
 	//
 	// Concatenates a path component to an existing string
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static void append(wchar_t* dest, size_t length, const char* next, const _arguments&... args)
 	{
 		*dest++ = delimiter;			// Append the delimiter character
@@ -322,7 +322,7 @@ template<> struct path_operations<path_format::windows>
 	// append (const wchar_t*)
 	//
 	// Concatenates a path component to an existing string
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static void append(wchar_t* dest, size_t length, const wchar_t* next, const _arguments&... args)
 	{
 		*dest++ = delimiter;			// Append the delimiter character
@@ -338,7 +338,7 @@ template<> struct path_operations<path_format::windows>
 	// append (const std::string&)
 	//
 	// Concatenates a path component to an existing string
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static void append(wchar_t* dest, size_t length, const std::string& next, const _arguments&... args)
 	{
 		*dest++ = delimiter;			// Append the delimiter character
@@ -356,7 +356,7 @@ template<> struct path_operations<path_format::windows>
 	// append (const std::wstring&)
 	//
 	// Concatenates a path component to an existing string
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static void append(wchar_t* dest, size_t length, const std::wstring& next, const _arguments&... args)
 	{
 		*dest++ = delimiter;			// Append the delimiter character
@@ -399,7 +399,7 @@ template<> struct path_operations<path_format::windows>
 	// count (const char*)
 	//
 	// Counts the number of characters in an input string; does not include null terminator
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static size_t count(const char* next, const _arguments&... args)
 	{
 		// Determine the number of UTF-16 characters required for the string
@@ -414,7 +414,7 @@ template<> struct path_operations<path_format::windows>
 	// count (const wchar_t*)
 	//
 	// Counts the number of characters in an input string; does not include null terminator
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static size_t count(const wchar_t* next, const _arguments&... args)
 	{
 		return /* delimiter */ 1 + length(next) + count(args...);
@@ -423,7 +423,7 @@ template<> struct path_operations<path_format::windows>
 	// count (const std::string&)
 	//
 	// Counts the number of characters in an input string; does not include null terminator
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static size_t count(const std::string& next, const _arguments&... args)
 	{
 		// Determine the number of UTF-16 characters required for the string
@@ -438,7 +438,7 @@ template<> struct path_operations<path_format::windows>
 	// count (const std::wstring&)
 	//
 	// Counts the number of characters in an input string; does not include null terminator
-	template<typename... _arguments>
+	template <typename... _arguments>
 	static size_t count(const std::wstring& next, const _arguments&... args)
 	{
 		return /* delimiter */ 1 + next.length() + count(args...);
@@ -533,7 +533,7 @@ template<> struct path_operations<path_format::windows>
 	}
 };
 
-template<typename _char_t> struct path_hash;
+template <typename _char_t> struct path_hash;
 
 // path_hash<char>
 //

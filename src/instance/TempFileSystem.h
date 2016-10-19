@@ -157,11 +157,11 @@ private:
 	// allocator_t
 	//
 	// Custom stl allocator that operates against a TempFileSystem private heap
-	template<typename _t>
+	template <typename _t>
 	class allocator_t
 	{
 		// Necessary for private member access from different types of allocator_t<>
-		template<typename _u> friend class allocator_t;
+		template <typename _u> friend class allocator_t;
 
 	public:
 
@@ -176,7 +176,7 @@ private:
 		// struct rebind
 		//
 		// Convert this allocator_t<_t> to allocator_t<_u>
-		template<class _u>
+		template <class _u>
 		struct rebind
 		{
 			typedef allocator_t<_u> other;
@@ -189,7 +189,7 @@ private:
 		// Copy Constructors
 		//
 		allocator_t(allocator_t const& rhs) : m_fs(rhs.m_fs) {}
-		template<typename _u> allocator_t(allocator_t<_u> const& rhs) : m_fs(rhs.m_fs) {}
+		template <typename _u> allocator_t(allocator_t<_u> const& rhs) : m_fs(rhs.m_fs) {}
 
 		// Destructor
 		//
@@ -197,7 +197,7 @@ private:
 
 		// Assignment Operator
 		//
-		template<typename _u>
+		template <typename _u>
 		allocator_t<_t>& operator=(allocator_t<_u> const& rhs)
 		{
 			m_fs = rhs.m_fs;
@@ -233,7 +233,7 @@ private:
 		// construct
 		//
 		// Constructs an object of type T in allocated uninitialized storage pointed to by p
-		template<typename _t, typename... _args>
+		template <typename _t, typename... _args>
 		void construct(pointer p, _args&&... args)
 		{
 			new(reinterpret_cast<void*>(p)) _t(std::forward<_args>(args)...);
@@ -251,7 +251,7 @@ private:
 		// destroy
 		//
 		// Calls the destructor of the object pointed to by p 
-		template<typename _u> void destroy(_u* p)
+		template <typename _u> void destroy(_u* p)
 		{
 			UNREFERENCED_PARAMETER(p);		// Not really, but shuts up the compiler
 			p->~_u();
