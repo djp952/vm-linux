@@ -105,6 +105,12 @@ void InstanceService::LoadInitialRamFileSystem(Namespace const* ns, Namespace::P
 
 	LogMessage(VirtualMachine::LogLevel::Informational, TEXT("Extracting initramfs archive "), initramfs.c_str());
 
+	//
+	// TODO: hard links.  Check how CPIO stores them, I'm guessing multiple entries will have the same
+	// inode number and report NumLinks > 1.  Perhaps need to use a map<> that holds the enumerated inode
+	// numbers and the node that was created for it so it won't be created twice
+	//
+
 	// initramfs is stored in a CPIO archive that may be compressed via a variety of different
 	// mechanisms. Wrap the file itself in a generic CompressedStreamReader to handle that
 	CpioArchive::EnumerateFiles(CompressedFileReader(initramfs.c_str()), [=](CpioFile const& file) -> void {
@@ -136,12 +142,12 @@ void InstanceService::LoadInitialRamFileSystem(Namespace const* ns, Namespace::P
 
 			// Attempt to create the target file node object in the file system and open a handle against it
 			auto node = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), UAPI_O_CREAT, file.Mode, file.UserId, file.GroupId);
-			auto handle = node->OpenHandle(branchpath->Mount, UAPI_O_RDWR);
 
 			// The file system can work more efficiently if the file size is set in advance
-			handle->SetLength(file.Data.Length);
+			node->SetLength(branchpath->Mount, file.Data.Length);
 
 			// Extract the data from the CPIO archive into the target file instance
+			auto handle = node->OpenHandle(branchpath->Mount, UAPI_O_RDWR);
 			std::vector<uint8_t> buffer(SystemInformation::PageSize << 2);
 			auto read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2);
 			while(read) {

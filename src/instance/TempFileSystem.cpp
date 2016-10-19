@@ -468,6 +468,21 @@ std::shared_ptr<TempFileSystem::symlink_node_t> TempFileSystem::symlink_node_t::
 }
 
 //
+// TEMPFILESYSTEM::SYMLINK_HANDLE_T IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// TempFileSystem::symlink_handle_t Constructor
+//
+// Arguments:
+//
+//	symlinknode	- Shared symlink_node_t instance
+
+TempFileSystem::symlink_handle_t::symlink_handle_t(std::shared_ptr<symlink_node_t> const& symlinknode) : node(symlinknode)
+{
+}
+
+//
 // TEMPFILESYSTEM::DIRECTORY IMPLEMENTATION
 //
 
@@ -1058,7 +1073,7 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::File::OpenHandle(Virtual
 	// todo: validate flags (both mount and handle)
 
 	// Handles are allocated normally within the process heap
-	return std::make_unique<FileHandle>(std::make_shared<file_handle_t>(m_node), flags);
+	return std::make_unique<FileHandle>(std::make_shared<file_handle_t>(m_node), mount->Flags, flags);
 }
 
 //---------------------------------------------------------------------------
@@ -1103,6 +1118,42 @@ uapi_timespec TempFileSystem::File::SetChangeTime(VirtualMachine::Mount const* m
 
 	m_node->ctime = ctime;
 	return ctime;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::SetLength
+//
+// Sets the length of the file
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	length		- New length to assign to the file
+
+size_t TempFileSystem::File::SetLength(VirtualMachine::Mount const* mount, size_t length)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	sync::reader_writer_lock::scoped_lock_write writer(m_node->datalock);
+
+	// Determine if the operation will shrink the file data buffer
+	bool shrink = (length < m_node->data.size());
+
+	// Resize the buffer initializing any new allocations to zero
+	try { m_node->data.resize(length, 0); }
+	catch(...) { throw LinuxException(UAPI_ENOSPC); }
+
+	// If the new length is less than the original length, trim the buffer
+	if(shrink) m_node->data.shrink_to_fit();
+
+	// Update the modification and change times for the node
+	m_node->mtime = m_node->ctime = convert<uapi_timespec>(datetime::now());
+
+	return m_node->data.size();
 }
 
 //---------------------------------------------------------------------------
@@ -1223,9 +1274,11 @@ uapi_uid_t TempFileSystem::File::getUserId(void) const
 // Arguments:
 //
 //	handle		- Shared file_handle_t instance
+//	mountflags	- Mount-level flags
 //	flags		- Instance-specific handle flags
 
-TempFileSystem::FileHandle::FileHandle(std::shared_ptr<file_handle_t> const& handle, uint32_t flags) : m_handle(handle), m_flags(flags)
+TempFileSystem::FileHandle::FileHandle(std::shared_ptr<file_handle_t> const& handle, uint32_t mountflags, uint32_t flags) : 
+	m_handle(handle), m_mountflags(mountflags), m_flags(flags)
 {
 }
 
@@ -1286,7 +1339,8 @@ size_t TempFileSystem::FileHandle::AdjustPosition(sync::reader_writer_lock::scop
 std::unique_ptr<VirtualMachine::Handle> TempFileSystem::FileHandle::Duplicate(void) const
 {
 	// Duplication of a file handle removes O_CLOEXEC from the flags -- see dup(2)
-	return std::make_unique<TempFileSystem::FileHandle>(m_handle, (m_flags & ~(UAPI_O_CLOEXEC)));
+	// todo: why do I care about O_CLOEXEC here, that's a file descriptor thing
+	return std::make_unique<TempFileSystem::FileHandle>(m_handle, m_mountflags, (m_flags & ~(UAPI_O_CLOEXEC)));
 }
 
 //---------------------------------------------------------------------------
@@ -1342,9 +1396,8 @@ size_t TempFileSystem::FileHandle::Read(void* buffer, size_t count)
 
 	m_handle->position = (pos + count);		// Set the new position	
 	
-	// todo: atime
-
-	return count;
+	TouchAccessTime();						// Update the node access time
+	return count;							// Return number of bytes read
 }
 
 //---------------------------------------------------------------------------
@@ -1382,9 +1435,8 @@ size_t TempFileSystem::FileHandle::ReadAt(ssize_t offset, int whence, void* buff
 	// Copy the requested data from the file into the provided buffer
 	memcpy(buffer, &m_handle->node->data[pos], count);
 
-	// todo: atime: requires access to or a copy of the mount flags
-
-	return count;
+	TouchAccessTime();						// Update the node access time
+	return count;							// Return number of bytes read
 }
 
 //---------------------------------------------------------------------------
@@ -1403,40 +1455,6 @@ size_t TempFileSystem::FileHandle::Seek(ssize_t offset, int whence)
 
 	m_handle->position = AdjustPosition(reader, offset, whence);
 	return m_handle->position;
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::FileHandle::SetLength
-//
-// Sets the length of the file
-//
-// Arguments:
-//
-//	length		- New length to assign to the file
-
-size_t TempFileSystem::FileHandle::SetLength(size_t length)
-{
-	uint32_t flags = m_flags;				// Copy the currently set flags
-
-	// The file cannot be open for read-only mode
-	if((flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
-
-	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
-
-	// Determine if the operation will shrink the file data buffer
-	bool shrink = (length < m_handle->node->data.size());
-
-	// Resize the buffer initializing any new allocations to zero
-	try { m_handle->node->data.resize(length, 0); }
-	catch(...) { throw LinuxException(UAPI_ENOSPC); }
-
-	// If the new length is less than the original length, trim the buffer
-	if(shrink) m_handle->node->data.shrink_to_fit();
-
-	// Update the modification and change times for the node
-	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
-
-	return m_handle->node->data.size();
 }
 
 //---------------------------------------------------------------------------
@@ -1465,6 +1483,38 @@ void TempFileSystem::FileHandle::Sync(void) const
 void TempFileSystem::FileHandle::SyncData(void) const
 {
 	// no operation
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::FileHandle::TouchAccessTime (private)
+//
+// Updates the node access time based on the mount and handle flags
+//
+// Arguments:
+//
+//	NONE
+
+void TempFileSystem::FileHandle::TouchAccessTime(void)
+{
+	bool			update = false;				// Flag to actually update atime
+	datetime		now = datetime::now();		// Current time as a datetime
+	uint32_t		flags = m_flags;			// Read the atomic<> flags
+
+	// There are two levels of flags that can prevent atime updates
+	if((m_mountflags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME) return;
+	if((flags & UAPI_O_NOATIME) == UAPI_O_NOATIME) return;
+
+	// Update atime if previous atime is more than 24 hours in the past (see mount(2))
+	if(now > (convert<datetime>(m_handle->node->atime.load()) + timespan::days(1))) update = true;
+
+	// MS_STRICTATIME - update atime
+	else if((m_mountflags & UAPI_MS_STRICTATIME) == UAPI_MS_STRICTATIME) update = true;
+
+	// Default (MS_RELATIME) - update atime if it is more recent than ctime or mtime
+	else if((now >= convert<datetime>(m_handle->node->ctime.load())) || (now >= convert<datetime>(m_handle->node->mtime.load()))) update = true;
+
+	// Update the access time if necessary
+	if(update) m_handle->node->atime = convert<uapi_timespec>(now);
 }
 
 //---------------------------------------------------------------------------
@@ -1737,28 +1787,10 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::SymbolicLink::OpenHandle
 	// Check that the provided mount is part of the same file system instance
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	throw LinuxException(UAPI_ELOOP);		// Can't open a symbolic link
-}
+	// todo: validate flags (both mount and handle)
 
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLink::ReadTarget
-//
-// Reads the target of the symbolic link into an output buffer
-//
-// Arguments:
-//
-//	buffer		- Buffer in which to store the link target string
-//	length		- Length of the target buffer, in bytes
-
-size_t TempFileSystem::SymbolicLink::ReadTarget(char_t* buffer, size_t length) const
-{
-	if(buffer == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Copy out the smaller of the target string length or the buffer length
-	length = std::min(m_node->target.length(), length);
-	memcpy(buffer, m_node->target.data(), length);
-
-	return length;
+	// Handles are allocated normally within the process heap
+	return std::make_unique<SymbolicLinkHandle>(std::make_shared<symlink_handle_t>(m_node), mount->Flags, flags);
 }
 
 //---------------------------------------------------------------------------
@@ -1922,6 +1954,247 @@ uapi_uid_t TempFileSystem::SymbolicLink::getUserId(void) const
 	return m_node->uid;
 }
 
+//
+// TEMPFILESYSTEM::SYMBOLICLINKHANDLE IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle Constructor
+//
+// Arguments:
+//
+//	handle		- Shared symlink_handle_t instance
+//	mountflags	- Mount-level flags
+//	flags		- Instance-specific handle flags
+
+TempFileSystem::SymbolicLinkHandle::SymbolicLinkHandle(std::shared_ptr<symlink_handle_t> const& handle, uint32_t mountflags, uint32_t flags) : 
+	m_handle(handle), m_mountflags(mountflags), m_flags(flags)
+{
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::Duplicate
+//
+// Duplicates this handle instance
+//
+// Arguments:
+//
+//	NONE
+
+std::unique_ptr<VirtualMachine::Handle> TempFileSystem::SymbolicLinkHandle::Duplicate(void) const
+{
+	return std::make_unique<TempFileSystem::SymbolicLinkHandle>(m_handle, m_mountflags, m_flags);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::getFlags
+//
+// Gets the current flags for this handle
+
+uint32_t TempFileSystem::SymbolicLinkHandle::getFlags(void) const
+{
+	return m_flags;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::getPosition
+//
+// Gets the current file position for this handle
+
+size_t TempFileSystem::SymbolicLinkHandle::getPosition(void) const
+{
+	return 0;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::Read
+//
+// Synchronously reads data from the underlying node into a buffer
+//
+// Arguments:
+//
+//	buffer		- Pointer to the output buffer
+//	count		- Maximum number of bytes to read into the buffer
+
+size_t TempFileSystem::SymbolicLinkHandle::Read(void* buffer, size_t count)
+{
+	if(count == 0) return 0;
+	if(buffer == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	uint32_t flags = m_flags;				// Copy the currently set flags
+
+	// The handle cannot be open for write-only mode
+	if((flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
+	// Determine the number of bytes to actually read from the target string
+	count = std::min(count, m_handle->node->target.size());
+
+	// Copy the requested data from the file into the provided buffer
+	memcpy(buffer, m_handle->node->target.data(), count);
+
+	TouchAccessTime();						// Update last access time
+	return count;							// Return number of bytes read
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::ReadAt
+//
+// Synchronously reads data from the underlying node into a buffer, does not
+// change the current file position
+//
+// Arguments:
+//
+//	offset		- Offset within the file from which to read
+//	whence		- Location from which to apply the specified offset
+//	buffer		- Pointer to the output buffer
+//	count		- Maximum number of bytes to read into the buffer
+
+size_t TempFileSystem::SymbolicLinkHandle::ReadAt(ssize_t offset, int whence, void* buffer, size_t count)
+{
+	if(count == 0) return 0;
+	if(buffer == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	uint32_t flags = m_flags;				// Copy the currently set flags
+
+	// The handle cannot be open for write-only mode
+	if((flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
+	// Determine from what position to begin reading the data
+	size_t position = 0;
+	if((whence == UAPI_SEEK_SET) || (whence == UAPI_SEEK_CUR)) position = offset;
+	else if(whence == UAPI_SEEK_END) position = m_handle->node->target.size() + offset;
+	else throw LinuxException(UAPI_EINVAL);
+
+	// Determine the number of bytes to actually read from the target string
+	if(position >= m_handle->node->target.size()) return 0;
+	count = std::min(count, m_handle->node->target.size() - position);
+
+	// Copy the requested data from the target string into the provided buffer
+	memcpy(buffer, &m_handle->node->target.data()[position], count);
+
+	TouchAccessTime();						// Update last access time
+	return count;							// Return number of bytes read
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::Seek
+//
+// Changes the file position
+//
+// Arguments:
+//
+//	offset		- Offset within the file to set the new position
+//	whence		- Location from which to apply the specified offset
+
+size_t TempFileSystem::SymbolicLinkHandle::Seek(ssize_t offset, int whence)
+{
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(whence);
+
+	throw LinuxException(UAPI_EPERM);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::Sync
+//
+// Synchronizes all metadata and data associated with the file to storage
+//
+// Arguments:
+//
+//	NONE
+
+void TempFileSystem::SymbolicLinkHandle::Sync(void) const
+{
+	// no operation
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::SyncData
+//
+// Synchronizes all data associated with the file to storage, not metadata
+//
+// Arguments:
+//
+//	NONE
+
+void TempFileSystem::SymbolicLinkHandle::SyncData(void) const
+{
+	// no operation
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::TouchAccessTime (private)
+//
+// Updates the node access time based on the mount and handle flags
+//
+// Arguments:
+//
+//	NONE
+
+void TempFileSystem::SymbolicLinkHandle::TouchAccessTime(void)
+{
+	bool			update = false;				// Flag to actually update atime
+	datetime		now = datetime::now();		// Current time as a datetime
+	uint32_t		flags = m_flags;			// Read the atomic<> flags
+
+	// There are two levels of flags that can prevent atime updates
+	if((m_mountflags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME) return;
+	if((flags & UAPI_O_NOATIME) == UAPI_O_NOATIME) return;
+
+	// Update atime if previous atime is more than 24 hours in the past (see mount(2))
+	if(now > (convert<datetime>(m_handle->node->atime.load()) + timespan::days(1))) update = true;
+
+	// MS_STRICTATIME - update atime
+	else if((m_mountflags & UAPI_MS_STRICTATIME) == UAPI_MS_STRICTATIME) update = true;
+
+	// Default (MS_RELATIME) - update atime if it is more recent than ctime or mtime
+	else if((now >= convert<datetime>(m_handle->node->ctime.load())) || (now >= convert<datetime>(m_handle->node->mtime.load()))) update = true;
+
+	// Update the access time if necessary
+	if(update) m_handle->node->atime = convert<uapi_timespec>(now);
+}
+		
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::Write
+//
+// Synchronously writes data from a buffer to the underlying node
+//
+// Arguments:
+//
+//	buffer		- Pointer to the input buffer
+//	count		- Maximum number of bytes to write from the buffer
+
+size_t TempFileSystem::SymbolicLinkHandle::Write(const void* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(count);
+
+	if(buffer == nullptr) throw LinuxException(UAPI_EFAULT);
+	throw LinuxException(UAPI_EPERM);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::WriteAt
+//
+// Synchronously writes data from a buffer to the underlying node, does not
+// change the current file position
+//
+// Arguments:
+//
+//	offset		- Offset within the file to begin writing
+//	whence		- Location from which to apply the specified offset
+//	buffer		- Pointer to the input buffer
+//	count		- Maximum number of bytes to write from the buffer
+
+size_t TempFileSystem::SymbolicLinkHandle::WriteAt(ssize_t offset, int whence, const void* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(whence);
+	UNREFERENCED_PARAMETER(count);
+
+	if(buffer == nullptr) throw LinuxException(UAPI_EFAULT);
+	throw LinuxException(UAPI_EPERM);
+}
+		
 //---------------------------------------------------------------------------
 
 #pragma warning(pop)

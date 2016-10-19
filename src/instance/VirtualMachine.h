@@ -191,11 +191,6 @@ public:
 		// Changes the file position
 		virtual size_t Seek(ssize_t offset, int whence) = 0;
 
-		// SetLength
-		//
-		// Sets the length of the file
-		virtual size_t SetLength(size_t length) = 0;
-
 		// Sync
 		//
 		// Synchronizes all metadata and data associated with the file to storage
@@ -396,6 +391,11 @@ public:
 		// Destructor
 		//
 		virtual ~File()=default;
+
+		// SetLength
+		//
+		// Sets the length of the file
+		virtual size_t SetLength(Mount const* mount, size_t length) = 0;
 	};
 
 	// SymbolicLink
@@ -406,11 +406,6 @@ public:
 		// Destructor
 		//
 		virtual ~SymbolicLink()=default;
-
-		// ReadTarget
-		//
-		// Reads the target of the symbolic link
-		virtual size_t ReadTarget(char_t* buffer, size_t length) const = 0;
 
 		// Target
 		//

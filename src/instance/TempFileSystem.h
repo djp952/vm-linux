@@ -518,6 +518,35 @@ private:
 		symlink_node_t& operator=(symlink_node_t const&)=delete;
 	};
 
+	// symlink_handle_t
+	//
+	// Internal shared representation of a symbolic link handle
+	class symlink_handle_t
+	{
+	public:
+
+		// Instance Constructor
+		//
+		symlink_handle_t(std::shared_ptr<symlink_node_t> const& symlinknode);
+
+		// Destructor
+		//
+		~symlink_handle_t()=default;
+
+		//-------------------------------------------------------------------
+		// Fields
+
+		// node
+		//
+		// Shared pointer to the referenced node instance
+		std::shared_ptr<symlink_node_t> const node;
+
+	private:
+
+		symlink_handle_t(symlink_handle_t const&)=delete;
+		symlink_handle_t& operator=(symlink_handle_t const&)=delete;
+	};
+
 	// Directory
 	//
 	// Implements a directory node for this file system
@@ -697,6 +726,11 @@ private:
 		// Changes the owner group id for this node
 		virtual uapi_gid_t SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid) override;
 
+		// SetLength (VirtualMachine::File)
+		//
+		// Sets the length of the file
+		virtual size_t SetLength(VirtualMachine::Mount const* mount, size_t length) override;
+
 		// SetMode (VirtualMachine::Node)
 		//
 		// Changes the mode flags for this node
@@ -777,7 +811,7 @@ private:
 
 		// Instance Constructor
 		//
-		FileHandle(std::shared_ptr<file_handle_t> const& handle, uint32_t flags);
+		FileHandle(std::shared_ptr<file_handle_t> const& handle, uint32_t mountflags, uint32_t flags);
 
 		// Destructor
 		//
@@ -805,11 +839,6 @@ private:
 		//
 		// Changes the file position
 		virtual size_t Seek(ssize_t offset, int whence) override;
-
-		// SetLength (VirtualMachine::Handle)
-		//
-		// Sets the length of the file
-		virtual size_t SetLength(size_t length) override;
 
 		// Sync (VirtualMachine::Handle)
 		//
@@ -859,11 +888,17 @@ private:
 		// Generates an adjusted handle position based on a delta and starting location
 		size_t AdjustPosition(sync::reader_writer_lock::scoped_lock const& lock, ssize_t delta, int whence) const;
 
+		// TouchAccessTime
+		//
+		// Updates the node access time based on the mount and handle flags
+		void TouchAccessTime(void);
+
 		//-------------------------------------------------------------------
 		// Member Variables
 
-		std::shared_ptr<file_handle_t>	m_handle;	// Shared handle instance
-		std::atomic<uint32_t>			m_flags;	// Handle flags
+		std::shared_ptr<file_handle_t>	m_handle;		// Shared handle instance
+		uint32_t const					m_mountflags;	// Mount-level flags
+		std::atomic<uint32_t>			m_flags;		// Handle flags
 	};
 
 	// Mount
@@ -948,11 +983,6 @@ private:
 		//
 		// Opens a handle against this node
 		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
-
-		// ReadTarget (VirtualMachine::SymbolicLink)
-		//
-		// Reads the target of the symbolic link
-		virtual size_t ReadTarget(char_t* buffer, size_t length) const override;
 
 		// SetAccessTime (VirtualMachine::Node)
 		//
@@ -1044,6 +1074,100 @@ private:
 		// Member Variables
 
 		std::shared_ptr<symlink_node_t>		m_node;		// Shared node instance
+	};
+
+	// SymbolicLinkHandle
+	//
+	// Implements VirtualMachine::Handle
+	class SymbolicLinkHandle : public VirtualMachine::Handle
+	{
+	public:
+
+		// Instance Constructor
+		//
+		SymbolicLinkHandle(std::shared_ptr<symlink_handle_t> const& handle, uint32_t mountflags, uint32_t flags);
+
+		// Destructor
+		//
+		~SymbolicLinkHandle()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// Duplicate (VirtualMachine::Handle)
+		//
+		// Creates a duplicate Handle instance
+		virtual std::unique_ptr<VirtualMachine::Handle> Duplicate(void) const override;
+
+		// Read (VirtualMachine::Handle)
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t Read(void* buffer, size_t count) override;
+
+		// ReadAt (VirtualMachine::Handle)
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t ReadAt(ssize_t offset, int whence, void* buffer, size_t count) override;
+
+		// Seek (VirtualMachine::Handle)
+		//
+		// Changes the file position
+		virtual size_t Seek(ssize_t offset, int whence) override;
+
+		// Sync (VirtualMachine::Handle)
+		//
+		// Synchronizes all metadata and data associated with the file to storage
+		virtual void Sync(void) const override;
+
+		// SyncData (VirtualMachine::Handle)
+		//
+		// Synchronizes all data associated with the file to storage, not metadata
+		virtual void SyncData(void) const override;
+
+		// Write (VirtualMachine::Handle)
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t Write(const void* buffer, size_t count) override;
+
+		// WriteAt (VirtualMachine::Handle)
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t WriteAt(ssize_t offset, int whence, const void* buffer, size_t count) override;
+
+		//-------------------------------------------------------------------
+		// Properties
+
+		// Flags (VirtualMachine::Handle)
+		//
+		// Gets the handle flags
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const override;
+
+		// Position (VirtualMachine::Handle)
+		//
+		// Gets the current file position for this handle
+		__declspec(property(get=getPosition)) size_t Position;
+		virtual size_t getPosition(void) const override;
+
+	private:
+
+		SymbolicLinkHandle(SymbolicLinkHandle const&)=delete;
+		SymbolicLinkHandle& operator=(SymbolicLinkHandle const&)=delete;
+
+		//-------------------------------------------------------------------
+		// Private Member Functions
+
+		// TouchAccessTime
+		//
+		// Updates the node access time based on the mount and handle flags
+		void TouchAccessTime(void);
+
+		//-------------------------------------------------------------------
+		// Member Variables
+
+		std::shared_ptr<symlink_handle_t>	m_handle;		// Shared handle instance
+		uint32_t const						m_mountflags;	// Mount-level flags
+		std::atomic<uint32_t>				m_flags;		// Handle flags
 	};
 
 	//-----------------------------------------------------------------------
