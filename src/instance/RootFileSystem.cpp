@@ -136,31 +136,10 @@ RootFileSystem::node_t::node_t(std::shared_ptr<RootFileSystem> const& filesystem
 //
 //	node		- Shared Node instance
 
-RootFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : m_node(node)
+RootFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : Node(node)
 {
-	_ASSERTE(m_node);
 }
 
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::getAccessTime
-//
-// Gets the access time of the node
-
-uapi_timespec RootFileSystem::Directory::getAccessTime(void) const
-{
-	return m_node->atime;
-}
-
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::getChangeTime
-//
-// Gets the change time of the node
-
-uapi_timespec RootFileSystem::Directory::getChangeTime(void) const
-{
-	return m_node->ctime;
-}
-		
 //---------------------------------------------------------------------------
 // RootFileSystem::Directory::CreateDirectory
 //
@@ -256,26 +235,6 @@ std::unique_ptr<VirtualMachine::SymbolicLink> RootFileSystem::Directory::CreateS
 	throw LinuxException(UAPI_EPERM);
 }
 
-//-----------------------------------------------------------------------------
-// RootFileSystem::Directory::getGroupId
-//
-// Gets the currently set owner group identifier for the directory
-
-uapi_gid_t RootFileSystem::Directory::getGroupId(void) const
-{
-	return m_node->gid;
-}
-
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::getIndex
-//
-// Gets the node index within the file system (inode number)
-
-intptr_t RootFileSystem::Directory::getIndex(void) const
-{
-	return m_node->index;
-}
-
 //---------------------------------------------------------------------------
 // RootFileSystem::Directory::LinkNode
 //
@@ -320,187 +279,6 @@ std::unique_ptr<VirtualMachine::Node> RootFileSystem::Directory::Lookup(VirtualM
 }
 
 //---------------------------------------------------------------------------
-// RootFileSystem::Directory::getMode
-//
-// Gets the type and permissions mask for the node
-
-uapi_mode_t RootFileSystem::Directory::getMode(void) const
-{
-	return m_node->mode;
-}
-
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::getModificationTime
-//
-// Gets the modification time of the node
-
-uapi_timespec RootFileSystem::Directory::getModificationTime(void) const
-{
-	return m_node->mtime;
-}
-		
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::OpenHandle
-//
-// Opens a handle against this node
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform the operation
-//	flags		- Handle flags
-
-std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Directory::OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags)
-{
-	UNREFERENCED_PARAMETER(mount);
-	UNREFERENCED_PARAMETER(flags);
-
-	// todo - need DirectoryHandle object
-	return nullptr;
-}
-
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::SetAccessTime
-//
-// Changes the access time of this node
-//
-// Arugments:
-//
-//	mount		- Mount point on which to perform this operation
-//	atime		- New access time to be set
-
-uapi_timespec RootFileSystem::Directory::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	m_node->atime = atime;
-	return atime;
-}
-
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::SetChangeTime
-//
-// Changes the change time of this node
-//
-// Arugments:
-//
-//	mount		- Mount point on which to perform this operation
-//	ctime		- New change time to be set
-
-uapi_timespec RootFileSystem::Directory::SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime)
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	m_node->ctime = ctime;
-	return ctime;
-}
-
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::SetGroupId
-//
-// Changes the owner group id for this node
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform this operation
-//	gid			- New owner group id to be set
-
-uapi_gid_t RootFileSystem::Directory::SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid)
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	m_node->gid = gid;
-	m_node->ctime = convert<uapi_timespec>(datetime::now());
-
-	return gid;
-}
-
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::SetMode
-//
-// Changes the mode flags for this node
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform this operation
-//	mode		- New mode flags to be set
-
-uapi_mode_t RootFileSystem::Directory::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	// Strip out all but the permissions from the provided mode; the type
-	// cannot be changed after a node has been created
-	mode = ((mode & UAPI_S_IALLUGO) | (m_node->mode & ~UAPI_S_IALLUGO));
-
-	m_node->mode = mode;
-	m_node->ctime = convert<uapi_timespec>(datetime::now());
-
-	return mode;
-}
-
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::SetModificationTime
-//
-// Changes the modification time of this node
-//
-// Arugments:
-//
-//	mount		- Mount point on which to perform this operation
-//	mtime		- New modification time to be set
-
-uapi_timespec RootFileSystem::Directory::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	m_node->mtime = m_node->ctime = mtime;
-	return mtime;
-}
-		
-//---------------------------------------------------------------------------
-// RootFileSystem::Directory::SetUserId
-//
-// Changes the owner user id for this node
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform this operation
-//	uid			- New owner user id to be set
-
-uapi_uid_t RootFileSystem::Directory::SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid)
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	m_node->uid = uid;
-	m_node->ctime = convert<uapi_timespec>(datetime::now());
-
-	return uid;
-}
-
-//---------------------------------------------------------------------------
 // RootFileSystem::Directory::UnlinkNode
 //
 // Unlinks a child node from this directory
@@ -521,16 +299,6 @@ void RootFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, c
 
 	// RootFileSystem does not allow unlinking of child nodes
 	throw LinuxException(UAPI_EPERM);
-}
-
-//-----------------------------------------------------------------------------
-// RootFileSystem::Directory::getUserId
-//
-// Gets the currently set owner user identifier for the directory
-
-uapi_uid_t RootFileSystem::Directory::getUserId(void) const
-{
-	return m_node->uid;
 }
 
 //
@@ -620,6 +388,268 @@ uint32_t RootFileSystem::Mount::getFlags(void) const
 std::unique_ptr<VirtualMachine::Node> RootFileSystem::Mount::GetRootNode(void) const
 {
 	return std::make_unique<RootFileSystem::Directory>(m_rootdir);
+}
+
+//
+// ROOTFILESYSTEM::NODE IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node Constructor
+//
+// Arguments:
+//
+//	node		- Shared Node instance
+
+template <class _interface>
+RootFileSystem::Node<_interface>::Node(std::shared_ptr<node_t> const& node) : m_node(node)
+{
+	_ASSERTE(m_node);
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::getAccessTime
+//
+// Gets the access time of the node
+
+template <class _interface>
+uapi_timespec RootFileSystem::Node<_interface>::getAccessTime(void) const
+{
+	return m_node->atime;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::getChangeTime
+//
+// Gets the change time of the node
+
+template <class _interface>
+uapi_timespec RootFileSystem::Node<_interface>::getChangeTime(void) const
+{
+	return m_node->ctime;
+}
+		
+//-----------------------------------------------------------------------------
+// RootFileSystem::Node::getGroupId
+//
+// Gets the currently set owner group identifier for the directory
+
+template <class _interface>
+uapi_gid_t RootFileSystem::Node<_interface>::getGroupId(void) const
+{
+	return m_node->gid;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::getIndex
+//
+// Gets the node index within the file system (inode number)
+
+template <class _interface>
+intptr_t RootFileSystem::Node<_interface>::getIndex(void) const
+{
+	return m_node->index;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::getMode
+//
+// Gets the type and permissions mask for the node
+
+template <class _interface>
+uapi_mode_t RootFileSystem::Node<_interface>::getMode(void) const
+{
+	return m_node->mode;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::getModificationTime
+//
+// Gets the modification time of the node
+
+template <class _interface>
+uapi_timespec RootFileSystem::Node<_interface>::getModificationTime(void) const
+{
+	return m_node->mtime;
+}
+		
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::OpenHandle
+//
+// Opens a handle against this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	flags		- Handle flags
+
+template <class _interface>
+std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Node<_interface>::OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags)
+{
+	UNREFERENCED_PARAMETER(mount);
+	UNREFERENCED_PARAMETER(flags);
+
+	// todo - need DirectoryHandle object
+	return nullptr;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::SetAccessTime
+//
+// Changes the access time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	atime		- New access time to be set
+
+template <class _interface>
+uapi_timespec RootFileSystem::Node<_interface>::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->atime = atime;
+	return atime;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::SetChangeTime
+//
+// Changes the change time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	ctime		- New change time to be set
+
+template <class _interface>
+uapi_timespec RootFileSystem::Node<_interface>::SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->ctime = ctime;
+	return ctime;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::SetGroupId
+//
+// Changes the owner group id for this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	gid			- New owner group id to be set
+
+template <class _interface>
+uapi_gid_t RootFileSystem::Node<_interface>::SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->gid = gid;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
+
+	return gid;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::SetMode
+//
+// Changes the mode flags for this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	mode		- New mode flags to be set
+
+template <class _interface>
+uapi_mode_t RootFileSystem::Node<_interface>::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// Strip out all but the permissions from the provided mode; the type
+	// cannot be changed after a node has been created
+	mode = ((mode & UAPI_S_IALLUGO) | (m_node->mode & ~UAPI_S_IALLUGO));
+
+	m_node->mode = mode;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
+
+	return mode;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::SetModificationTime
+//
+// Changes the modification time of this node
+//
+// Arugments:
+//
+//	mount		- Mount point on which to perform this operation
+//	mtime		- New modification time to be set
+
+template <class _interface>
+uapi_timespec RootFileSystem::Node<_interface>::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->mtime = m_node->ctime = mtime;
+	return mtime;
+}
+		
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::SetUserId
+//
+// Changes the owner user id for this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	uid			- New owner user id to be set
+
+template <class _interface>
+uapi_uid_t RootFileSystem::Node<_interface>::SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	m_node->uid = uid;
+	m_node->ctime = convert<uapi_timespec>(datetime::now());
+
+	return uid;
+}
+
+//-----------------------------------------------------------------------------
+// RootFileSystem::Node::getUserId
+//
+// Gets the currently set owner user identifier for the directory
+
+template <class _interface>
+uapi_uid_t RootFileSystem::Node<_interface>::getUserId(void) const
+{
+	return m_node->uid;
 }
 
 //---------------------------------------------------------------------------

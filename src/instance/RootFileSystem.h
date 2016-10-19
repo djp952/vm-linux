@@ -174,48 +174,24 @@ private:
 		node_t& operator=(node_t const&)=delete;
 	};
 
-	// Directory
+	// Node
 	//
-	// Implements a directory node for this file system
-	class Directory : public VirtualMachine::Directory
+	// Implements VirtualMachine::Node
+	template <class _interface>
+	class Node : public _interface
 	{
 	public:
 
 		// Instance Constructor
 		//
-		Directory(std::shared_ptr<node_t> const& node);
+		Node(std::shared_ptr<node_t> const& node);
 
 		// Destructor
 		//
-		virtual ~Directory()=default;
+		virtual ~Node()=default;
 
 		//-------------------------------------------------------------------
 		// Member Functions
-
-		// CreateDirectory (VirtualMachine::Directory)
-		//
-		// Creates or opens a directory node as a child of this directory
-		virtual std::unique_ptr<VirtualMachine::Directory> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
-
-		// CreateFile (VirtualMachine::Directory)
-		//
-		// Creates or opens a regular file node as a child of this directory
-		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
-
-		// CreateSymbolicLink (VirtualMachine::Directory)
-		//
-		// Creates or opens a symbolic link as a child of this directory
-		virtual std::unique_ptr<VirtualMachine::SymbolicLink> CreateSymbolicLink(VirtualMachine::Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_uid_t gid) override;
-
-		// LinkNode (VirtualMachine::Directory)
-		//
-		// Links an existing node as a child of this directory
-		virtual void LinkNode(VirtualMachine::Mount const* mount, VirtualMachine::Node const* node, char_t const* name) override;
-
-		// Lookup (VirtualMachine::Directory)
-		//
-		// Accesses a child node of this directory by name
-		virtual std::unique_ptr<VirtualMachine::Node> Lookup(VirtualMachine::Mount const* mount, char_t const* name) const override;
 
 		// OpenHandle (VirtualMachine::Node)
 		//
@@ -251,11 +227,6 @@ private:
 		//
 		// Changes the owner user id for this node
 		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
-
-		// UnlinkNode (VirtualMachine::Directory)
-		//
-		// Unlinks a child node from this directory
-		virtual void UnlinkNode(VirtualMachine::Mount const* mount, char_t const* name) override;
 
 		//---------------------------------------------------------------------
 		// Properties
@@ -302,17 +273,71 @@ private:
 		__declspec(property(get=getUserId)) uapi_uid_t UserId;
 		virtual uapi_uid_t getUserId(void) const override;
 
-	private:
+	protected:
 
-		Directory(Directory const&)=delete;
-		Directory& operator=(Directory const&)=delete;
+		Node(Node const&)=delete;
+		Node& operator=(Node const&)=delete;
 
-		//---------------------------------------------------------------------
-		// Member Variables
+		//-------------------------------------------------------------------
+		// Protected Member Variables
 
 		std::shared_ptr<node_t>			m_node;		// Shared node instance
 	};
 
+	// Directory
+	//
+	// Implements VirtualMachine::Directory
+	class Directory : public Node<VirtualMachine::Directory>
+	{
+	public:
+
+		// Instance Constructor
+		//
+		Directory(std::shared_ptr<node_t> const& node);
+
+		// Destructor
+		//
+		virtual ~Directory()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// CreateDirectory (VirtualMachine::Directory)
+		//
+		// Creates or opens a directory node as a child of this directory
+		virtual std::unique_ptr<VirtualMachine::Directory> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+
+		// CreateFile (VirtualMachine::Directory)
+		//
+		// Creates or opens a regular file node as a child of this directory
+		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+
+		// CreateSymbolicLink (VirtualMachine::Directory)
+		//
+		// Creates or opens a symbolic link as a child of this directory
+		virtual std::unique_ptr<VirtualMachine::SymbolicLink> CreateSymbolicLink(VirtualMachine::Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_uid_t gid) override;
+
+		// LinkNode (VirtualMachine::Directory)
+		//
+		// Links an existing node as a child of this directory
+		virtual void LinkNode(VirtualMachine::Mount const* mount, VirtualMachine::Node const* node, char_t const* name) override;
+
+		// Lookup (VirtualMachine::Directory)
+		//
+		// Accesses a child node of this directory by name
+		virtual std::unique_ptr<VirtualMachine::Node> Lookup(VirtualMachine::Mount const* mount, char_t const* name) const override;
+
+		// UnlinkNode (VirtualMachine::Directory)
+		//
+		// Unlinks a child node from this directory
+		virtual void UnlinkNode(VirtualMachine::Mount const* mount, char_t const* name) override;
+
+	private:
+
+		Directory(Directory const&)=delete;
+		Directory& operator=(Directory const&)=delete;
+	};
+	
 	// Mount
 	//
 	// Implements VirtualMachine::Mount
