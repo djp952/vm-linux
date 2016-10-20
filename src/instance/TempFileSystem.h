@@ -547,10 +547,115 @@ private:
 		symlink_handle_t& operator=(symlink_handle_t const&)=delete;
 	};
 
+	// Node
+	//
+	// Implements VirtualMachine::Node
+	template <class _interface, typename _node_type>
+	class Node : public _interface
+	{
+	public:
+
+		// Instance Constructor
+		//
+		Node(std::shared_ptr<_node_type> const& node);
+
+		// Destructor
+		//
+		virtual ~Node()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// SetAccessTime (VirtualMachine::Node)
+		//
+		// Changes the access time of this node
+		virtual uapi_timespec SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime) override;
+
+		// SetChangeTime (VirtualMachine::Node)
+		//
+		// Changes the change time of this node
+		virtual uapi_timespec SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime) override;
+
+		// SetGroupId (VirtualMachine::Node)
+		//
+		// Changes the owner group id for this node
+		virtual uapi_gid_t SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid) override;
+
+		// SetMode (VirtualMachine::Node)
+		//
+		// Changes the mode flags for this node
+		virtual uapi_mode_t SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode) override;
+
+		// SetModificationTime (VirtualMachine::Node)
+		//
+		// Changes the modification time of this node
+		virtual uapi_timespec SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime) override;
+
+		// SetUserId (VirtualMachine::Node)
+		//
+		// Changes the owner user id for this node
+		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
+
+		//---------------------------------------------------------------------
+		// Properties
+
+		// AccessTime (VirtualMachine::Node)
+		//
+		// Gets the access time of the node
+		__declspec(property(get=getAccessTime)) uapi_timespec AccessTime;
+		virtual uapi_timespec getAccessTime(void) const override;
+
+		// ChangeTime (VirtualMachine::Node)
+		//
+		// Gets the change time of the node
+		__declspec(property(get=getChangeTime)) uapi_timespec ChangeTime;
+		virtual uapi_timespec getChangeTime(void) const override;
+
+		// GroupId (VirtualMachine::Node)
+		//
+		// Gets the node owner group identifier
+		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
+		virtual uapi_gid_t getGroupId(void) const override;
+
+		// Index (VirtualMachine::Node)
+		//
+		// Gets the node index within the file system (inode number)
+		__declspec(property(get=getIndex)) intptr_t Index;
+		virtual intptr_t getIndex(void) const override;
+
+		// Mode (VirtualMachine::Node)
+		//
+		// Gets the node type and permission mask for the node
+		__declspec(property(get=getMode)) uapi_mode_t Mode;
+		virtual uapi_mode_t getMode(void) const override;
+
+		// ModificationTime (VirtualMachine::Node)
+		//
+		// Gets the modification time of the node
+		__declspec(property(get=getModificationTime)) uapi_timespec ModificationTime;
+		virtual uapi_timespec getModificationTime(void) const override;
+
+		// UserId (VirtualMachine::Node)
+		//
+		// Gets the node owner user identifier 
+		__declspec(property(get=getUserId)) uapi_uid_t UserId;
+		virtual uapi_uid_t getUserId(void) const override;
+
+	protected:
+
+		Node(Node const&)=delete;
+		Node& operator=(Node const&)=delete;
+
+		//-------------------------------------------------------------------
+		// Protected Member Variables
+
+		std::shared_ptr<_node_type>		m_node;		// Shared node instance
+	};
+
 	// Directory
 	//
 	// Implements a directory node for this file system
-	class Directory : public VirtualMachine::Directory
+	class Directory : public Node<VirtualMachine::Directory, directory_node_t>
 	{
 	friend class TempFileSystem;
 	public:
@@ -596,101 +701,21 @@ private:
 		// Opens a handle against this node
 		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
 
-		// SetAccessTime (VirtualMachine::Node)
-		//
-		// Changes the access time of this node
-		virtual uapi_timespec SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime) override;
-
-		// SetChangeTime (VirtualMachine::Node)
-		//
-		// Changes the change time of this node
-		virtual uapi_timespec SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime) override;
-
-		// SetGroupId (VirtualMachine::Node)
-		//
-		// Changes the owner group id for this node
-		virtual uapi_gid_t SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid) override;
-
-		// SetMode (VirtualMachine::Node)
-		//
-		// Changes the mode flags for this node
-		virtual uapi_mode_t SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode) override;
-
-		// SetModificationTime (VirtualMachine::Node)
-		//
-		// Changes the modification time of this node
-		virtual uapi_timespec SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime) override;
-
-		// SetUserId (VirtualMachine::Node)
-		//
-		// Changes the owner user id for this node
-		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
-
 		// UnlinkNode (VirtualMachine::Directory)
 		//
 		// Unlinks a child node from this directory
 		virtual void UnlinkNode(VirtualMachine::Mount const* mount, char_t const* name) override;
 
-		//-------------------------------------------------------------------
-		// Properties
-
-		// AccessTime (VirtualMachine::Node)
-		//
-		// Gets the access time of the node
-		__declspec(property(get=getAccessTime)) uapi_timespec AccessTime;
-		virtual uapi_timespec getAccessTime(void) const override;
-
-		// ChangeTime (VirtualMachine::Node)
-		//
-		// Gets the change time of the node
-		__declspec(property(get=getChangeTime)) uapi_timespec ChangeTime;
-		virtual uapi_timespec getChangeTime(void) const override;
-
-		// GroupId (VirtualMachine::Node)
-		//
-		// Gets the node owner group identifier
-		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
-		virtual uapi_gid_t getGroupId(void) const override;
-
-		// Index (VirtualMachine::Node)
-		//
-		// Gets the node index within the file system (inode number)
-		__declspec(property(get=getIndex)) intptr_t Index;
-		virtual intptr_t getIndex(void) const override;
-
-		// Mode (VirtualMachine::Node)
-		//
-		// Gets the node type and permission mask for the node
-		__declspec(property(get=getMode)) uapi_mode_t Mode;
-		virtual uapi_mode_t getMode(void) const override;
-
-		// ModificationTime (VirtualMachine::Node)
-		//
-		// Gets the modification time of the node
-		__declspec(property(get=getModificationTime)) uapi_timespec ModificationTime;
-		virtual uapi_timespec getModificationTime(void) const override;
-
-		// UserId (VirtualMachine::Node)
-		//
-		// Gets the node owner user identifier 
-		__declspec(property(get=getUserId)) uapi_uid_t UserId;
-		virtual uapi_uid_t getUserId(void) const override;
-
 	private:
 
 		Directory(Directory const&)=delete;
 		Directory& operator=(Directory const&)=delete;
-
-		//---------------------------------------------------------------------
-		// Member Variables
-
-		std::shared_ptr<directory_node_t>	m_node;		// Shared node instance
 	};
 
 	// File
 	//
 	// Implements VirtualMachine::File
-	class File : public VirtualMachine::File
+	class File : public Node<VirtualMachine::File, file_node_t>
 	{
 	friend class TempFileSystem;
 	public:
@@ -711,95 +736,15 @@ private:
 		// Opens a handle against this node
 		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
 
-		// SetAccessTime (VirtualMachine::Node)
-		//
-		// Changes the access time of this node
-		virtual uapi_timespec SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime) override;
-
-		// SetChangeTime (VirtualMachine::Node)
-		//
-		// Changes the change time of this node
-		virtual uapi_timespec SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime) override;
-
-		// SetGroupId (VirtualMachine::Node)
-		//
-		// Changes the owner group id for this node
-		virtual uapi_gid_t SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid) override;
-
 		// SetLength (VirtualMachine::File)
 		//
 		// Sets the length of the file
 		virtual size_t SetLength(VirtualMachine::Mount const* mount, size_t length) override;
 
-		// SetMode (VirtualMachine::Node)
-		//
-		// Changes the mode flags for this node
-		virtual uapi_mode_t SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode) override;
-
-		// SetModificationTime (VirtualMachine::Node)
-		//
-		// Changes the modification time of this node
-		virtual uapi_timespec SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime) override;
-
-		// SetUserId (VirtualMachine::Node)
-		//
-		// Changes the owner user id for this node
-		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
-
-		//---------------------------------------------------------------------
-		// Properties
-
-		// AccessTime (VirtualMachine::Node)
-		//
-		// Gets the access time of the node
-		__declspec(property(get=getAccessTime)) uapi_timespec AccessTime;
-		virtual uapi_timespec getAccessTime(void) const override;
-
-		// ChangeTime (VirtualMachine::Node)
-		//
-		// Gets the change time of the node
-		__declspec(property(get=getChangeTime)) uapi_timespec ChangeTime;
-		virtual uapi_timespec getChangeTime(void) const override;
-
-		// GroupId (VirtualMachine::Node)
-		//
-		// Gets the node owner group identifier
-		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
-		virtual uapi_gid_t getGroupId(void) const override;
-
-		// Index (VirtualMachine::Node)
-		//
-		// Gets the node index within the file system (inode number)
-		__declspec(property(get=getIndex)) intptr_t Index;
-		virtual intptr_t getIndex(void) const override;
-
-		// Mode (VirtualMachine::Node)
-		//
-		// Gets the node type and permission mask for the node
-		__declspec(property(get=getMode)) uapi_mode_t Mode;
-		virtual uapi_mode_t getMode(void) const override;
-
-		// ModificationTime (VirtualMachine::Node)
-		//
-		// Gets the modification time of the node
-		__declspec(property(get=getModificationTime)) uapi_timespec ModificationTime;
-		virtual uapi_timespec getModificationTime(void) const override;
-
-		// UserId (VirtualMachine::Node)
-		//
-		// Gets the node owner user identifier 
-		__declspec(property(get=getUserId)) uapi_uid_t UserId;
-		virtual uapi_uid_t getUserId(void) const override;
-
 	private:
 
 		File(File const&)=delete;
 		File& operator=(File const&)=delete;
-
-		//-------------------------------------------------------------------
-		// Member Variables
-
-		std::shared_ptr<file_node_t>	m_node;		// Shared node instance
 	};
 
 	// FileHandle
@@ -963,7 +908,7 @@ private:
 	// SymbolicLink
 	//
 	// Implements VirtualMachine::SymbolicLink
-	class SymbolicLink : public VirtualMachine::SymbolicLink
+	class SymbolicLink : public Node<VirtualMachine::SymbolicLink, symlink_node_t>
 	{
 	friend class TempFileSystem;
 	public:
@@ -984,74 +929,8 @@ private:
 		// Opens a handle against this node
 		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
 
-		// SetAccessTime (VirtualMachine::Node)
-		//
-		// Changes the access time of this node
-		virtual uapi_timespec SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime) override;
-
-		// SetChangeTime (VirtualMachine::Node)
-		//
-		// Changes the change time of this node
-		virtual uapi_timespec SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime) override;
-
-		// SetGroupId (VirtualMachine::Node)
-		//
-		// Changes the owner group id for this node
-		virtual uapi_gid_t SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid) override;
-
-		// SetMode (VirtualMachine::Node)
-		//
-		// Changes the mode flags for this node
-		virtual uapi_mode_t SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode) override;
-
-		// SetModificationTime (VirtualMachine::Node)
-		//
-		// Changes the modification time of this node
-		virtual uapi_timespec SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime) override;
-
-		// SetUserId (VirtualMachine::Node)
-		//
-		// Changes the owner user id for this node
-		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
-
 		//---------------------------------------------------------------------
 		// Properties
-
-		// AccessTime (VirtualMachine::Node)
-		//
-		// Gets the access time of the node
-		__declspec(property(get=getAccessTime)) uapi_timespec AccessTime;
-		virtual uapi_timespec getAccessTime(void) const override;
-
-		// ChangeTime (VirtualMachine::Node)
-		//
-		// Gets the change time of the node
-		__declspec(property(get=getChangeTime)) uapi_timespec ChangeTime;
-		virtual uapi_timespec getChangeTime(void) const override;
-
-		// GroupId (VirtualMachine::Node)
-		//
-		// Gets the node owner group identifier
-		__declspec(property(get=getGroupId)) uapi_gid_t GroupId;
-		virtual uapi_gid_t getGroupId(void) const override;
-
-		// Index (VirtualMachine::Node)
-		//
-		// Gets the node index within the file system (inode number)
-		__declspec(property(get=getIndex)) intptr_t Index;
-		virtual intptr_t getIndex(void) const override;
-
-		// Mode (VirtualMachine::Node)
-		//
-		// Gets the node type and permission mask for the node
-		__declspec(property(get=getMode)) uapi_mode_t Mode;
-		virtual uapi_mode_t getMode(void) const override;
-
-		// ModificationTime (VirtualMachine::Node)
-		//
-		// Gets the modification time of the node
-		__declspec(property(get=getModificationTime)) uapi_timespec ModificationTime;
-		virtual uapi_timespec getModificationTime(void) const override;
 
 		// Target (VirtualMachine::SymbolicLink)
 		//
@@ -1059,21 +938,10 @@ private:
 		__declspec(property(get=getTarget)) char_t const* Target;
 		virtual char_t const* getTarget(void) const override;
 
-		// UserId (VirtualMachine::Node)
-		//
-		// Gets the node owner user identifier 
-		__declspec(property(get=getUserId)) uapi_uid_t UserId;
-		virtual uapi_uid_t getUserId(void) const override;
-
 	private:
 
 		SymbolicLink(SymbolicLink const&)=delete;
 		SymbolicLink& operator=(SymbolicLink const&)=delete;
-
-		//-------------------------------------------------------------------
-		// Member Variables
-
-		std::shared_ptr<symlink_node_t>		m_node;		// Shared node instance
 	};
 
 	// SymbolicLinkHandle

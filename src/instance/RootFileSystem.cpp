@@ -279,6 +279,25 @@ std::unique_ptr<VirtualMachine::Node> RootFileSystem::Directory::Lookup(VirtualM
 }
 
 //---------------------------------------------------------------------------
+// RootFileSystem::Directory::OpenHandle
+//
+// Opens a handle against this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	flags		- Handle flags
+
+std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Directory::OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags)
+{
+	UNREFERENCED_PARAMETER(mount);
+	UNREFERENCED_PARAMETER(flags);
+
+	// todo - need DirectoryHandle object
+	return nullptr;
+}
+
+//---------------------------------------------------------------------------
 // RootFileSystem::Directory::UnlinkNode
 //
 // Unlinks a child node from this directory
@@ -401,8 +420,8 @@ std::unique_ptr<VirtualMachine::Node> RootFileSystem::Mount::GetRootNode(void) c
 //
 //	node		- Shared Node instance
 
-template <class _interface>
-RootFileSystem::Node<_interface>::Node(std::shared_ptr<node_t> const& node) : m_node(node)
+template <class _interface, typename _node_type>
+RootFileSystem::Node<_interface, _node_type>::Node(std::shared_ptr<_node_type> const& node) : m_node(node)
 {
 	_ASSERTE(m_node);
 }
@@ -412,8 +431,8 @@ RootFileSystem::Node<_interface>::Node(std::shared_ptr<node_t> const& node) : m_
 //
 // Gets the access time of the node
 
-template <class _interface>
-uapi_timespec RootFileSystem::Node<_interface>::getAccessTime(void) const
+template <class _interface, typename _node_type>
+uapi_timespec RootFileSystem::Node<_interface, _node_type>::getAccessTime(void) const
 {
 	return m_node->atime;
 }
@@ -423,8 +442,8 @@ uapi_timespec RootFileSystem::Node<_interface>::getAccessTime(void) const
 //
 // Gets the change time of the node
 
-template <class _interface>
-uapi_timespec RootFileSystem::Node<_interface>::getChangeTime(void) const
+template <class _interface, typename _node_type>
+uapi_timespec RootFileSystem::Node<_interface, _node_type>::getChangeTime(void) const
 {
 	return m_node->ctime;
 }
@@ -434,8 +453,8 @@ uapi_timespec RootFileSystem::Node<_interface>::getChangeTime(void) const
 //
 // Gets the currently set owner group identifier for the directory
 
-template <class _interface>
-uapi_gid_t RootFileSystem::Node<_interface>::getGroupId(void) const
+template <class _interface, typename _node_type>
+uapi_gid_t RootFileSystem::Node<_interface, _node_type>::getGroupId(void) const
 {
 	return m_node->gid;
 }
@@ -445,8 +464,8 @@ uapi_gid_t RootFileSystem::Node<_interface>::getGroupId(void) const
 //
 // Gets the node index within the file system (inode number)
 
-template <class _interface>
-intptr_t RootFileSystem::Node<_interface>::getIndex(void) const
+template <class _interface, typename _node_type>
+intptr_t RootFileSystem::Node<_interface, _node_type>::getIndex(void) const
 {
 	return m_node->index;
 }
@@ -456,8 +475,8 @@ intptr_t RootFileSystem::Node<_interface>::getIndex(void) const
 //
 // Gets the type and permissions mask for the node
 
-template <class _interface>
-uapi_mode_t RootFileSystem::Node<_interface>::getMode(void) const
+template <class _interface, typename _node_type>
+uapi_mode_t RootFileSystem::Node<_interface, _node_type>::getMode(void) const
 {
 	return m_node->mode;
 }
@@ -467,32 +486,12 @@ uapi_mode_t RootFileSystem::Node<_interface>::getMode(void) const
 //
 // Gets the modification time of the node
 
-template <class _interface>
-uapi_timespec RootFileSystem::Node<_interface>::getModificationTime(void) const
+template <class _interface, typename _node_type>
+uapi_timespec RootFileSystem::Node<_interface, _node_type>::getModificationTime(void) const
 {
 	return m_node->mtime;
 }
 		
-//---------------------------------------------------------------------------
-// RootFileSystem::Node::OpenHandle
-//
-// Opens a handle against this node
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform the operation
-//	flags		- Handle flags
-
-template <class _interface>
-std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Node<_interface>::OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags)
-{
-	UNREFERENCED_PARAMETER(mount);
-	UNREFERENCED_PARAMETER(flags);
-
-	// todo - need DirectoryHandle object
-	return nullptr;
-}
-
 //---------------------------------------------------------------------------
 // RootFileSystem::Node::SetAccessTime
 //
@@ -503,8 +502,8 @@ std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Node<_interface>::OpenHa
 //	mount		- Mount point on which to perform this operation
 //	atime		- New access time to be set
 
-template <class _interface>
-uapi_timespec RootFileSystem::Node<_interface>::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
+template <class _interface, typename _node_type>
+uapi_timespec RootFileSystem::Node<_interface, _node_type>::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -526,8 +525,8 @@ uapi_timespec RootFileSystem::Node<_interface>::SetAccessTime(VirtualMachine::Mo
 //	mount		- Mount point on which to perform this operation
 //	ctime		- New change time to be set
 
-template <class _interface>
-uapi_timespec RootFileSystem::Node<_interface>::SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime)
+template <class _interface, typename _node_type>
+uapi_timespec RootFileSystem::Node<_interface, _node_type>::SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -549,8 +548,8 @@ uapi_timespec RootFileSystem::Node<_interface>::SetChangeTime(VirtualMachine::Mo
 //	mount		- Mount point on which to perform this operation
 //	gid			- New owner group id to be set
 
-template <class _interface>
-uapi_gid_t RootFileSystem::Node<_interface>::SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid)
+template <class _interface, typename _node_type>
+uapi_gid_t RootFileSystem::Node<_interface, _node_type>::SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -574,8 +573,8 @@ uapi_gid_t RootFileSystem::Node<_interface>::SetGroupId(VirtualMachine::Mount co
 //	mount		- Mount point on which to perform this operation
 //	mode		- New mode flags to be set
 
-template <class _interface>
-uapi_mode_t RootFileSystem::Node<_interface>::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
+template <class _interface, typename _node_type>
+uapi_mode_t RootFileSystem::Node<_interface, _node_type>::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -603,8 +602,8 @@ uapi_mode_t RootFileSystem::Node<_interface>::SetMode(VirtualMachine::Mount cons
 //	mount		- Mount point on which to perform this operation
 //	mtime		- New modification time to be set
 
-template <class _interface>
-uapi_timespec RootFileSystem::Node<_interface>::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
+template <class _interface, typename _node_type>
+uapi_timespec RootFileSystem::Node<_interface, _node_type>::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -626,8 +625,8 @@ uapi_timespec RootFileSystem::Node<_interface>::SetModificationTime(VirtualMachi
 //	mount		- Mount point on which to perform this operation
 //	uid			- New owner user id to be set
 
-template <class _interface>
-uapi_uid_t RootFileSystem::Node<_interface>::SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid)
+template <class _interface, typename _node_type>
+uapi_uid_t RootFileSystem::Node<_interface, _node_type>::SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -646,8 +645,8 @@ uapi_uid_t RootFileSystem::Node<_interface>::SetUserId(VirtualMachine::Mount con
 //
 // Gets the currently set owner user identifier for the directory
 
-template <class _interface>
-uapi_uid_t RootFileSystem::Node<_interface>::getUserId(void) const
+template <class _interface, typename _node_type>
+uapi_uid_t RootFileSystem::Node<_interface, _node_type>::getUserId(void) const
 {
 	return m_node->uid;
 }

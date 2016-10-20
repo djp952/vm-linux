@@ -177,14 +177,14 @@ private:
 	// Node
 	//
 	// Implements VirtualMachine::Node
-	template <class _interface>
+	template <class _interface, typename _node_type>
 	class Node : public _interface
 	{
 	public:
 
 		// Instance Constructor
 		//
-		Node(std::shared_ptr<node_t> const& node);
+		Node(std::shared_ptr<_node_type> const& node);
 
 		// Destructor
 		//
@@ -192,11 +192,6 @@ private:
 
 		//-------------------------------------------------------------------
 		// Member Functions
-
-		// OpenHandle (VirtualMachine::Node)
-		//
-		// Opens a handle against this node
-		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
 
 		// SetAccessTime (VirtualMachine::Node)
 		//
@@ -281,13 +276,13 @@ private:
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<node_t>			m_node;		// Shared node instance
+		std::shared_ptr<_node_type>		m_node;		// Shared node instance
 	};
 
 	// Directory
 	//
 	// Implements VirtualMachine::Directory
-	class Directory : public Node<VirtualMachine::Directory>
+	class Directory : public Node<VirtualMachine::Directory, node_t>
 	{
 	public:
 
@@ -326,6 +321,11 @@ private:
 		//
 		// Accesses a child node of this directory by name
 		virtual std::unique_ptr<VirtualMachine::Node> Lookup(VirtualMachine::Mount const* mount, char_t const* name) const override;
+
+		// OpenHandle (VirtualMachine::Node)
+		//
+		// Opens a handle against this node
+		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
 
 		// UnlinkNode (VirtualMachine::Directory)
 		//
