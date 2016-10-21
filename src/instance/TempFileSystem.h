@@ -442,40 +442,6 @@ private:
 		file_node_t& operator=(file_node_t const&)=delete;
 	};
 
-	// file_handle_t
-	//
-	// Internal shared representation of a file handle
-	class file_handle_t
-	{
-	public:
-
-		// Instance Constructor
-		//
-		file_handle_t(std::shared_ptr<file_node_t> const& filenode);
-
-		// Destructor
-		//
-		~file_handle_t()=default;
-
-		//-------------------------------------------------------------------
-		// Fields
-
-		// node
-		//
-		// Shared pointer to the referenced node instance
-		std::shared_ptr<file_node_t> const node;
-
-		// position
-		//
-		// Current file pointer
-		std::atomic<size_t> position;
-
-	private:
-
-		file_handle_t(file_handle_t const&)=delete;
-		file_handle_t& operator=(file_handle_t const&)=delete;
-	};
-
 	// symlink_node_t
 	//
 	// Specialization of node_t for symbolic link nodes
@@ -516,35 +482,6 @@ private:
 
 		symlink_node_t(symlink_node_t const&)=delete;
 		symlink_node_t& operator=(symlink_node_t const&)=delete;
-	};
-
-	// symlink_handle_t
-	//
-	// Internal shared representation of a symbolic link handle
-	class symlink_handle_t
-	{
-	public:
-
-		// Instance Constructor
-		//
-		symlink_handle_t(std::shared_ptr<symlink_node_t> const& symlinknode);
-
-		// Destructor
-		//
-		~symlink_handle_t()=default;
-
-		//-------------------------------------------------------------------
-		// Fields
-
-		// node
-		//
-		// Shared pointer to the referenced node instance
-		std::shared_ptr<symlink_node_t> const node;
-
-	private:
-
-		symlink_handle_t(symlink_handle_t const&)=delete;
-		symlink_handle_t& operator=(symlink_handle_t const&)=delete;
 	};
 
 	// Node
@@ -595,6 +532,16 @@ private:
 		//
 		// Changes the owner user id for this node
 		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
+
+		// Sync (VirtualMachine::Node)
+		//
+		// Synchronizes all metadata and data associated with the file to storage
+		virtual void Sync(VirtualMachine::Mount const* mount) const override;
+
+		// SyncData (VirtualMachine::Node)
+		//
+		// Synchronizes all data associated with the file to storage, not metadata
+		virtual void SyncData(VirtualMachine::Mount const* mount) const override;
 
 		//---------------------------------------------------------------------
 		// Properties
@@ -696,15 +643,34 @@ private:
 		// Accesses a child node of this directory by name
 		virtual std::unique_ptr<VirtualMachine::Node> Lookup(VirtualMachine::Mount const* mount, char_t const* name) const override;
 
-		// OpenHandle (VirtualMachine::Node)
+		// Read (VirtualMachine::Node)
 		//
-		// Opens a handle against this node
-		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
+		// Reads data from the node at the specified position
+		virtual size_t Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count) override;
+
+		// SetLength (VirtualMachine::Node)
+		//
+		// Sets the length of the node data
+		virtual size_t SetLength(VirtualMachine::Mount const* mount, size_t length) override;
 
 		// UnlinkNode (VirtualMachine::Directory)
 		//
 		// Unlinks a child node from this directory
 		virtual void UnlinkNode(VirtualMachine::Mount const* mount, char_t const* name) override;
+
+		// Write (VirtualMachine::Node)
+		//
+		// Writes data into the node at the specified position
+		virtual size_t Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count) override;
+
+		//-------------------------------------------------------------------
+		// Properties
+
+		// Length (VirtualMachine::Node)
+		//
+		// Gets the length of the node data
+		__declspec(property(get=getLength)) size_t Length;
+		virtual size_t getLength(void) const override;
 
 	private:
 
@@ -731,119 +697,34 @@ private:
 		//-------------------------------------------------------------------
 		// Member Functions
 
-		// OpenHandle (VirtualMachine::Node)
+		// Read (VirtualMachine::Node)
 		//
-		// Opens a handle against this node
-		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
+		// Reads data from the node at the specified position
+		virtual size_t Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count) override;
 
-		// SetLength (VirtualMachine::File)
+		// SetLength (VirtualMachine::Node)
 		//
 		// Sets the length of the file
 		virtual size_t SetLength(VirtualMachine::Mount const* mount, size_t length) override;
+
+		// Write (VirtualMachine::Node)
+		//
+		// Writes data into the node at the specified position
+		virtual size_t Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count) override;
+
+		//-------------------------------------------------------------------
+		// Properties
+
+		// Length (VirtualMachine::Node)
+		//
+		// Gets the length of the node data
+		__declspec(property(get=getLength)) size_t Length;
+		virtual size_t getLength(void) const override;
 
 	private:
 
 		File(File const&)=delete;
 		File& operator=(File const&)=delete;
-	};
-
-	// FileHandle
-	//
-	// Implements VirtualMachine::Handle
-	class FileHandle : public VirtualMachine::Handle
-	{
-	public:
-
-		// Instance Constructor
-		//
-		FileHandle(std::shared_ptr<file_handle_t> const& handle, uint32_t mountflags, uint32_t flags);
-
-		// Destructor
-		//
-		~FileHandle()=default;
-
-		//-------------------------------------------------------------------
-		// Member Functions
-
-		// Duplicate (VirtualMachine::Handle)
-		//
-		// Creates a duplicate Handle instance
-		virtual std::unique_ptr<VirtualMachine::Handle> Duplicate(void) const override;
-
-		// Read (VirtualMachine::Handle)
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t Read(void* buffer, size_t count) override;
-
-		// ReadAt (VirtualMachine::Handle)
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t ReadAt(ssize_t offset, int whence, void* buffer, size_t count) override;
-
-		// Seek (VirtualMachine::Handle)
-		//
-		// Changes the file position
-		virtual size_t Seek(ssize_t offset, int whence) override;
-
-		// Sync (VirtualMachine::Handle)
-		//
-		// Synchronizes all metadata and data associated with the file to storage
-		virtual void Sync(void) const override;
-
-		// SyncData (VirtualMachine::Handle)
-		//
-		// Synchronizes all data associated with the file to storage, not metadata
-		virtual void SyncData(void) const override;
-
-		// Write (VirtualMachine::Handle)
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t Write(const void* buffer, size_t count) override;
-
-		// WriteAt (VirtualMachine::Handle)
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t WriteAt(ssize_t offset, int whence, const void* buffer, size_t count) override;
-
-		//-------------------------------------------------------------------
-		// Properties
-
-		// Flags (VirtualMachine::Handle)
-		//
-		// Gets the handle flags
-		__declspec(property(get=getFlags)) uint32_t Flags;
-		virtual uint32_t getFlags(void) const override;
-
-		// Position (VirtualMachine::Handle)
-		//
-		// Gets the current file position for this handle
-		__declspec(property(get=getPosition)) size_t Position;
-		virtual size_t getPosition(void) const override;
-
-	private:
-
-		FileHandle(FileHandle const&)=delete;
-		FileHandle& operator=(FileHandle const&)=delete;
-
-		//-------------------------------------------------------------------
-		// Private Member Functions
-
-		// AdjustPosition
-		//
-		// Generates an adjusted handle position based on a delta and starting location
-		size_t AdjustPosition(sync::reader_writer_lock::scoped_lock const& lock, ssize_t delta, int whence) const;
-
-		// TouchAccessTime
-		//
-		// Updates the node access time based on the mount and handle flags
-		void TouchAccessTime(void);
-
-		//-------------------------------------------------------------------
-		// Member Variables
-
-		std::shared_ptr<file_handle_t>	m_handle;		// Shared handle instance
-		uint32_t const					m_mountflags;	// Mount-level flags
-		std::atomic<uint32_t>			m_flags;		// Handle flags
 	};
 
 	// Mount
@@ -924,13 +805,29 @@ private:
 		//-------------------------------------------------------------------
 		// Member Functions
 
-		// OpenHandle (VirtualMachine::Node)
+		// Read (VirtualMachine::Node)
 		//
-		// Opens a handle against this node
-		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
+		// Reads data from the node at the specified position
+		virtual size_t Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count) override;
+
+		// SetLength (VirtualMachine::Node)
+		//
+		// Sets the length of the node data
+		virtual size_t SetLength(VirtualMachine::Mount const* mount, size_t length) override;
+
+		// Write (VirtualMachine::Node)
+		//
+		// Writes data into the node at the specified position
+		virtual size_t Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count) override;
 
 		//---------------------------------------------------------------------
 		// Properties
+
+		// Length (VirtualMachine::Node)
+		//
+		// Gets the length of the node data
+		__declspec(property(get=getLength)) size_t Length;
+		virtual size_t getLength(void) const override;
 
 		// Target (VirtualMachine::SymbolicLink)
 		//
@@ -942,100 +839,6 @@ private:
 
 		SymbolicLink(SymbolicLink const&)=delete;
 		SymbolicLink& operator=(SymbolicLink const&)=delete;
-	};
-
-	// SymbolicLinkHandle
-	//
-	// Implements VirtualMachine::Handle
-	class SymbolicLinkHandle : public VirtualMachine::Handle
-	{
-	public:
-
-		// Instance Constructor
-		//
-		SymbolicLinkHandle(std::shared_ptr<symlink_handle_t> const& handle, uint32_t mountflags, uint32_t flags);
-
-		// Destructor
-		//
-		~SymbolicLinkHandle()=default;
-
-		//-------------------------------------------------------------------
-		// Member Functions
-
-		// Duplicate (VirtualMachine::Handle)
-		//
-		// Creates a duplicate Handle instance
-		virtual std::unique_ptr<VirtualMachine::Handle> Duplicate(void) const override;
-
-		// Read (VirtualMachine::Handle)
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t Read(void* buffer, size_t count) override;
-
-		// ReadAt (VirtualMachine::Handle)
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t ReadAt(ssize_t offset, int whence, void* buffer, size_t count) override;
-
-		// Seek (VirtualMachine::Handle)
-		//
-		// Changes the file position
-		virtual size_t Seek(ssize_t offset, int whence) override;
-
-		// Sync (VirtualMachine::Handle)
-		//
-		// Synchronizes all metadata and data associated with the file to storage
-		virtual void Sync(void) const override;
-
-		// SyncData (VirtualMachine::Handle)
-		//
-		// Synchronizes all data associated with the file to storage, not metadata
-		virtual void SyncData(void) const override;
-
-		// Write (VirtualMachine::Handle)
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t Write(const void* buffer, size_t count) override;
-
-		// WriteAt (VirtualMachine::Handle)
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t WriteAt(ssize_t offset, int whence, const void* buffer, size_t count) override;
-
-		//-------------------------------------------------------------------
-		// Properties
-
-		// Flags (VirtualMachine::Handle)
-		//
-		// Gets the handle flags
-		__declspec(property(get=getFlags)) uint32_t Flags;
-		virtual uint32_t getFlags(void) const override;
-
-		// Position (VirtualMachine::Handle)
-		//
-		// Gets the current file position for this handle
-		__declspec(property(get=getPosition)) size_t Position;
-		virtual size_t getPosition(void) const override;
-
-	private:
-
-		SymbolicLinkHandle(SymbolicLinkHandle const&)=delete;
-		SymbolicLinkHandle& operator=(SymbolicLinkHandle const&)=delete;
-
-		//-------------------------------------------------------------------
-		// Private Member Functions
-
-		// TouchAccessTime
-		//
-		// Updates the node access time based on the mount and handle flags
-		void TouchAccessTime(void);
-
-		//-------------------------------------------------------------------
-		// Member Variables
-
-		std::shared_ptr<symlink_handle_t>	m_handle;		// Shared handle instance
-		uint32_t const						m_mountflags;	// Mount-level flags
-		std::atomic<uint32_t>				m_flags;		// Handle flags
 	};
 
 	//-----------------------------------------------------------------------

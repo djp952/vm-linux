@@ -59,6 +59,8 @@ public:
 	// Instance Constructors
 	//
 	Namespace(std::unique_ptr<VirtualMachine::Mount>&& rootmount);
+
+	// todo: shouldn't this be a Duplicate() or Clone() function?
 	Namespace(Namespace const* rhs, uint32_t flags);
 
 	// Destructor

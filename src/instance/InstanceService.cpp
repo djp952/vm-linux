@@ -147,17 +147,19 @@ void InstanceService::LoadInitialRamFileSystem(Namespace const* ns, Namespace::P
 			node->SetLength(branchpath->Mount, file.Data.Length);
 
 			// Extract the data from the CPIO archive into the target file instance
-			auto handle = node->OpenHandle(branchpath->Mount, UAPI_O_RDWR);
+			size_t offset = 0;
 			std::vector<uint8_t> buffer(SystemInformation::PageSize << 2);
+
 			auto read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2);
 			while(read) {
 
-				handle->Write(&buffer[0], read);
+				offset += node->Write(branchpath->Mount, offset, &buffer[0], read);
 				read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2);
 			}
 
 			// Set the node's attributes to match those speciifed in the CPIO archive
 			SetNodeAttributes(branchpath->Mount, node.get(), file);
+			node->Sync(branchpath->Mount);
 		}
 
 		// S_IFLNK - Create and/or replace the target symbolic link
@@ -171,6 +173,7 @@ void InstanceService::LoadInitialRamFileSystem(Namespace const* ns, Namespace::P
 			// Attempt to create the target symbolic link node object in the file system
 			auto node = branchdir->CreateSymbolicLink(branchpath->Mount, filepath.leaf(), target.get(), file.UserId, file.GroupId);
 			SetNodeAttributes(branchpath->Mount, node.get(), file);
+			node->Sync(branchpath->Mount);
 		}
 	});
 }

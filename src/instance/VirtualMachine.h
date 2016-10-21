@@ -162,67 +162,67 @@ public:
 		virtual ~FileSystem()=default;
 	};
 
-	// Handle
-	//
-	// Interface that must be implemented by a file system handle
-	struct Handle
-	{
-		// Destructor
-		//
-		virtual ~Handle()=default;
+	//// Handle
+	////
+	//// Interface that must be implemented by a file system handle
+	//struct Handle
+	//{
+	//	// Destructor
+	//	//
+	//	virtual ~Handle()=default;
 
-		// Duplicate
-		//
-		// Creates a duplicate Handle instance
-		virtual std::unique_ptr<Handle> Duplicate(void) const = 0;
+	//	// Duplicate
+	//	//
+	//	// Creates a duplicate Handle instance
+	//	virtual std::unique_ptr<Handle> Duplicate(void) const = 0;
 
-		// Read
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t Read(void* buffer, size_t count) = 0;
+	//	// Read
+	//	//
+	//	// Synchronously reads data from the underlying node into a buffer
+	//	virtual size_t Read(void* buffer, size_t count) = 0;
 
-		// ReadAt
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t ReadAt(ssize_t offset, int whence, void* buffer, size_t count) = 0;
+	//	// ReadAt
+	//	//
+	//	// Synchronously reads data from the underlying node into a buffer
+	//	virtual size_t ReadAt(ssize_t offset, int whence, void* buffer, size_t count) = 0;
 
-		// Seek
-		//
-		// Changes the file position
-		virtual size_t Seek(ssize_t offset, int whence) = 0;
+	//	// Seek
+	//	//
+	//	// Changes the file position
+	//	virtual size_t Seek(ssize_t offset, int whence) = 0;
 
-		// Sync
-		//
-		// Synchronizes all metadata and data associated with the file to storage
-		virtual void Sync(void) const = 0;
+	//	// Sync
+	//	//
+	//	// Synchronizes all metadata and data associated with the file to storage
+	//	virtual void Sync(void) const = 0;
 
-		// SyncData
-		//
-		// Synchronizes all data associated with the file to storage, not metadata
-		virtual void SyncData(void) const = 0;
+	//	// SyncData
+	//	//
+	//	// Synchronizes all data associated with the file to storage, not metadata
+	//	virtual void SyncData(void) const = 0;
 
-		// Write
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t Write(const void* buffer, size_t count) = 0;
+	//	// Write
+	//	//
+	//	// Synchronously writes data from a buffer to the underlying node
+	//	virtual size_t Write(const void* buffer, size_t count) = 0;
 
-		// WriteAt
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t WriteAt(ssize_t offset, int whence, const void* buffer, size_t count) = 0;
+	//	// WriteAt
+	//	//
+	//	// Synchronously writes data from a buffer to the underlying node
+	//	virtual size_t WriteAt(ssize_t offset, int whence, const void* buffer, size_t count) = 0;
 
-		// Flags
-		//
-		// Gets the handle flags
-		__declspec(property(get=getFlags)) uint32_t Flags;
-		virtual uint32_t getFlags(void) const = 0;
+	//	// Flags
+	//	//
+	//	// Gets the handle flags
+	//	__declspec(property(get=getFlags)) uint32_t Flags;
+	//	virtual uint32_t getFlags(void) const = 0;
 
-		// Position
-		//
-		// Gets the current file position for this handle
-		__declspec(property(get=getPosition)) size_t Position;
-		virtual size_t getPosition(void) const = 0;
-	};
+	//	// Position
+	//	//
+	//	// Gets the current file position for this handle
+	//	__declspec(property(get=getPosition)) size_t Position;
+	//	virtual size_t getPosition(void) const = 0;
+	//};
 
 	// Mount
 	//
@@ -265,10 +265,13 @@ public:
 		//
 		virtual ~Node()=default;
 
-		// OpenHandle
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// Read
 		//
-		// Opens a handle against this node
-		virtual std::unique_ptr<struct Handle> OpenHandle(Mount const* mount, uint32_t flags) = 0;
+		// Reads data from the node at the specified position
+		virtual size_t Read(Mount const* mount, size_t offset, void* buffer, size_t count) = 0;
 
 		// SetAccessTime
 		//
@@ -285,6 +288,11 @@ public:
 		// Changes the owner group id for this node
 		virtual uapi_gid_t SetGroupId(Mount const* mount, uapi_gid_t gid) = 0;
 
+		// SetLength
+		//
+		// Sets the length of the node data
+		virtual size_t SetLength(Mount const* mount, size_t length) = 0;
+
 		// SetMode
 		//
 		// Changes the mode flags for this node
@@ -299,6 +307,24 @@ public:
 		//
 		// Changes the owner user id for this node
 		virtual uapi_uid_t SetUserId(Mount const* mount, uapi_uid_t uid) = 0;
+
+		// Sync
+		//
+		// Synchronizes all metadata and data associated with the file to storage
+		virtual void Sync(Mount const* mount) const = 0;
+
+		// SyncData
+		//
+		// Synchronizes all data associated with the file to storage, not metadata
+		virtual void SyncData(Mount const* mount) const = 0;
+
+		// Write
+		//
+		// Writes data into the node at the specified position
+		virtual size_t Write(Mount const* mount, size_t offset, void const* buffer, size_t count) = 0;
+
+		//-------------------------------------------------------------------
+		// Properties
 
 		// AccessTime
 		//
@@ -323,6 +349,12 @@ public:
 		// Gets the node index within the file system (inode number)
 		__declspec(property(get=getIndex)) intptr_t Index;
 		virtual intptr_t getIndex(void) const = 0;
+
+		// Length
+		//
+		// Gets the length of the node data
+		__declspec(property(get=getLength)) size_t Length;
+		virtual size_t getLength(void) const = 0;
 
 		// Mode
 		//
@@ -391,11 +423,6 @@ public:
 		// Destructor
 		//
 		virtual ~File()=default;
-
-		// SetLength
-		//
-		// Sets the length of the file
-		virtual size_t SetLength(Mount const* mount, size_t length) = 0;
 	};
 
 	// SymbolicLink

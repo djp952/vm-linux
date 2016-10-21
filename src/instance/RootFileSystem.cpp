@@ -235,6 +235,17 @@ std::unique_ptr<VirtualMachine::SymbolicLink> RootFileSystem::Directory::CreateS
 	throw LinuxException(UAPI_EPERM);
 }
 
+//-----------------------------------------------------------------------------
+// RootFileSystem::Directory::getLength
+//
+// Gets the length of the node data
+
+size_t RootFileSystem::Directory::getLength(void) const
+{
+	// There is always just . and .. available to be read
+	return sizeof(uapi_linux_dirent64) * 2;
+}
+
 //---------------------------------------------------------------------------
 // RootFileSystem::Directory::LinkNode
 //
@@ -279,22 +290,51 @@ std::unique_ptr<VirtualMachine::Node> RootFileSystem::Directory::Lookup(VirtualM
 }
 
 //---------------------------------------------------------------------------
-// RootFileSystem::Directory::OpenHandle
+// RootFileSystem::Directory::Read
 //
-// Opens a handle against this node
+// Reads data from the underlying node into a buffer
 //
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
-//	flags		- Handle flags
+//	offset		- Offset to being writing the data
+//	buffer		- Destination data output buffer
+//	count		- Maximum number of bytes to write from the buffer
 
-std::unique_ptr<VirtualMachine::Handle> RootFileSystem::Directory::OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags)
+size_t RootFileSystem::Directory::Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count)
 {
-	UNREFERENCED_PARAMETER(mount);
-	UNREFERENCED_PARAMETER(flags);
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
-	// todo - need DirectoryHandle object
-	return nullptr;
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// TODO - directory read format
+	UNREFERENCED_PARAMETER(offset);
+	return 0;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::SetLength
+//
+// Sets the length of the node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	length		- New length to assign to the file
+
+size_t RootFileSystem::Directory::SetLength(VirtualMachine::Mount const* mount, size_t length)
+{
+	UNREFERENCED_PARAMETER(length);
+
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	throw LinuxException(UAPI_EISDIR);
 }
 
 //---------------------------------------------------------------------------
@@ -318,6 +358,32 @@ void RootFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, c
 
 	// RootFileSystem does not allow unlinking of child nodes
 	throw LinuxException(UAPI_EPERM);
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::Write
+//
+// Writes data into the node at the specified position
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	offset		- Offset to being writing the data
+//	buffer		- Source data input buffer
+//	count		- Maximum number of bytes to write from the buffer
+
+size_t RootFileSystem::Directory::Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(offset);
+
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	
+	throw LinuxException(UAPI_EISDIR);
 }
 
 //
@@ -511,8 +577,23 @@ uapi_timespec RootFileSystem::Node<_interface, _node_type>::SetAccessTime(Virtua
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->atime = atime;
-	return atime;
+	// If the mount point prevents changing the access time there is nothing to do
+	if((mount->Flags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME) return m_node->atime;
+
+	bool		update = false;							// Flag to actually update atime
+	datetime	newatime = convert<datetime>(atime);	// New access time as a datetime
+
+	// Update atime if previous atime is more than 24 hours in the past (see mount(2))
+	if(newatime > (convert<datetime>(m_node->atime.load()) + timespan::days(1))) update = true;
+
+	// MS_STRICTATIME - update atime
+	else if((mount->Flags & UAPI_MS_STRICTATIME) == UAPI_MS_STRICTATIME) update = true;
+
+	// Default (MS_RELATIME) - update atime if it is more recent than ctime or mtime
+	else if((newatime >= convert<datetime>(m_node->ctime.load())) || (newatime >= convert<datetime>(m_node->mtime.load()))) update = true;
+
+	if(update) m_node->atime = atime;				// Update access time
+	return atime;									// Return new access time
 }
 
 //---------------------------------------------------------------------------
@@ -558,8 +639,6 @@ uapi_gid_t RootFileSystem::Node<_interface, _node_type>::SetGroupId(VirtualMachi
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	m_node->gid = gid;
-	m_node->ctime = convert<uapi_timespec>(datetime::now());
-
 	return gid;
 }
 
@@ -587,8 +666,6 @@ uapi_mode_t RootFileSystem::Node<_interface, _node_type>::SetMode(VirtualMachine
 	mode = ((mode & UAPI_S_IALLUGO) | (m_node->mode & ~UAPI_S_IALLUGO));
 
 	m_node->mode = mode;
-	m_node->ctime = convert<uapi_timespec>(datetime::now());
-
 	return mode;
 }
 
@@ -635,9 +712,51 @@ uapi_uid_t RootFileSystem::Node<_interface, _node_type>::SetUserId(VirtualMachin
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	m_node->uid = uid;
-	m_node->ctime = convert<uapi_timespec>(datetime::now());
-
 	return uid;
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::Sync
+//
+// Synchronizes all metadata and data associated with the file to storage
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+
+template <class _interface, typename _node_type>
+void RootFileSystem::Node<_interface, _node_type>::Sync(VirtualMachine::Mount const* mount) const
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// This is a no-operation in RootFileSystem
+}
+
+//---------------------------------------------------------------------------
+// RootFileSystem::Node::SyncData
+//
+// Synchronizes all data associated with the file to storage, not metadata
+//
+// Arguments:
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+
+template <class _interface, typename _node_type>
+void RootFileSystem::Node<_interface, _node_type>::SyncData(VirtualMachine::Mount const* mount) const
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// This is a no-operation in RootFileSystem
 }
 
 //-----------------------------------------------------------------------------

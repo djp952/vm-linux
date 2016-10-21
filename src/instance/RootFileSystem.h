@@ -223,6 +223,16 @@ private:
 		// Changes the owner user id for this node
 		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
 
+		// Sync (VirtualMachine::Node)
+		//
+		// Synchronizes all metadata and data associated with the file to storage
+		virtual void Sync(VirtualMachine::Mount const* mount) const override;
+
+		// SyncData (VirtualMachine::Node)
+		//
+		// Synchronizes all data associated with the file to storage, not metadata
+		virtual void SyncData(VirtualMachine::Mount const* mount) const override;
+
 		//---------------------------------------------------------------------
 		// Properties
 
@@ -322,15 +332,34 @@ private:
 		// Accesses a child node of this directory by name
 		virtual std::unique_ptr<VirtualMachine::Node> Lookup(VirtualMachine::Mount const* mount, char_t const* name) const override;
 
-		// OpenHandle (VirtualMachine::Node)
+		// Read (VirtualMachine::Node)
 		//
-		// Opens a handle against this node
-		virtual std::unique_ptr<VirtualMachine::Handle> OpenHandle(VirtualMachine::Mount const* mount, uint32_t flags) override;
+		// Reads data from the node at the specified position
+		virtual size_t Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count) override;
+
+		// SetLength (VirtualMachine::Node)
+		//
+		// Sets the length of the node data
+		virtual size_t SetLength(VirtualMachine::Mount const* mount, size_t length) override;
 
 		// UnlinkNode (VirtualMachine::Directory)
 		//
 		// Unlinks a child node from this directory
 		virtual void UnlinkNode(VirtualMachine::Mount const* mount, char_t const* name) override;
+
+		// Write (VirtualMachine::Node)
+		//
+		// Writes data into the node at the specified position
+		virtual size_t Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count) override;
+
+		//-------------------------------------------------------------------
+		// Properties
+
+		// Length (VirtualMachine::Node)
+		//
+		// Gets the length of the node data
+		__declspec(property(get=getLength)) size_t Length;
+		virtual size_t getLength(void) const override;
 
 	private:
 
