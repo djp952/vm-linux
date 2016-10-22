@@ -36,6 +36,7 @@
 #include "CompressedFileReader.h"
 #include "CpioArchive.h"
 #include "Executable.h"
+#include "FileDescriptor.h"
 #include "HostFileSystem.h"
 #include "LinuxException.h"
 #include "Process.h"
@@ -80,101 +81,110 @@ InstanceService::InstanceService()
 }
 
 //---------------------------------------------------------------------------
-// InstanceService::LoadInitialRamFileSystem
+// InstanceService::ExtractInitialRamFileSystem
 //
-// Loads the contents of an initramfs file into the root file system
+// Extracts the contents of a CPIO archive file into a destination directory
 //
 // Arguments:
 //
-//	current			- Current working directory Path instance
+//	destination		- Destination directory Path instance
+//	cpioarchive		- Path to the CPIO archive to be extracted
 //	initramfs		- Path to the initramfs file to be loaded
 
-void InstanceService::LoadInitialRamFileSystem(Namespace const* ns, Namespace::Path const* current, std::tstring const& initramfs)
+void InstanceService::ExtractInitialRamFileSystem(Namespace const* ns, Namespace::Path const* destination, std::tstring const& cpioarchive)
 {
-	if(ns == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(current == nullptr) throw LinuxException(UAPI_EFAULT);
+	std::map<uint32_t, std::string>		links;				// Collection of established node links
 
-	// sets a node's attributes after it's been created from the CPIO archive
-	auto SetNodeAttributes = [](VirtualMachine::Mount const* mount, VirtualMachine::Node* node, CpioFile const& file) -> void 
+	if(ns == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(destination == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// WriteNodeData (local)
+	//
+	// Writes the contents of a CpioFile data stream into a file system node instance
+	auto WriteNodeData = [](VirtualMachine::Mount const* mount, VirtualMachine::Node* node, CpioFile const& file) -> void 
 	{ 
-		node->SetMode(mount, file.Mode);
-		node->SetUserId(mount, file.UserId);
-		node->SetGroupId(mount, file.GroupId);
-		node->SetModificationTime(mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
+		size_t offset = 0;
+		std::vector<uint8_t> buffer(SystemInformation::PageSize << 2);
+
+		// Write all of the data from the CpioFile data stream into the destination node
+		node->SetLength(mount, file.Data.Length);
+		while(auto read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2)) offset += node->Write(mount, offset, &buffer[0], read);
 	};
 
-	LogMessage(VirtualMachine::LogLevel::Informational, TEXT("Extracting initramfs archive "), initramfs.c_str());
+	LogMessage(VirtualMachine::LogLevel::Informational, TEXT("Extracting initramfs archive "), cpioarchive.c_str());
 
-	//
-	// TODO: hard links.  Check how CPIO stores them, I'm guessing multiple entries will have the same
-	// inode number and report NumLinks > 1.  Perhaps need to use a map<> that holds the enumerated inode
-	// numbers and the node that was created for it so it won't be created twice
-	//
+	// The CPIO archive may be compressed via a variety of different mechanisms; wrap in a CompressedStreamReader
+	CpioArchive::EnumerateFiles(CompressedFileReader(cpioarchive.c_str()), [&](CpioFile const& file) -> void {
 
-	// initramfs is stored in a CPIO archive that may be compressed via a variety of different
-	// mechanisms. Wrap the file itself in a generic CompressedStreamReader to handle that
-	CpioArchive::EnumerateFiles(CompressedFileReader(initramfs.c_str()), [=](CpioFile const& file) -> void {
-
-		std::tstringstream message;						// Log message stream instance
-		posix_path filepath(file.Path);					// Convert the path into a posix_path
+		// Convert the file path into a posix_path to access the branch and leaf separately
+		posix_path filepath(file.Path);
 
 		// Indicate the node being processed as an informational log message
+		std::tstringstream message;
 		message << std::setw(6) << std::setfill(TEXT(' ')) << std::oct << file.Mode << TEXT(" ") << file.Path;
 		LogMessage(VirtualMachine::LogLevel::Informational, message);
 		
-		// initramfs does not automatically create branch directory objects, they have to exist
-		auto branchpath = ns->LookupPath(current, filepath.branch(), UAPI_O_DIRECTORY);
+		// Acquire a pointer to the branch path directory node, which must already exist
+		auto branchpath = ns->LookupPath(destination, filepath.branch(), UAPI_O_DIRECTORY);
 
 		// Get a pointer to the Directory instance pointed to by the branch path
 		VirtualMachine::Directory* branchdir = dynamic_cast<VirtualMachine::Directory*>(branchpath->Node);
 		if(branchdir == nullptr) throw LinuxException(UAPI_ENOTDIR);
 
-		// S_IFDIR - Create and/or replace the target directory
-		if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
+		// Try to unlink any existing node with the same name in the destination directory
+		try { branchdir->UnlinkNode(branchpath->Mount, filepath.leaf()); }
+		catch(LinuxException const& ex) { if(ex.Code != UAPI_ENOENT) throw; }
 
-			// Attempt to create the target directory node object in the file system
-			auto node = branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), UAPI_O_CREAT, file.Mode, file.UserId, file.GroupId);
-			SetNodeAttributes(branchpath->Mount, node.get(), file);
-		}
+		// S_IFREG - Create a regular file node or hard link in the target directory
+		//
+		if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFREG) {
 
-		// S_IFREG - Create and/or replace the target file
-		else if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFREG) {
+			// If a file node with the same inode number has already been created, generate a hard
+			// link to the existing node rather than creating a new standalone regular file node
+			auto link = links.find(file.INode);
+			if(link != links.end()) {
 
-			// Attempt to create the target file node object in the file system and open a handle against it
-			auto node = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), UAPI_O_CREAT, file.Mode, file.UserId, file.GroupId);
-
-			// The file system can work more efficiently if the file size is set in advance
-			node->SetLength(branchpath->Mount, file.Data.Length);
-
-			// Extract the data from the CPIO archive into the target file instance
-			size_t offset = 0;
-			std::vector<uint8_t> buffer(SystemInformation::PageSize << 2);
-
-			auto read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2);
-			while(read) {
-
-				offset += node->Write(branchpath->Mount, offset, &buffer[0], read);
-				read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2);
+				// Create the hard link, overwrite any existing file data, and touch the modification time
+				auto existing = ns->LookupPath(destination, link->second.c_str(), UAPI_O_NOFOLLOW);
+				branchdir->LinkNode(existing->Mount, existing->Node, filepath.leaf());
+				WriteNodeData(existing->Mount, existing->Node, file);
+				existing->Node->SetModificationTime(branchpath->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
 			}
-
-			// Set the node's attributes to match those speciifed in the CPIO archive
-			SetNodeAttributes(branchpath->Mount, node.get(), file);
-			node->Sync(branchpath->Mount);
+				
+			else {
+				
+				// Create a new regular file node as a child of the branch directory and touch the modification time
+				auto node = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+				WriteNodeData(branchpath->Mount, node.get(), file);
+				node->SetModificationTime(branchpath->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
+			}
 		}
 
-		// S_IFLNK - Create and/or replace the target symbolic link
+		// S_IFDIR - Create a directory node in the target directory
+		//
+		else if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
+
+			// Create a new directory node as a child of the branch directory and touch the modification time
+			auto node = branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+			node->SetModificationTime(branchpath->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
+		}
+
+		// S_IFLNK - Create a symbolic link node in the target directory
+		//
 		else if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFLNK) {
 
-			// Convert the file data into a null terminated C-style string
+			// Convert the file data into a null terminated string to serve as the link target
 			auto target = std::make_unique<char_t[]>(file.Data.Length + 1);
 			file.Data.Read(target.get(), file.Data.Length);
 			target[file.Data.Length] = '\0';
 
-			// Attempt to create the target symbolic link node object in the file system
+			// Create a new symbolic link node as a child of the branch directory and touch the modification time
 			auto node = branchdir->CreateSymbolicLink(branchpath->Mount, filepath.leaf(), target.get(), file.UserId, file.GroupId);
-			SetNodeAttributes(branchpath->Mount, node.get(), file);
-			node->Sync(branchpath->Mount);
+			node->SetModificationTime(branchpath->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
 		}
+
+		// Store at least one valid path for every inode number that was created for making hard links
+		links.emplace(file.INode, file.Path);
 	});
 }
 	
@@ -317,7 +327,7 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 			std::tstring initrd = param_initrd;				// Pull out the param_initrd string
 
 			// Attempt to extract the contents of the initramfs archive into the root file system
-			try { LoadInitialRamFileSystem(m_rootns.get(), rootpath.get(), initrd); }
+			try { ExtractInitialRamFileSystem(m_rootns.get(), rootpath.get(), initrd); }
 			catch(std::exception& ex) { throw InitialRamFileSystemException(initrd.c_str(), ex.what()); }
 		}
 
@@ -329,9 +339,8 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 
 		try {
 			
-			// Look up the path to the init binary and attempt to open an execute handle against it
-			auto initpath = m_rootns->LookupPath(rootpath.get(), init.c_str(), 0);
-			//auto exechandle = initpath->Node->OpenExecute(...);
+			// Open a read-only file descriptor against the specified init binary/script file
+			auto initfd = std::make_unique<FileDescriptor>(m_rootns->LookupPath(rootpath.get(), init.c_str(), 0), UAPI_O_RDONLY);
 
 			//auto initexe = std::make_unique<Executable>(TEXT("D:\\Linux Stuff\\android-5.0.2_r1-x86\\root\\init"));
 			//m_initprocess = std::make_unique<Process>();

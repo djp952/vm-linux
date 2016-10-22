@@ -103,6 +103,54 @@ size_t FileDescriptor::AdjustPosition(ssize_t delta, int whence) const
 }
 
 //---------------------------------------------------------------------------
+// FileDescriptor::getAllowsExecute
+//
+// Determines if the caller has EXECUTE access to the underlying node
+
+bool FileDescriptor::getAllowsExecute(void) const
+{
+	uint32_t flags = m_flags;			// Copy the current set of flags
+	
+	// Write-only access to the node prevents execution regardless of permissions
+	if((flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) return false;
+
+	// todo - permission check
+	return true;
+}
+
+//---------------------------------------------------------------------------
+// FileDescriptor::getAllowsRead
+//
+// Determines if the caller has READ access to the underlying node
+
+bool FileDescriptor::getAllowsRead(void) const
+{
+	uint32_t flags = m_flags;			// Copy the current set of flags
+	
+	// Write-only access to the node prevents read regardless of permissions
+	if((flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) return false;
+
+	// todo - permission check
+	return true;
+}
+
+//---------------------------------------------------------------------------
+// FileDescriptor::getAllowsWrite
+//
+// Determines if the caller has WRITE access to the underlying node
+
+bool FileDescriptor::getAllowsWrite(void) const
+{
+	uint32_t flags = m_flags;			// Copy the current set of flags
+	
+	// Read-only access to the node prevents write regardless of permissions
+	if((flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) return false;
+
+	// todo - permission check
+	return true;
+}
+
+//---------------------------------------------------------------------------
 // FileDescriptor::Duplicate
 //
 // Duplicates this file descriptor

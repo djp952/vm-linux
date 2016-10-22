@@ -290,6 +290,16 @@ VirtualMachine::Mount* Namespace::Path::getMount(void) const
 }
 		
 //---------------------------------------------------------------------------
+// Namespace::Path::getName
+//
+// Gets the name of the node pointed by by this path
+
+char_t const* Namespace::Path::getName(void) const
+{
+	return m_path->name.c_str();
+}
+		
+//---------------------------------------------------------------------------
 // Namespace::Path::getNode
 //
 // Gets a pointer to the referenced node instance

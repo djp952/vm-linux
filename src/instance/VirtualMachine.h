@@ -52,7 +52,6 @@ public:
 	struct Directory;
 	struct File;
 	struct FileSystem;
-	struct Handle;
 	struct Mount;
 	struct Node;
 	struct SymbolicLink;
@@ -162,68 +161,6 @@ public:
 		virtual ~FileSystem()=default;
 	};
 
-	//// Handle
-	////
-	//// Interface that must be implemented by a file system handle
-	//struct Handle
-	//{
-	//	// Destructor
-	//	//
-	//	virtual ~Handle()=default;
-
-	//	// Duplicate
-	//	//
-	//	// Creates a duplicate Handle instance
-	//	virtual std::unique_ptr<Handle> Duplicate(void) const = 0;
-
-	//	// Read
-	//	//
-	//	// Synchronously reads data from the underlying node into a buffer
-	//	virtual size_t Read(void* buffer, size_t count) = 0;
-
-	//	// ReadAt
-	//	//
-	//	// Synchronously reads data from the underlying node into a buffer
-	//	virtual size_t ReadAt(ssize_t offset, int whence, void* buffer, size_t count) = 0;
-
-	//	// Seek
-	//	//
-	//	// Changes the file position
-	//	virtual size_t Seek(ssize_t offset, int whence) = 0;
-
-	//	// Sync
-	//	//
-	//	// Synchronizes all metadata and data associated with the file to storage
-	//	virtual void Sync(void) const = 0;
-
-	//	// SyncData
-	//	//
-	//	// Synchronizes all data associated with the file to storage, not metadata
-	//	virtual void SyncData(void) const = 0;
-
-	//	// Write
-	//	//
-	//	// Synchronously writes data from a buffer to the underlying node
-	//	virtual size_t Write(const void* buffer, size_t count) = 0;
-
-	//	// WriteAt
-	//	//
-	//	// Synchronously writes data from a buffer to the underlying node
-	//	virtual size_t WriteAt(ssize_t offset, int whence, const void* buffer, size_t count) = 0;
-
-	//	// Flags
-	//	//
-	//	// Gets the handle flags
-	//	__declspec(property(get=getFlags)) uint32_t Flags;
-	//	virtual uint32_t getFlags(void) const = 0;
-
-	//	// Position
-	//	//
-	//	// Gets the current file position for this handle
-	//	__declspec(property(get=getPosition)) size_t Position;
-	//	virtual size_t getPosition(void) const = 0;
-	//};
-
 	// Mount
 	//
 	// Interface that must be implemented by a file system mount
@@ -232,6 +169,9 @@ public:
 		// Destructor
 		//
 		virtual ~Mount()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
 
 		// Duplicate
 		//
@@ -242,6 +182,9 @@ public:
 		//
 		// Gets a pointer to the mount point root node instance
 		virtual std::unique_ptr<Node> GetRootNode(void) const = 0;
+
+		//-------------------------------------------------------------------
+		// Properties
 
 		// FileSystem
 		//
@@ -384,15 +327,18 @@ public:
 		//
 		virtual ~Directory()=default;
 
+		//-------------------------------------------------------------------
+		// Member Functions
+
 		// CreateDirectory
 		//
 		// Creates or opens a directory node as a child of this directory
-		virtual std::unique_ptr<Directory> CreateDirectory(Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
+		virtual std::unique_ptr<Directory> CreateDirectory(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 
 		// CreateFile
 		//
 		// Creates or opens a regular file node as a child of this directory
-		virtual std::unique_ptr<File> CreateFile(Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
+		virtual std::unique_ptr<File> CreateFile(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 
 		// CreateSymbolicLink
 		//
@@ -433,6 +379,9 @@ public:
 		// Destructor
 		//
 		virtual ~SymbolicLink()=default;
+
+		//-------------------------------------------------------------------
+		// Properties
 
 		// Target
 		//

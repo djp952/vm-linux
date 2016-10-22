@@ -43,13 +43,13 @@
 // File descriptors are based on a Namespace::Path to a node rather than a direct
 // pointer to the file system node since the associated mount point must also be
 // tracked and accessed to call into file system node functions
+//
+// TODO: This needs a ton more functionality; as stated above ALL file system
+// operations take place with a file descriptor and the lower level FileSystem
+// implementation only deals with mount-level permissions and flags
 
 class FileDescriptor
 {
-	// FORWARD DECLARATIONS
-	//
-	class handle_t;
-
 public:
 
 	// Instance Constructor
@@ -106,6 +106,24 @@ public:
 	//-----------------------------------------------------------------------
 	// Properties
 
+	// AllowsExecute
+	//
+	// Determines if the file descriptor allows execute access to the caller
+	__declspec(property(get=getAllowsExecute)) bool AllowsExecute;
+	bool getAllowsExecute(void) const;
+
+	// AllowsRead
+	//
+	// Determines if the file descriptor allows read access to the caller
+	__declspec(property(get=getAllowsRead)) bool AllowsRead;
+	bool getAllowsRead(void) const;
+
+	// AllowsWrite
+	//
+	// Determines if the file descriptor allows write access to the caller
+	__declspec(property(get=getAllowsWrite)) bool AllowsWrite;
+	bool getAllowsWrite(void) const;
+
 	// Flags
 	//
 	// Gets the file descriptor flags
@@ -122,6 +140,10 @@ private:
 
 	FileDescriptor(FileDescriptor const&)=delete;
 	FileDescriptor& operator=(FileDescriptor const&)=delete;
+
+	// FORWARD DECLARATIONS
+	//
+	class handle_t;
 
 	// Instance Constructor
 	//

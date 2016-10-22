@@ -150,12 +150,11 @@ RootFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : Node
 //	mount		- Mount point on which to perform the operation
 //	name		- Name to assign to the new node
 //	mode		- Initial permissions to assign to the node
-//	flags		- Flags to use when opening/creating the directory
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
 std::unique_ptr<VirtualMachine::Directory> RootFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name,
-	uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
 	UNREFERENCED_PARAMETER(mode);
 	UNREFERENCED_PARAMETER(uid);
@@ -181,13 +180,12 @@ std::unique_ptr<VirtualMachine::Directory> RootFileSystem::Directory::CreateDire
 //
 //	mount		- Mount point on which to perform the operation
 //	name		- Name to assign to the new node
-//	flags		- Flags to use when opening/creating the file
 //	mode		- Initial permissions to assign to the node
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
 std::unique_ptr<VirtualMachine::File> RootFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, char_t const* name,
-	uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
 	UNREFERENCED_PARAMETER(mode);
 	UNREFERENCED_PARAMETER(uid);
@@ -308,6 +306,9 @@ size_t RootFileSystem::Directory::Read(VirtualMachine::Mount const* mount, size_
 
 	// Check that the mount is for this file system and it's not read-only
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	//static uapi_linux_dirent64 self{};
+	//static uapi_linux_dirent64 parent{};
 
 	// TODO - directory read format
 	UNREFERENCED_PARAMETER(offset);

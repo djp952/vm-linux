@@ -53,14 +53,15 @@
 #define S_IWUGO		(S_IWUSR | S_IWGRP | S_IWOTH)
 #define S_IXUGO		(S_IXUSR | S_IXGRP | S_IXOTH)
 
-// Additional UAPI Data Types
+// linux/types.h
 //
 typedef __kernel_gid_t		gid_t;
 typedef __kernel_mode_t		mode_t;
 typedef __kernel_uid_t		uid_t;
 typedef __kernel_fsid_t		fsid_t;
 
-// todo: verify size, alignment and packing within Linux kernel
+// fs/readdir.c
+//
 struct linux_dirent {
 
 	unsigned long	d_ino;
@@ -69,7 +70,8 @@ struct linux_dirent {
 	char			d_name[1];
 };
 
-// todo: verify size, alignment and packing within Linux kernel
+// include/linux/dirent.h
+//
 struct linux_dirent64 {
 
 	__u64			d_ino;

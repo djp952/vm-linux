@@ -137,10 +137,10 @@ private:
 	//-------------------------------------------------------------------------
 	// Private Member Functions
 
-	// LoadInitialRamFileSystem
+	// ExtractInitialRamFileSystem
 	//
-	// Loads the contents of an initramfs file into the root file system
-	void LoadInitialRamFileSystem(Namespace const* ns, Namespace::Path const* current, std::tstring const& initramfs);
+	// Extracts the contents of an initramfs archive file into a destination directory
+	void ExtractInitialRamFileSystem(Namespace const* ns, Namespace::Path const* destination, std::tstring const& cpioarchive);
 	
 	// OnStart (Service)
 	//

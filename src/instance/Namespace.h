@@ -88,6 +88,12 @@ public:
 		__declspec(property(get=getMount)) VirtualMachine::Mount* Mount;
 		VirtualMachine::Mount* getMount(void) const;
 
+		// Name
+		//
+		// Accesses the name of the node referenced by this path
+		__declspec(property(get=getName)) char_t const* Name;
+		char_t const* getName(void) const;
+
 		// Node
 		//
 		// Accesses the underlying node instance

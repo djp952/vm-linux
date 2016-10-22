@@ -477,13 +477,12 @@ TempFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : Node
 //
 //	mount		- Mount point on which to perform the operation
 //	name		- Name to assign to the new directory
-//	flags		- Flags to use when opening/creating the directory
 //	mode		- Initial permissions to assign to the node
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
 std::unique_ptr<VirtualMachine::Directory> TempFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name,
-	uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
@@ -517,13 +516,12 @@ std::unique_ptr<VirtualMachine::Directory> TempFileSystem::Directory::CreateDire
 //
 //	mount		- Mount point on which to perform the operation
 //	name		- Name to assign to the new node
-//	flags		- Flags to use when opening/creating the file
 //	mode		- Initial permissions to assign to the node
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
 std::unique_ptr<VirtualMachine::File> TempFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, char_t const* name,
-	uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
@@ -701,6 +699,11 @@ size_t TempFileSystem::Directory::Read(VirtualMachine::Mount const* mount, size_
 	// Check that the mount is for this file system and it's not read-only
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
+	// Lock the nodes collection for exclusive access
+	sync::reader_writer_lock::scoped_lock_write writer(m_node->nodeslock);
+
+
+
 	// TODO - directory read format
 	UNREFERENCED_PARAMETER(offset);
 	return 0;
@@ -764,11 +767,6 @@ void TempFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, c
 
 		// If the directory is not empty, it cannot be unlinked
 		if(dir->nodes.size() > 0) throw LinuxException(UAPI_ENOTEMPTY);
-
-		// If the directory is a mount point or the root of a process, it cannot be unlinked
-		// TODO: UAPI_EBUSY is the error code -- can the file system know this since those
-		// aspects are controlled externally by the Namespace?  Probably needs to be in the
-		// system call ...
 	}
 
 	// Unlink the node by removing it from this directory; the node itself will
@@ -891,8 +889,7 @@ size_t TempFileSystem::File::Read(VirtualMachine::Mount const* mount, size_t off
 	// Copy the requested data from the file into the provided buffer
 	memcpy(buffer, &m_node->data[offset], count);
 
-	/// todo TouchAccessTime();						// Update the node access time
-	return count;							// Return number of bytes read
+	return count;
 }
 
 //---------------------------------------------------------------------------
@@ -1369,8 +1366,7 @@ size_t TempFileSystem::SymbolicLink::Read(VirtualMachine::Mount const* mount, si
 	// Copy the requested data from the target string into the provided buffer
 	memcpy(buffer, &m_node->target.data()[offset], count);
 
-	/// todo TouchAccessTime();						// Update last access time
-	return count;							// Return number of bytes read
+	return count;
 }
 
 //---------------------------------------------------------------------------
