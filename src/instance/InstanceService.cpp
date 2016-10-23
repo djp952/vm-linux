@@ -119,6 +119,19 @@ void InstanceService::ExtractInitialRamFileSystem(Namespace const* ns, Namespace
 		// Convert the file path into a posix_path to access the branch and leaf separately
 		posix_path filepath(file.Path);
 
+		// SPECIAL CASE: "."
+		//
+		// If a . entry was specified in the CPIO archive, apply the metadata to the current directory
+		if(strcmp(filepath.leaf(), ".") == 0) {
+
+			destination->Node->SetMode(destination->Mount, file.Mode);
+			destination->Node->SetUserId(destination->Mount, file.UserId);
+			destination->Node->SetGroupId(destination->Mount, file.GroupId);
+			destination->Node->SetModificationTime(destination->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
+
+			return;
+		}
+
 		// Indicate the node being processed as an informational log message
 		std::tstringstream message;
 		message << std::setw(6) << std::setfill(TEXT(' ')) << std::oct << file.Mode << TEXT(" ") << file.Path;

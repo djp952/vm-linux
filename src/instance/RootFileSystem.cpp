@@ -233,6 +233,27 @@ std::unique_ptr<VirtualMachine::SymbolicLink> RootFileSystem::Directory::CreateS
 	throw LinuxException(UAPI_EPERM);
 }
 
+//---------------------------------------------------------------------------
+// RootFileSystem::Directory::Enumerate
+//
+// Enumerates all of the entries in this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	func		- Callback function to invoke for each entry; return false to stop
+
+void RootFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func) const
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(func == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// Nothing to do -- there are no child entries in a RootFileSystem directory
+}
+
 //-----------------------------------------------------------------------------
 // RootFileSystem::Directory::getLength
 //
@@ -295,24 +316,21 @@ std::unique_ptr<VirtualMachine::Node> RootFileSystem::Directory::Lookup(VirtualM
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
-//	offset		- Offset to being writing the data
+//	offset		- Offset from which to begin reading the data
 //	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to write from the buffer
+//	count		- Maximum number of bytes to read into the buffer
 
 size_t RootFileSystem::Directory::Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count)
 {
+	UNREFERENCED_PARAMETER(offset);
+
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
 	// Check that the mount is for this file system and it's not read-only
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	//static uapi_linux_dirent64 self{};
-	//static uapi_linux_dirent64 parent{};
-
-	// TODO - directory read format
-	UNREFERENCED_PARAMETER(offset);
-	return 0;
+	throw LinuxException(UAPI_EISDIR);
 }
 
 //---------------------------------------------------------------------------
@@ -369,7 +387,7 @@ void RootFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, c
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
-//	offset		- Offset to being writing the data
+//	offset		- Offset from which to begin writing the data
 //	buffer		- Source data input buffer
 //	count		- Maximum number of bytes to write from the buffer
 

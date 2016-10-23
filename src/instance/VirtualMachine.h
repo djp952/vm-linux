@@ -90,6 +90,27 @@ public:
 		static AllocationFlags const TopDown;
 	};
 
+	// DirectoryEntry
+	//
+	// Information about a single directory entry
+	struct DirectoryEntry
+	{
+		// Index
+		//
+		// The node index (inode number)
+		intptr_t Index;
+
+		// Mode
+		//
+		// The mode flags and permission bits for the directory entry
+		uapi_mode_t Mode;
+
+		// Name
+		//
+		// The name assigned to the directory entry
+		char_t const* Name;
+	};
+
 	// LogLevel
 	//
 	// Strongly typed enumeration defining the level of a log entry
@@ -344,6 +365,11 @@ public:
 		//
 		// Creates or opens a symbolic link as a child of this directory
 		virtual std::unique_ptr<SymbolicLink> CreateSymbolicLink(Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_uid_t gid) = 0;
+
+		// Enumerate
+		//
+		// Enumerates all of the entries in this directory
+		virtual void Enumerate(Mount const* mount, std::function<bool(DirectoryEntry const&)> func) const = 0;
 
 		// LinkNode
 		//

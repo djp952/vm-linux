@@ -584,6 +584,36 @@ std::unique_ptr<VirtualMachine::SymbolicLink> TempFileSystem::Directory::CreateS
 }
 
 //---------------------------------------------------------------------------
+// TempFileSystem::Directory::Enumerate
+//
+// Enumerates all of the entries in this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	func		- Callback function to invoke for each entry; return false to stop
+
+void TempFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func) const
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(func == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Check that the mount is for this file system and it's not read-only
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// Lock the nodes collection for shared access
+	sync::reader_writer_lock::scoped_lock_read reader(m_node->nodeslock);
+
+	// There are many different formats used when reading directories from the system 
+	// call interfaces, use a caller-provided function to do the actual processing
+	for(auto const entry : m_node->nodes) {
+
+		// The callback function can return false to stop the enumeration
+		if(!func({ entry.second->index, entry.second->mode, entry.first.c_str() })) break;
+	}
+}
+
+//---------------------------------------------------------------------------
 // TempFileSystem::Directory::LinkNode
 //
 // Links an existing node as a child of this directory
@@ -687,26 +717,21 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Lookup(VirtualM
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
-//	offset		- Offset to being writing the data
+//	offset		- Offset from which to begin reading the data
 //	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to write from the buffer
+//	count		- Maximum number of bytes to read into the buffer
 
 size_t TempFileSystem::Directory::Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count)
 {
+	UNREFERENCED_PARAMETER(offset);
+
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
 	// Check that the mount is for this file system and it's not read-only
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// Lock the nodes collection for exclusive access
-	sync::reader_writer_lock::scoped_lock_write writer(m_node->nodeslock);
-
-
-
-	// TODO - directory read format
-	UNREFERENCED_PARAMETER(offset);
-	return 0;
+	throw LinuxException(UAPI_EISDIR);
 }
 
 //---------------------------------------------------------------------------
@@ -782,7 +807,7 @@ void TempFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, c
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
-//	offset		- Offset to being writing the data
+//	offset		- Offset from which to begin writing the data
 //	buffer		- Source data input buffer
 //	count		- Maximum number of bytes to write from the buffer
 
@@ -868,9 +893,9 @@ size_t TempFileSystem::File::SetLength(VirtualMachine::Mount const* mount, size_
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
-//	offset		- Offset to being writing the data
+//	offset		- Offset from which to begin reading the data
 //	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to write from the buffer
+//	count		- Maximum number of bytes to read into the buffer
 
 size_t TempFileSystem::File::Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count)
 {
@@ -900,7 +925,7 @@ size_t TempFileSystem::File::Read(VirtualMachine::Mount const* mount, size_t off
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
-//	offset		- Offset to being writing the data
+//	offset		- Offset from which to begin writing the data
 //	buffer		- Source data input buffer
 //	count		- Maximum number of bytes to write from the buffer
 
@@ -1347,9 +1372,9 @@ size_t TempFileSystem::SymbolicLink::getLength(void) const
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
-//	offset		- Offset to being writing the data
+//	offset		- Offset from which to begin reading the data
 //	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to write from the buffer
+//	count		- Maximum number of bytes to read into the buffer
 
 size_t TempFileSystem::SymbolicLink::Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count)
 {
@@ -1410,7 +1435,7 @@ char_t const* TempFileSystem::SymbolicLink::getTarget(void) const
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
-//	offset		- Offset to being writing the data
+//	offset		- Offset from which to begin writing the data
 //	buffer		- Source data input buffer
 //	count		- Maximum number of bytes to write from the buffer
 

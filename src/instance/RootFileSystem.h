@@ -322,6 +322,11 @@ private:
 		// Creates or opens a symbolic link as a child of this directory
 		virtual std::unique_ptr<VirtualMachine::SymbolicLink> CreateSymbolicLink(VirtualMachine::Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_uid_t gid) override;
 
+		// Enumerate (VirtualMachine::Directory)
+		//
+		// Enumerates all of the entries in this directory
+		virtual void Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func) const override;
+
 		// LinkNode (VirtualMachine::Directory)
 		//
 		// Links an existing node as a child of this directory
