@@ -23,6 +23,8 @@
 #include "stdafx.h"
 #include "Executable.h"
 
+#include "FileDescriptor.h"
+
 #pragma warning(push, 4)
 
 //---------------------------------------------------------------------------
@@ -30,9 +32,9 @@
 //
 // TODO: TEMPORARY
 
-Executable::Executable(tchar_t const* path)
+Executable::Executable(std::unique_ptr<FileDescriptor>&& fd)
 {
-	UNREFERENCED_PARAMETER(path);
+	UNREFERENCED_PARAMETER(fd);
 }
 
 //---------------------------------------------------------------------------

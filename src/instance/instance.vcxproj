@@ -230,7 +230,6 @@
     <ClInclude Include="NativeProcess.h" />
     <ClInclude Include="NativeArchitecture.h" />
     <ClInclude Include="Process.h" />
-    <ClInclude Include="RootFileSystem.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="InstanceService.h" />
     <ClInclude Include="SystemLog.h" />
@@ -517,7 +516,6 @@
     <ClCompile Include="Namespace.cpp" />
     <ClCompile Include="NativeProcess.cpp" />
     <ClCompile Include="Process.cpp" />
-    <ClCompile Include="RootFileSystem.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

@@ -28,18 +28,19 @@
 #pragma warning(push, 4)
 
 //---------------------------------------------------------------------------
-// Process::Load
+// Process Constructor
 //
-// Loads an Executable instance into the process
+// Creates a new process from an Executable instance
 //
 // Arguments:
 //
 //	executable		- The Executable instance to be loaded
 
-void Process::Load(Executable const* executable)
+Process::Process(std::unique_ptr<Executable>&& executable)
 {
 	UNREFERENCED_PARAMETER(executable);
 }
+
 //---------------------------------------------------------------------------
 
 #pragma warning(pop)

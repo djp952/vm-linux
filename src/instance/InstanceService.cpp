@@ -40,7 +40,6 @@
 #include "HostFileSystem.h"
 #include "LinuxException.h"
 #include "Process.h"
-#include "RootFileSystem.h"
 #include "SystemInformation.h"
 #include "SystemLog.h"
 #include "TempFileSystem.h"
@@ -292,7 +291,6 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 
 		m_fstypes.emplace(TEXT("hostfs"), MountHostFileSystem);
 		m_fstypes.emplace(TEXT("procfs"), MountProcFileSystem);
-		m_fstypes.emplace(TEXT("rootfs"), MountRootFileSystem);
 		m_fstypes.emplace(TEXT("tmpfs"), MountTempFileSystem);
 
 		//
@@ -348,19 +346,16 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// LAUNCH INIT PROCESS
 		//
 
-		std::string init = std::to_string(param_init);				// Pull out the param_init string
+		std::string initpath = std::to_string(param_init);				// Pull out the param_init string
 
 		try {
-			
-			// Open a read-only file descriptor against the specified init binary/script file
-			auto initfd = std::make_unique<FileDescriptor>(m_rootns->LookupPath(rootpath.get(), init.c_str(), 0), UAPI_O_RDONLY);
 
-			//auto initexe = std::make_unique<Executable>(TEXT("D:\\Linux Stuff\\android-5.0.2_r1-x86\\root\\init"));
-			//m_initprocess = std::make_unique<Process>();
-			//m_initprocess->Load(initexe.get());
+			// Create and launch the specified init binary via a standard read-only file descriptor
+			auto initfd = std::make_unique<FileDescriptor>(m_rootns->LookupPath(rootpath.get(), initpath.c_str(), 0), UAPI_O_RDONLY);
+			auto init = std::make_unique<Process>(std::make_unique<Executable>(std::move(initfd)));
 		}
 
-		catch(std::exception& ex) { throw LaunchInitException(init.c_str(), ex.what()); }
+		catch(std::exception& ex) { throw LaunchInitException(initpath.c_str(), ex.what()); }
 	}
 
 	catch(std::exception& ex) {

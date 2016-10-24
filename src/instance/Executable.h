@@ -28,6 +28,10 @@
 
 #pragma warning(push, 4)
 
+// FORWARD DECLARATIONS
+//
+class FileDescriptor;
+
 //-----------------------------------------------------------------------------
 // Class Executable
 //
@@ -39,7 +43,7 @@ public:
 
 	// Instance Constructors
 	//
-	Executable(tchar_t const* path);
+	Executable(std::unique_ptr<FileDescriptor>&& fd);
 
 	// Destructor
 	//

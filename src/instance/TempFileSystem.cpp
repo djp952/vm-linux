@@ -669,8 +669,7 @@ void TempFileSystem::Directory::LinkNode(VirtualMachine::Mount const* mount, Vir
 
 size_t TempFileSystem::Directory::getLength(void) const
 {
-	// The size of the data is 2 (. and ..) plus the number of children
-	return (2 + m_node->nodes.size()) * sizeof(uapi_linux_dirent64);
+	throw LinuxException(UAPI_EISDIR);
 }
 
 //-----------------------------------------------------------------------------

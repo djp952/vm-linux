@@ -41,7 +41,7 @@ public:
 
 	// Instance Constructors
 	//
-	Process()=default;
+	Process(std::unique_ptr<Executable>&& executable);
 
 	// Destructor
 	//
@@ -49,11 +49,6 @@ public:
 
 	//-------------------------------------------------------------------------
 	// Member Functions
-
-	// Load
-	//
-	// Loads an Executable instance into the process
-	void Load(Executable const* executable);
 
 	//-------------------------------------------------------------------------
 	// Properties

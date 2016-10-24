@@ -158,9 +158,6 @@
     <ClInclude Include="VirtualMachine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="RootFileSystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="TempFileSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -341,9 +338,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VirtualMachine.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="RootFileSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="TempFileSystem.cpp">
