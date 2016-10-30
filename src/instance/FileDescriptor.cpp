@@ -93,7 +93,8 @@ size_t FileDescriptor::AdjustPosition(ssize_t delta, int whence) const
 		// UAPI_SEEK_END - Seeks to an offset relative to the end of the file
 		case UAPI_SEEK_END:
 
-			pos = m_handle->path->Node->Length + delta;
+			///pos = m_handle->path->Node->Length + delta;
+			throw LinuxException(UAPI_EINVAL); /// all this stuff will need to be moved back into Handle, Length only applies to Files now
 			break;
 
 		default: throw LinuxException(UAPI_EINVAL);
@@ -197,25 +198,26 @@ size_t FileDescriptor::getPosition(void) const
 
 size_t FileDescriptor::Read(void* buffer, size_t count)
 {
-	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+	return 0;
+	//if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
-	uint32_t flags = m_flags;				// Copy the currently set flags
+	//uint32_t flags = m_flags;				// Copy the currently set flags
 
-	// The file descriptor cannot be open for write-only mode
-	if((flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+	//// The file descriptor cannot be open for write-only mode
+	//if((flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
 
-	auto mount = m_handle->path->Mount;		// Pull out a pointer to the mount
-	auto node = m_handle->path->Node;		// Pull out a pointer to the node
-	size_t pos = m_handle->position;		// Get the current position value
+	//auto mount = m_handle->path->Mount;		// Pull out a pointer to the mount
+	//auto node = m_handle->path->Node;		// Pull out a pointer to the node
+	//size_t pos = m_handle->position;		// Get the current position value
 
-	// Read the data from the underlying node and increment the position pointer
-	count = node->Read(mount, pos, buffer, count);
-	m_handle->position = (pos + count);
+	//// Read the data from the underlying node and increment the position pointer
+	//count = node->Read(mount, pos, buffer, count);
+	//m_handle->position = (pos + count);
 
-	// O_NOATIME - Do not update the last access time of the node after a read
-	if((flags & UAPI_O_NOATIME) == 0) node->SetAccessTime(mount, convert<uapi_timespec>(datetime::now()));
+	//// O_NOATIME - Do not update the last access time of the node after a read
+	//if((flags & UAPI_O_NOATIME) == 0) node->SetAccessTime(mount, convert<uapi_timespec>(datetime::now()));
 
-	return count;							// Return number of bytes read
+	//return count;							// Return number of bytes read
 }
 
 //---------------------------------------------------------------------------
@@ -233,23 +235,24 @@ size_t FileDescriptor::Read(void* buffer, size_t count)
 
 size_t FileDescriptor::ReadAt(ssize_t offset, int whence, void* buffer, size_t count)
 {
-	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+	return 0;
+	//if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
-	uint32_t flags = m_flags;				// Copy the currently set flags
+	//uint32_t flags = m_flags;				// Copy the currently set flags
 
-	// The file descriptor cannot be open for write-only mode
-	if((flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+	//// The file descriptor cannot be open for write-only mode
+	//if((flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
 
-	auto mount = m_handle->path->Mount;		// Pull out a pointer to the mount
-	auto node = m_handle->path->Node;		// Pull out a pointer to the node
+	//auto mount = m_handle->path->Mount;		// Pull out a pointer to the mount
+	//auto node = m_handle->path->Node;		// Pull out a pointer to the node
 
-	// Read the data from the underlying node -- do not change the position pointer
-	count = node->Read(mount, AdjustPosition(offset, whence), buffer, count);
+	//// Read the data from the underlying node -- do not change the position pointer
+	//count = node->Read(mount, AdjustPosition(offset, whence), buffer, count);
 
-	// O_NOATIME - Do not update the last access time of the node after a read
-	if((flags & UAPI_O_NOATIME) == 0) node->SetAccessTime(mount, convert<uapi_timespec>(datetime::now()));
+	//// O_NOATIME - Do not update the last access time of the node after a read
+	//if((flags & UAPI_O_NOATIME) == 0) node->SetAccessTime(mount, convert<uapi_timespec>(datetime::now()));
 
-	return count;							// Return the number of bytes read
+	//return count;							// Return the number of bytes read
 }
 
 //---------------------------------------------------------------------------
@@ -281,7 +284,7 @@ size_t FileDescriptor::Seek(ssize_t offset, int whence)
 
 void FileDescriptor::Sync(void) const
 {
-	m_handle->path->Node->Sync(m_handle->path->Mount);
+	//m_handle->path->Node->Sync(m_handle->path->Mount);
 }
 
 //---------------------------------------------------------------------------
@@ -295,7 +298,7 @@ void FileDescriptor::Sync(void) const
 
 void FileDescriptor::SyncData(void) const
 {
-	m_handle->path->Node->SyncData(m_handle->path->Mount);
+	//m_handle->path->Node->SyncData(m_handle->path->Mount);
 }
 
 //---------------------------------------------------------------------------
@@ -310,25 +313,26 @@ void FileDescriptor::SyncData(void) const
 
 size_t FileDescriptor::Write(void const* buffer, size_t count)
 {
-	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+	return 0;
+	//if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
-	uint32_t flags = m_flags;				// Copy the currently set flags
+	//uint32_t flags = m_flags;				// Copy the currently set flags
 
-	// The file descriptor cannot be open for read-only mode
-	if((flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	//// The file descriptor cannot be open for read-only mode
+	//if((flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
 
-	auto mount = m_handle->path->Mount;		// Pull out a pointer to the mount
-	auto node = m_handle->path->Node;		// Pull out a pointer to the node
-	size_t pos = m_handle->position;		// Get the current position value
+	//auto mount = m_handle->path->Mount;		// Pull out a pointer to the mount
+	//auto node = m_handle->path->Node;		// Pull out a pointer to the node
+	//size_t pos = m_handle->position;		// Get the current position value
 
-	// Write the data into the underlying node and increment the position pointer
-	count = node->Write(mount, pos, buffer, count);
-	m_handle->position = (pos + count);
+	//// Write the data into the underlying node and increment the position pointer
+	//count = node->Write(mount, pos, buffer, count);
+	//m_handle->position = (pos + count);
 
-	// Writing to the node always updates the modification time stamp
-	node->SetModificationTime(mount, convert<uapi_timespec>(datetime::now()));
+	//// Writing to the node always updates the modification time stamp
+	//node->SetModificationTime(mount, convert<uapi_timespec>(datetime::now()));
 
-	return count;							// Return number of bytes read
+	//return count;							// Return number of bytes read
 }
 
 //---------------------------------------------------------------------------
@@ -346,23 +350,24 @@ size_t FileDescriptor::Write(void const* buffer, size_t count)
 
 size_t FileDescriptor::WriteAt(ssize_t offset, int whence, void const* buffer, size_t count)
 {
-	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+	return 0;
+	//if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
-	uint32_t flags = m_flags;				// Copy the currently set flags
+	//uint32_t flags = m_flags;				// Copy the currently set flags
 
-	// The file descriptor cannot be open for read-only mode
-	if((flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	//// The file descriptor cannot be open for read-only mode
+	//if((flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
 
-	auto mount = m_handle->path->Mount;		// Pull out a pointer to the mount
-	auto node = m_handle->path->Node;		// Pull out a pointer to the node
+	//auto mount = m_handle->path->Mount;		// Pull out a pointer to the mount
+	//auto node = m_handle->path->Node;		// Pull out a pointer to the node
 
-	// Write the data into the underlying node -- do not change the position pointer
-	count = node->Write(mount, AdjustPosition(offset, whence), buffer, count);
+	//// Write the data into the underlying node -- do not change the position pointer
+	//count = node->Write(mount, AdjustPosition(offset, whence), buffer, count);
 
-	// Writing to the node always updates the modification time stamp
-	node->SetModificationTime(mount, convert<uapi_timespec>(datetime::now()));
+	//// Writing to the node always updates the modification time stamp
+	//node->SetModificationTime(mount, convert<uapi_timespec>(datetime::now()));
 
-	return count;							// Return the number of bytes read
+	//return count;							// Return the number of bytes read
 }
 
 //

@@ -50,11 +50,15 @@ public:
 	//
 
 	struct Directory;
+	struct DirectoryHandle;
 	struct File;
+	struct FileHandle;
 	struct FileSystem;
+	struct Handle;
 	struct Mount;
 	struct Node;
 	struct SymbolicLink;
+	struct SymbolicLinkHandle;
 
 	//
 	// CONSTANTS
@@ -199,11 +203,6 @@ public:
 		// Duplicates the Mount instance
 		virtual std::unique_ptr<Mount> Duplicate(void) const = 0;
 
-		// GetRootNode
-		//
-		// Gets a pointer to the mount point root node instance
-		virtual std::unique_ptr<Node> GetRootNode(void) const = 0;
-
 		//-------------------------------------------------------------------
 		// Properties
 
@@ -211,13 +210,19 @@ public:
 		//
 		// Accesses the underlying file system instance
 		__declspec(property(get=getFileSystem)) struct FileSystem* FileSystem;
-		virtual  struct FileSystem* getFileSystem(void) const = 0;
+		virtual struct FileSystem* getFileSystem(void) const = 0;
 
 		// Flags
 		//
 		// Gets the mount point flags
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const = 0;
+
+		// RootNode
+		//
+		// Gets a pointer to the mount point root node instance
+		__declspec(property(get=getRootNode)) struct Node const* RootNode;
+		virtual struct Node const* getRootNode(void) const = 0;
 	};
 
 	// Node
@@ -232,10 +237,15 @@ public:
 		//-------------------------------------------------------------------
 		// Member Functions
 
-		// Read
+		// Duplicate
 		//
-		// Reads data from the node at the specified position
-		virtual size_t Read(Mount const* mount, size_t offset, void* buffer, size_t count) = 0;
+		// Duplicates this node instance
+		virtual std::unique_ptr<Node> Duplicate(uint32_t flags) const = 0;
+
+		// Seek
+		//
+		// Changes the file position
+		virtual size_t Seek(Mount const* mount, ssize_t offset, int whence) = 0;
 
 		// SetAccessTime
 		//
@@ -251,11 +261,6 @@ public:
 		//
 		// Changes the owner group id for this node
 		virtual uapi_gid_t SetGroupId(Mount const* mount, uapi_gid_t gid) = 0;
-
-		// SetLength
-		//
-		// Sets the length of the node data
-		virtual size_t SetLength(Mount const* mount, size_t length) = 0;
 
 		// SetMode
 		//
@@ -282,11 +287,6 @@ public:
 		// Synchronizes all data associated with the file to storage, not metadata
 		virtual void SyncData(Mount const* mount) const = 0;
 
-		// Write
-		//
-		// Writes data into the node at the specified position
-		virtual size_t Write(Mount const* mount, size_t offset, void const* buffer, size_t count) = 0;
-
 		//-------------------------------------------------------------------
 		// Properties
 
@@ -302,6 +302,12 @@ public:
 		__declspec(property(get=getChangeTime)) uapi_timespec ChangeTime;
 		virtual uapi_timespec getChangeTime(void) const = 0;
 
+		// Flags
+		//
+		// Gets the handle-level flags applied to this instance
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const = 0;
+
 		// GroupId
 		//
 		// Gets the node owner group identifier
@@ -313,12 +319,6 @@ public:
 		// Gets the node index within the file system (inode number)
 		__declspec(property(get=getIndex)) intptr_t Index;
 		virtual intptr_t getIndex(void) const = 0;
-
-		// Length
-		//
-		// Gets the length of the node data
-		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const = 0;
 
 		// Mode
 		//
@@ -353,18 +353,18 @@ public:
 
 		// CreateDirectory
 		//
-		// Creates or opens a directory node as a child of this directory
-		virtual std::unique_ptr<Directory> CreateDirectory(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
+		// Creates a directory node as a child of this directory
+		virtual void CreateDirectory(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 
 		// CreateFile
 		//
-		// Creates or opens a regular file node as a child of this directory
-		virtual std::unique_ptr<File> CreateFile(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
+		// Creates a regular file node as a child of this directory
+		virtual void CreateFile(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 
 		// CreateSymbolicLink
 		//
-		// Creates or opens a symbolic link as a child of this directory
-		virtual std::unique_ptr<SymbolicLink> CreateSymbolicLink(Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_uid_t gid) = 0;
+		// Creates a symbolic link node as a child of this directory
+		virtual void CreateSymbolicLink(Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_uid_t gid) = 0;
 
 		// Enumerate
 		//
@@ -376,10 +376,10 @@ public:
 		// Links an existing node as a child of this directory
 		virtual void LinkNode(Mount const* mount, Node const* node, char_t const* name) = 0;
 
-		// Lookup
+		// OpenNode
 		//
-		// Accesses a child node of this directory by name
-		virtual std::unique_ptr<Node> Lookup(Mount const* mount, char_t const* name) const = 0;
+		// Opens a child node of this directory by name
+		virtual std::unique_ptr<Node> OpenNode(Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) const = 0;
 
 		// UnlinkNode
 		//
@@ -395,6 +395,43 @@ public:
 		// Destructor
 		//
 		virtual ~File()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// Read
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t Read(Mount const* mount, void* buffer, size_t count) = 0;
+
+		// ReadAt
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t ReadAt(Mount const* mount, ssize_t offset, int whence, void* buffer, size_t count) = 0;
+
+		// SetLength
+		//
+		// Sets the length of the node data
+		virtual size_t SetLength(Mount const* mount, size_t length) = 0;
+
+		// Write
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t Write(Mount const* mount, const void* buffer, size_t count) = 0;
+
+		// WriteAt
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t WriteAt(Mount const* mount, ssize_t offset, int whence, const void* buffer, size_t count) = 0;
+
+		//-------------------------------------------------------------------
+		// Properties
+
+		// Length
+		//
+		// Gets the length of the node data
+		__declspec(property(get=getLength)) size_t Length;
+		virtual size_t getLength(void) const = 0;
 	};
 
 	// SymbolicLink

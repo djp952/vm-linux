@@ -179,9 +179,9 @@ std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source,
 
 	// Construct the root directory node on the file system heap using the specified attributes
 	auto rootdir = TempFileSystem::directory_node_t::allocate_shared(fs, (mode & ~UAPI_S_IFMT) | UAPI_S_IFDIR, uid, gid);
-
-	// Create and return the mount point instance to return to the caller
-	return std::make_unique<TempFileSystem::Mount>(fs, rootdir, options.Flags & UAPI_MS_PERMOUNT_MASK);
+	
+	// Create and return the mount point instance with an O_PATH handle against the root directory
+	return std::make_unique<TempFileSystem::Mount>(fs, std::make_shared<TempFileSystem::Directory>(rootdir, UAPI_O_DIRECTORY | UAPI_O_PATH), options.Flags & UAPI_MS_PERMOUNT_MASK);
 }
 
 //---------------------------------------------------------------------------
@@ -453,6 +453,22 @@ std::shared_ptr<TempFileSystem::symlink_node_t> TempFileSystem::symlink_node_t::
 }
 
 //
+// TEMPFILESYSTEM::HANDLE_T IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// TempFileSystem::handle_t Constructor
+//
+// Arguments:
+//
+//	nodeptr			- Shared reference to the node instance
+
+template <typename _node_type>
+TempFileSystem::handle_t<_node_type>::handle_t(std::shared_ptr<_node_type> const& nodeptr) : node(nodeptr)
+{
+}
+
+//
 // TEMPFILESYSTEM::DIRECTORY IMPLEMENTATION
 //
 
@@ -461,11 +477,25 @@ std::shared_ptr<TempFileSystem::symlink_node_t> TempFileSystem::symlink_node_t::
 //
 // Arguments:
 //
-//	node		- Shared Node instance
+//	node		- Shared node_t instance
+//	flags		- Instance specific handle flags
 
-TempFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : Node(std::dynamic_pointer_cast<directory_node_t>(node))
+TempFileSystem::Directory::Directory(std::shared_ptr<directory_node_t> const& node, uint32_t flags) : Directory(std::make_shared<handle_t<directory_node_t>>(node), flags)
 {
-	_ASSERTE(m_node);
+	_ASSERTE(m_handle);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory Constructor
+//
+// Arguments:
+//
+//	handle		- Shared handle_t instance
+//	flags		- Instance specific handle flags
+
+TempFileSystem::Directory::Directory(std::shared_ptr<handle_t<directory_node_t>> const& handle, uint32_t flags) : Node(handle, flags)
+{
+	_ASSERTE(m_handle);
 }
 
 //---------------------------------------------------------------------------
@@ -481,30 +511,27 @@ TempFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : Node
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
-std::unique_ptr<VirtualMachine::Directory> TempFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name,
-	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+void TempFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name,	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 
 	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 	
 	// Check that the proper node type has been specified in the mode flags
 	if((mode & UAPI_S_IFMT) != UAPI_S_IFDIR) throw LinuxException(UAPI_EINVAL);
 
 	// Construct the new node on the file system heap using the specified attributes
-	auto node = directory_node_t::allocate_shared(m_node->fs, mode, uid, gid);
+	auto node = directory_node_t::allocate_shared(m_handle->node->fs, mode, uid, gid);
 
 	// Lock the nodes collection for exclusive access
-	sync::reader_writer_lock::scoped_lock_write writer(m_node->nodeslock);
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->nodeslock);
 
 	// Attempt to insert the new node into the collection
-	auto result = m_node->nodes.emplace(name, node);
+	auto result = m_handle->node->nodes.emplace(name, node);
 	if(result.second == false) throw LinuxException(UAPI_EEXIST);
-
-	return std::make_unique<Directory>(node);
 }
 
 //---------------------------------------------------------------------------
@@ -520,30 +547,27 @@ std::unique_ptr<VirtualMachine::Directory> TempFileSystem::Directory::CreateDire
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
-std::unique_ptr<VirtualMachine::File> TempFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, char_t const* name,
-	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+void TempFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 
 	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 	
 	// Check that the proper node type has been specified in the mode flags
 	if((mode & UAPI_S_IFMT) != UAPI_S_IFREG) throw LinuxException(UAPI_EINVAL);
 
 	// Construct the new node on the file system heap using the specified attributes
-	auto node = file_node_t::allocate_shared(m_node->fs, mode, uid, gid);
+	auto node = file_node_t::allocate_shared(m_handle->node->fs, mode, uid, gid);
 
 	// Lock the nodes collection for exclusive access
-	sync::reader_writer_lock::scoped_lock_write writer(m_node->nodeslock);
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->nodeslock);
 
 	// Attempt to insert the new node into the collection
-	auto result = m_node->nodes.emplace(name, node);
+	auto result = m_handle->node->nodes.emplace(name, node);
 	if(result.second == false) throw LinuxException(UAPI_EEXIST);
-
-	return std::make_unique<File>(node);
 }
 
 //---------------------------------------------------------------------------
@@ -559,28 +583,40 @@ std::unique_ptr<VirtualMachine::File> TempFileSystem::Directory::CreateFile(Virt
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
-std::unique_ptr<VirtualMachine::SymbolicLink> TempFileSystem::Directory::CreateSymbolicLink(VirtualMachine::Mount const* mount, 
-	char_t const* name, char_t const* target, uapi_uid_t uid, uapi_gid_t gid)
+void TempFileSystem::Directory::CreateSymbolicLink(VirtualMachine::Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_gid_t gid)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(target == nullptr) throw LinuxException(UAPI_EFAULT);
 	
 	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 	
 	// Construct the new node on the file system heap using the specified attributes
-	auto node = symlink_node_t::allocate_shared(m_node->fs, target, uid, gid);
+	auto node = symlink_node_t::allocate_shared(m_handle->node->fs, target, uid, gid);
 
 	// Lock the nodes collection for exclusive access
-	sync::reader_writer_lock::scoped_lock_write writer(m_node->nodeslock);
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->nodeslock);
 
 	// Attempt to insert the new node into the collection
-	auto result = m_node->nodes.emplace(name, node);
+	auto result = m_handle->node->nodes.emplace(name, node);
 	if(result.second == false) throw LinuxException(UAPI_EEXIST);
+}
 
-	return std::make_unique<SymbolicLink>(node);
+//---------------------------------------------------------------------------
+// TempFileSystem::Directory::Duplicate
+//
+// Duplicates this node handle
+//
+// Arguments:
+//
+//	flags		- New flags to be applied to the duplicate handle
+
+std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Duplicate(uint32_t flags) const
+{
+	// Duplicates reference the same handle but have their own flags
+	return std::make_unique<Directory>(m_handle, flags);
 }
 
 //---------------------------------------------------------------------------
@@ -598,15 +634,15 @@ void TempFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, st
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(func == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	// Check that the mount is for this file system
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
 	// Lock the nodes collection for shared access
-	sync::reader_writer_lock::scoped_lock_read reader(m_node->nodeslock);
+	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->nodeslock);
 
 	// There are many different formats used when reading directories from the system 
 	// call interfaces, use a caller-provided function to do the actual processing
-	for(auto const entry : m_node->nodes) {
+	for(auto const entry : m_handle->node->nodes) {
 
 		// The callback function can return false to stop the enumeration
 		if(!func({ entry.second->index, entry.second->mode, entry.first.c_str() })) break;
@@ -633,126 +669,100 @@ void TempFileSystem::Directory::LinkNode(VirtualMachine::Mount const* mount, Vir
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 	
 	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	// S_IFREG - File node instance
 	if((node->Mode & UAPI_S_IFMT) == UAPI_S_IFREG) {
-		if(File const* file = dynamic_cast<File const*>(node)) nodeptr = std::dynamic_pointer_cast<node_t>(file->m_node);
+		if(File const* file = dynamic_cast<File const*>(node)) nodeptr = file->m_handle->node;
 	}
 
 	// S_IFDIR - Directory node instance
 	else if((node->Mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
-		if(Directory const* dir = dynamic_cast<Directory const*>(node)) nodeptr = std::dynamic_pointer_cast<node_t>(dir->m_node);
+		if(Directory const* dir = dynamic_cast<Directory const*>(node)) nodeptr = dir->m_handle->node;
 	}
 
 	// S_IFLNK - SymbolicLink node instance
 	else if((node->Mode & UAPI_S_IFMT) == UAPI_S_IFLNK) {
-		if(SymbolicLink const* symlink = dynamic_cast<SymbolicLink const*>(node)) nodeptr = std::dynamic_pointer_cast<node_t>(symlink->m_node);
+		if(SymbolicLink const* symlink = dynamic_cast<SymbolicLink const*>(node)) nodeptr = symlink->m_handle->node;
 	}
 
 	// Any other node type results in ENXIO for now
 	if(!nodeptr) throw LinuxException(UAPI_ENXIO);
 
 	// Lock the nodes collection for exclusive access
-	sync::reader_writer_lock::scoped_lock_write writer(m_node->nodeslock);
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->nodeslock);
 
 	// Attempt to insert the node into the collection with the new name
-	auto result = m_node->nodes.emplace(name, nodeptr);
+	auto result = m_handle->node->nodes.emplace(name, nodeptr);
 	if(result.second == false) throw LinuxException(UAPI_EEXIST);
 }
 
 //-----------------------------------------------------------------------------
-// TempFileSystem::Directory::getLength
+// TempFileSystem::Directory::OpenNode
 //
-// Gets the length of the node data
-
-size_t TempFileSystem::Directory::getLength(void) const
-{
-	throw LinuxException(UAPI_EISDIR);
-}
-
-//-----------------------------------------------------------------------------
-// TempFileSystem::Directory::Lookup
-//
-// Accesses a child node of this directory by name
+// Opens or creates a child node of this directory by name
 //
 // Arguments:
 //
 //	mount		- Mount point on which to perform the operation
 //	name		- Name of the child node to be looked up
+//	flags		- Handle flags to apply to the node instance
+//	mode		- Permissions to assign if creating the node
+//	uid			- Owner user id to assign if creating the node
+//	gid			- Owner group id to assign if creating the node
 
-std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Lookup(VirtualMachine::Mount const* mount, char_t const* name) const 
+std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::OpenNode(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) const
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 
+	// TODO: MUCH WORK IN HERE - NEEDS TO PROCESS FLAGS AND CREATE FILES
+	UNREFERENCED_PARAMETER(mode);
+	UNREFERENCED_PARAMETER(uid);
+	UNREFERENCED_PARAMETER(gid);
+
 	// Check that the provided mount is part of the same file system instance
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
 	// Lock the nodes collection for shared access
-	sync::reader_writer_lock::scoped_lock_read reader(m_node->nodeslock);
+	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->nodeslock);
 
 	// Attempt to find the node in the collection, ENOENT if it doesn't exist
-	auto found = m_node->nodes.find(name);
-	if(found == m_node->nodes.end()) throw LinuxException(UAPI_ENOENT);
+	auto found = m_handle->node->nodes.find(name);
+	if(found == m_handle->node->nodes.end()) throw LinuxException(UAPI_ENOENT);
 
 	// Return the appropriate type of VirtualMachine::Node instance to the caller
 	switch(found->second->mode & UAPI_S_IFMT) {
 
-		case UAPI_S_IFDIR: return std::make_unique<Directory>(found->second);
-		case UAPI_S_IFREG: return std::make_unique<File>(found->second);
-		case UAPI_S_IFLNK: return std::make_unique<SymbolicLink>(found->second);
+		case UAPI_S_IFDIR: return std::make_unique<Directory>(std::dynamic_pointer_cast<directory_node_t>(found->second), flags);
+		case UAPI_S_IFREG: return std::make_unique<File>(std::dynamic_pointer_cast<file_node_t>(found->second), flags);
+		case UAPI_S_IFLNK: return std::make_unique<SymbolicLink>(std::dynamic_pointer_cast<symlink_node_t>(found->second), flags);
 	}
 
 	throw LinuxException(UAPI_ENXIO);
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::Directory::Read
+// TempFileSystem::Directory::Seek
 //
-// Reads data from the underlying node into a buffer
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform the operation
-//	offset		- Offset from which to begin reading the data
-//	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to read into the buffer
-
-size_t TempFileSystem::Directory::Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(offset);
-
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-
-	throw LinuxException(UAPI_EISDIR);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::Directory::SetLength
-//
-// Sets the length of the node
+// Changes the file position
 //
 // Arguments:
 //
 //	mount		- Mount point on which to perform this operation
-//	length		- New length to assign to the file
+//	offset		- Delta from the current handle position to be set
+//	whence		- Location from which to apply the specified delta
 
-size_t TempFileSystem::Directory::SetLength(VirtualMachine::Mount const* mount, size_t length)
+size_t TempFileSystem::Directory::Seek(VirtualMachine::Mount const* mount, ssize_t offset, int whence)
 {
-	UNREFERENCED_PARAMETER(length);
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(whence);
 
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
+	// todo - this is actually valid for directories
 	throw LinuxException(UAPI_EISDIR);
 }
 
@@ -772,15 +782,15 @@ void TempFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, c
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 	
 	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 	
 	// Lock the nodes collection for exclusive access
-	sync::reader_writer_lock::scoped_lock_write writer(m_node->nodeslock);
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->nodeslock);
 
 	// Attempt to find the node in the collection, ENOENT if it doesn't exist
-	auto found = m_node->nodes.find(name);
-	if(found == m_node->nodes.end()) throw LinuxException(UAPI_ENOENT);
+	auto found = m_handle->node->nodes.find(name);
+	if(found == m_handle->node->nodes.end()) throw LinuxException(UAPI_ENOENT);
 
 	// Directory nodes are processed using different semantics than other nodes
 	if((found->second->mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
@@ -795,33 +805,7 @@ void TempFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, c
 
 	// Unlink the node by removing it from this directory; the node itself will
 	// die off when it's no longer in use but this prevents it from being looked up
-	m_node->nodes.erase(found->first);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::Directory::Write
-//
-// Writes data into the node at the specified position
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform the operation
-//	offset		- Offset from which to begin writing the data
-//	buffer		- Source data input buffer
-//	count		- Maximum number of bytes to write from the buffer
-
-size_t TempFileSystem::Directory::Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(offset);
-
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-	
-	throw LinuxException(UAPI_EISDIR);
+	m_handle->node->nodes.erase(found->first);
 }
 
 //
@@ -833,26 +817,197 @@ size_t TempFileSystem::Directory::Write(VirtualMachine::Mount const* mount, size
 //
 // Arguments:
 //
-//	node		- Shared Node instance
+//	node			- Shared node_t instance
+//	flags			- Instance-specific handle flags
 
-TempFileSystem::File::File(std::shared_ptr<node_t> const& node) : Node(std::dynamic_pointer_cast<file_node_t>(node))
+TempFileSystem::File::File(std::shared_ptr<file_node_t> const& node, uint32_t flags) : File(std::make_shared<handle_t<file_node_t>>(node), flags)
 {
-	_ASSERTE(m_node);
-	_ASSERTE((m_node->mode & UAPI_S_IFMT) == UAPI_S_IFREG);
-}
-
-//-----------------------------------------------------------------------------
-// TempFileSystem::File::getLength
-//
-// Gets the length of the node data
-
-size_t TempFileSystem::File::getLength(void) const
-{
-	return m_node->data.size();
+	_ASSERTE(m_handle);
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::File::SetLength
+// TempFileSystem::File Constructor
+//
+// Arguments:
+//
+//	handle			- Shared handle_t instance
+//	flags			- Instance-specific handle flags
+
+TempFileSystem::File::File(std::shared_ptr<handle_t<file_node_t>> const& handle, uint32_t flags) : Node(handle, flags)
+{
+	_ASSERTE(m_handle);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::AdjustPosition (private)
+//
+// Generates an adjusted handle position based on a delta and starting location
+//
+// Arguments:
+//
+//	lock		- Reference to a scoped_lock against the node data
+//	delta		- Delta to current handle position to be calculated
+//	whence		- Location from which to apply the specified delta
+
+size_t TempFileSystem::File::AdjustPosition(sync::reader_writer_lock::scoped_lock const& lock, ssize_t delta, int whence) const
+{
+	UNREFERENCED_PARAMETER(lock);			// Unused; ensure caller has a scoped_lock
+
+	size_t pos = m_handle->position;		// Copy the current position
+
+	switch(whence) {
+
+		// UAPI_SEEK_SET - Seeks to an offset relative to the beginning of the file;
+		case UAPI_SEEK_SET:
+
+			if(delta < 0) throw LinuxException(UAPI_EINVAL);
+			pos = static_cast<size_t>(delta);
+			break;
+
+		// UAPI_SEEK_CUR - Seeks to an offset relative to the current position
+		case UAPI_SEEK_CUR:
+
+			if((delta < 0) && ((pos - delta) < 0)) throw LinuxException(UAPI_EINVAL);
+			pos += delta;
+			break;
+
+		// UAPI_SEEK_END - Seeks to an offset relative to the end of the file
+		case UAPI_SEEK_END:
+
+			pos = m_handle->node->data.size() + delta;
+			break;
+
+		default: throw LinuxException(UAPI_EINVAL);
+	}
+
+	return pos;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::Duplicate
+//
+// Duplicates this node handle
+//
+// Arguments:
+//
+//	flags		- New flags to be applied to the duplicate handle
+
+std::unique_ptr<VirtualMachine::Node> TempFileSystem::File::Duplicate(uint32_t flags) const
+{
+	// Duplicates reference the same handle but have their own flags
+	return std::make_unique<File>(m_handle, flags);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::getLength
+//
+// Gets the length of the file node data
+
+size_t TempFileSystem::File::getLength(void) const
+{
+	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
+	return m_handle->node->data.size();
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::Read
+//
+// Synchronously reads data from the underlying node into a buffer
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	buffer		- Destination data output buffer
+//	count		- Maximum number of bytes to read into the buffer
+
+size_t TempFileSystem::File::Read(VirtualMachine::Mount const* mount, void* buffer, size_t count)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// Verify the provided mount point and ensure that the handle is not write-only
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
+	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
+
+	size_t pos = m_handle->position;		// Copy the current position
+
+	// Determine the number of bytes to actually read from the file data
+	if(pos >= m_handle->node->data.size()) return 0;
+	count = std::min(count, m_handle->node->data.size() - pos);
+
+	// Copy the requested data from the file into the provided buffer
+	if(count > 0) memcpy(buffer, &m_handle->node->data[pos], count);
+
+	m_handle->position = (pos + count);		// Set the new position
+
+	return count;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::ReadAt
+//
+// Synchronously reads data from the underlying node into a buffer
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	offset		- Delta from the current handle position to read from
+//	whence		- Location from which to apply the specified delta
+//	buffer		- Destination data output buffer
+//	count		- Maximum number of bytes to read into the buffer
+
+size_t TempFileSystem::File::ReadAt(VirtualMachine::Mount const* mount, ssize_t offset, int whence, void* buffer, size_t count)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// Verify the provided mount point and ensure that the handle is not write-only
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
+	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
+
+	// ReadAt() does not update the file position, just calculate the offset
+	size_t pos = AdjustPosition(reader, offset, whence);
+
+	// Determine the number of bytes to actually read from the file data
+	if(pos >= m_handle->node->data.size()) return 0;
+	count = std::min(count, m_handle->node->data.size() - pos);
+
+	// Copy the requested data from the file into the provided buffer
+	if(count > 0) memcpy(buffer, &m_handle->node->data[pos], count);
+
+	return count;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::Seek
+//
+// Changes the file position
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	offset		- Delta from the current handle position to be set
+//	whence		- Location from which to apply the specified delta
+
+size_t TempFileSystem::File::Seek(VirtualMachine::Mount const* mount, ssize_t offset, int whence)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
+	
+	auto newposition = AdjustPosition(reader, offset, whence);
+	m_handle->position = newposition;
+
+	return newposition;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::FileHandle::SetLength
 //
 // Sets the length of the file
 //
@@ -865,89 +1020,100 @@ size_t TempFileSystem::File::SetLength(VirtualMachine::Mount const* mount, size_
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Verify the provided mount point and ensure that the handle is not read-only
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
 
-	sync::reader_writer_lock::scoped_lock_write writer(m_node->datalock);
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
 
 	// Determine if the operation will shrink the file data buffer
-	bool shrink = (length < m_node->data.size());
+	bool shrink = (length < m_handle->node->data.size());
 
 	// Resize the buffer initializing any new allocations to zero
-	try { m_node->data.resize(length, 0); }
+	try { m_handle->node->data.resize(length, 0); }
 	catch(...) { throw LinuxException(UAPI_ENOSPC); }
 
 	// If the new length is less than the original length, trim the buffer
-	if(shrink) m_node->data.shrink_to_fit();
+	if(shrink) m_handle->node->data.shrink_to_fit();
 
-	return m_node->data.size();
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::File::Read
-//
-// Reads data from the underlying node into a buffer
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform the operation
-//	offset		- Offset from which to begin reading the data
-//	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to read into the buffer
-
-size_t TempFileSystem::File::Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count)
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-
-	sync::reader_writer_lock::scoped_lock_read reader(m_node->datalock);
-
-	// Determine the number of bytes to actually read from the file data
-	if(offset >= m_node->data.size()) return 0;
-	count = std::min(count, m_node->data.size() - offset);
-
-	// Copy the requested data from the file into the provided buffer
-	memcpy(buffer, &m_node->data[offset], count);
-
-	return count;
+	return m_handle->node->data.size();
 }
 
 //---------------------------------------------------------------------------
 // TempFileSystem::File::Write
 //
-// Writes data into the node at the specified position
+// Synchronously writes data from a buffer to the underlying node
 //
 // Arguments:
 //
-//	mount		- Mount point on which to perform the operation
-//	offset		- Offset from which to begin writing the data
+//	mount		- Mount point on which to perform this operation
 //	buffer		- Source data input buffer
-//	count		- Maximum number of bytes to write from the buffer
+//	count		- Maximum number of bytes to write into the node
 
-size_t TempFileSystem::File::Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count)
+size_t TempFileSystem::File::Write(VirtualMachine::Mount const* mount, const void* buffer, size_t count)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Verify the provided mount point and ensure that the handle is not read-only
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
 
-	sync::reader_writer_lock::scoped_lock_write writer(m_node->datalock);
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
+
+	size_t pos = m_handle->position;		// Copy the current position
 
 	// Ensure that the node buffer is large enough to accept the data
-	if((offset + count) > m_node->data.size()) {
+	if((pos + count) > m_handle->node->data.size()) {
 		
-		try { m_node->data.resize(offset + count); }
+		try { m_handle->node->data.resize(pos + count); }
 		catch(...) { throw LinuxException(UAPI_ENOSPC); }
 	}
 
 	// Copy the data from the input buffer into the node data buffer
-	memcpy(&m_node->data[offset], buffer, count);
+	if(count > 0) memcpy(&m_handle->node->data[pos], buffer, count);
+	
+	m_handle->position = (pos + count);		// Set the new position
+
+	return count;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::File::WriteAt
+//
+// Synchronously writes data from a buffer to the underlying node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	offset		- Delta from the current handle position to write to
+//	whence		- Location from which to apply the specified delta
+//	buffer		- Source data input buffer
+//	count		- Maximum number of bytes to write into the node
+
+size_t TempFileSystem::File::WriteAt(VirtualMachine::Mount const* mount, ssize_t offset, int whence, const void* buffer, size_t count)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// Verify the provided mount point and ensure that the handle is not read-only
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+
+	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
+
+	// WriteAt() does not update the file position, just calculate the offset
+	size_t pos = AdjustPosition(writer, offset, whence);
+
+	// Ensure that the node buffer is large enough to accept the data
+	if((pos + count) > m_handle->node->data.size()) {
+		
+		try { m_handle->node->data.resize(pos + count); }
+		catch(...) { throw LinuxException(UAPI_ENOSPC); }
+	}
+
+	// Copy the data from the input buffer into the node data buffer
+	if(count > 0) memcpy(&m_handle->node->data[pos], buffer, count);
 
 	return count;
 }
@@ -965,13 +1131,10 @@ size_t TempFileSystem::File::Write(VirtualMachine::Mount const* mount, size_t of
 //	rootdir		- Root directory node instance
 //	flags		- Mount-specific flags
 
-TempFileSystem::Mount::Mount(std::shared_ptr<TempFileSystem> const& fs, std::shared_ptr<directory_node_t> const& rootdir, uint32_t flags) : 
+TempFileSystem::Mount::Mount(std::shared_ptr<TempFileSystem> const& fs, std::shared_ptr<Directory> const& rootdir, uint32_t flags) : 
 	m_fs(fs), m_rootdir(rootdir), m_flags(flags)
 {
 	_ASSERTE(m_fs);
-
-	// The root directory node is converted from a unique to a shared pointer so it
-	// can be shared among multiple cloned Mount instances
 	_ASSERTE(m_rootdir);
 
 	// The specified flags should not include any that apply to the file system
@@ -1036,9 +1199,9 @@ uint32_t TempFileSystem::Mount::getFlags(void) const
 //
 //	NONE
 
-std::unique_ptr<VirtualMachine::Node> TempFileSystem::Mount::GetRootNode(void) const
+VirtualMachine::Node const* TempFileSystem::Mount::getRootNode(void) const
 {
-	return std::make_unique<TempFileSystem::Directory>(m_rootdir);
+	return m_rootdir.get();
 }
 
 //
@@ -1046,16 +1209,16 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::Mount::GetRootNode(void) c
 //
 
 //---------------------------------------------------------------------------
-// TempFileSystem::Node Constructor
+// TempFileSystem::Node Constructor (protected)
 //
 // Arguments:
 //
-//	node		- Shared _node_type instance
+//	handle		- Shared handle_t instance
 
-template <class _interface, typename _node_type>
-TempFileSystem::Node<_interface, _node_type>::Node(std::shared_ptr<_node_type> const& node) : m_node(node)
+template <class _interface, typename _handle_type>
+TempFileSystem::Node<_interface, _handle_type>::Node(std::shared_ptr<_handle_type> const& handle, uint32_t flags) : m_handle(handle), m_flags(flags)
 {
-	_ASSERTE(m_node);
+	_ASSERTE(m_handle);
 }
 
 //---------------------------------------------------------------------------
@@ -1063,10 +1226,10 @@ TempFileSystem::Node<_interface, _node_type>::Node(std::shared_ptr<_node_type> c
 //
 // Gets the access time of the node
 
-template <class _interface, typename _node_type>
-uapi_timespec TempFileSystem::Node<_interface, _node_type>::getAccessTime(void) const
+template <class _interface, typename _handle_type>
+uapi_timespec TempFileSystem::Node<_interface, _handle_type>::getAccessTime(void) const
 {
-	return m_node->atime;
+	return m_handle->node->atime;
 }
 
 //---------------------------------------------------------------------------
@@ -1074,10 +1237,21 @@ uapi_timespec TempFileSystem::Node<_interface, _node_type>::getAccessTime(void) 
 //
 // Gets the change time of the node
 
-template <class _interface, typename _node_type>
-uapi_timespec TempFileSystem::Node<_interface, _node_type>::getChangeTime(void) const
+template <class _interface, typename _handle_type>
+uapi_timespec TempFileSystem::Node<_interface, _handle_type>::getChangeTime(void) const
 {
-	return m_node->ctime;
+	return m_handle->node->ctime;
+}
+		
+//---------------------------------------------------------------------------
+// TempFileSystem::Node::getFlags
+//
+// Gets the current set of handle flags
+
+template <class _interface, typename _handle_type>
+uint32_t TempFileSystem::Node<_interface, _handle_type>::getFlags(void) const
+{
+	return m_flags;
 }
 		
 //---------------------------------------------------------------------------
@@ -1085,10 +1259,10 @@ uapi_timespec TempFileSystem::Node<_interface, _node_type>::getChangeTime(void) 
 //
 // Gets the currently set owner group identifier for the file
 
-template <class _interface, typename _node_type>
-uapi_gid_t TempFileSystem::Node<_interface, _node_type>::getGroupId(void) const
+template <class _interface, typename _handle_type>
+uapi_gid_t TempFileSystem::Node<_interface, _handle_type>::getGroupId(void) const
 {
-	return m_node->gid;
+	return m_handle->node->gid;
 }
 
 //---------------------------------------------------------------------------
@@ -1096,10 +1270,10 @@ uapi_gid_t TempFileSystem::Node<_interface, _node_type>::getGroupId(void) const
 //
 // Gets the node index within the file system (inode number)
 
-template <class _interface, typename _node_type>
-intptr_t TempFileSystem::Node<_interface, _node_type>::getIndex(void) const
+template <class _interface, typename _handle_type>
+intptr_t TempFileSystem::Node<_interface, _handle_type>::getIndex(void) const
 {
-	return m_node->index;
+	return m_handle->node->index;
 }
 
 //---------------------------------------------------------------------------
@@ -1107,10 +1281,10 @@ intptr_t TempFileSystem::Node<_interface, _node_type>::getIndex(void) const
 //
 // Gets the type and permissions mask for the node
 
-template <class _interface, typename _node_type>
-uapi_mode_t TempFileSystem::Node<_interface, _node_type>::getMode(void) const
+template <class _interface, typename _handle_type>
+uapi_mode_t TempFileSystem::Node<_interface, _handle_type>::getMode(void) const
 {
-	return m_node->mode;
+	return m_handle->node->mode;
 }
 
 //---------------------------------------------------------------------------
@@ -1118,10 +1292,10 @@ uapi_mode_t TempFileSystem::Node<_interface, _node_type>::getMode(void) const
 //
 // Gets the modification time of the node
 
-template <class _interface, typename _node_type>
-uapi_timespec TempFileSystem::Node<_interface, _node_type>::getModificationTime(void) const
+template <class _interface, typename _handle_type>
+uapi_timespec TempFileSystem::Node<_interface, _handle_type>::getModificationTime(void) const
 {
-	return m_node->mtime;
+	return m_handle->node->mtime;
 }
 		
 //---------------------------------------------------------------------------
@@ -1134,32 +1308,34 @@ uapi_timespec TempFileSystem::Node<_interface, _node_type>::getModificationTime(
 //	mount		- Mount point on which to perform this operation
 //	atime		- New access time to be set
 
-template <class _interface, typename _node_type>
-uapi_timespec TempFileSystem::Node<_interface, _node_type>::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
+template <class _interface, typename _handle_type>
+uapi_timespec TempFileSystem::Node<_interface, _handle_type>::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Check that the handle was not opened in read-only mode and the mount is not read-only
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	
+	// If the handle or the underlying mount was opened with NOATIME, there is nothing to do
+	if((m_flags & UAPI_O_NOATIME) == UAPI_O_NOATIME) return m_handle->node->atime;
+	if((mount->Flags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME) return m_handle->node->atime;
 
-	// If the mount point prevents changing the access time there is nothing to do
-	if((mount->Flags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME) return m_node->atime;
-
-	bool		update = false;							// Flag to actually update atime
-	datetime	newatime = convert<datetime>(atime);	// New access time as a datetime
+	bool update = false;								// Flag to actually update atime
+	datetime newatime = convert<datetime>(atime);		// Convert into a datetime value
 
 	// Update atime if previous atime is more than 24 hours in the past (see mount(2))
-	if(newatime > (convert<datetime>(m_node->atime.load()) + timespan::days(1))) update = true;
+	if(newatime > (convert<datetime>(m_handle->node->atime.load()) + timespan::days(1))) update = true;
 
-	// MS_STRICTATIME - update atime
+	// MS_STRICTATIME - always update atime
 	else if((mount->Flags & UAPI_MS_STRICTATIME) == UAPI_MS_STRICTATIME) update = true;
 
 	// Default (MS_RELATIME) - update atime if it is more recent than ctime or mtime
-	else if((newatime >= convert<datetime>(m_node->ctime.load())) || (newatime >= convert<datetime>(m_node->mtime.load()))) update = true;
+	else if((newatime >= convert<datetime>(m_handle->node->ctime.load())) || (newatime >= convert<datetime>(m_handle->node->mtime.load()))) update = true;
 
-	if(update) m_node->atime = atime;				// Update access time
-	return atime;									// Return new access time
+	if(update) m_handle->node->atime = atime;
+	return m_handle->node->atime;
 }
 
 //---------------------------------------------------------------------------
@@ -1172,16 +1348,17 @@ uapi_timespec TempFileSystem::Node<_interface, _node_type>::SetAccessTime(Virtua
 //	mount		- Mount point on which to perform this operation
 //	ctime		- New change time to be set
 
-template <class _interface, typename _node_type>
-uapi_timespec TempFileSystem::Node<_interface, _node_type>::SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime)
+template <class _interface, typename _handle_type>
+uapi_timespec TempFileSystem::Node<_interface, _handle_type>::SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Check that the handle was not opened in read-only mode and the mount is not read-only
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->ctime = ctime;
+	m_handle->node->ctime = ctime;
 	return ctime;
 }
 
@@ -1195,16 +1372,17 @@ uapi_timespec TempFileSystem::Node<_interface, _node_type>::SetChangeTime(Virtua
 //	mount		- Mount point on which to perform this operation
 //	gid			- New owner group id to be set
 
-template <class _interface, typename _node_type>
-uapi_gid_t TempFileSystem::Node<_interface, _node_type>::SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid)
+template <class _interface, typename _handle_type>
+uapi_gid_t TempFileSystem::Node<_interface, _handle_type>::SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Check that the handle was not opened in read-only mode and the mount is not read-only
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->gid = gid;
+	m_handle->node->gid = gid;
 	return gid;
 }
 
@@ -1218,20 +1396,21 @@ uapi_gid_t TempFileSystem::Node<_interface, _node_type>::SetGroupId(VirtualMachi
 //	mount		- Mount point on which to perform this operation
 //	mode		- New mode flags to be set
 
-template <class _interface, typename _node_type>
-uapi_mode_t TempFileSystem::Node<_interface, _node_type>::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
+template <class _interface, typename _handle_type>
+uapi_mode_t TempFileSystem::Node<_interface, _handle_type>::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Check that the handle was not opened in read-only mode and the mount is not read-only
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	// Strip out all but the permissions from the provided mode; the type
 	// cannot be changed after a node has been created
-	mode = ((mode & UAPI_S_IALLUGO) | (m_node->mode & ~UAPI_S_IALLUGO));
+	mode = ((mode & UAPI_S_IALLUGO) | (m_handle->node->mode.load() & ~UAPI_S_IALLUGO));
 
-	m_node->mode = mode;
+	m_handle->node->mode = mode;
 	return mode;
 }
 
@@ -1245,19 +1424,20 @@ uapi_mode_t TempFileSystem::Node<_interface, _node_type>::SetMode(VirtualMachine
 //	mount		- Mount point on which to perform this operation
 //	mtime		- New modification time to be set
 
-template <class _interface, typename _node_type>
-uapi_timespec TempFileSystem::Node<_interface, _node_type>::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
+template <class _interface, typename _handle_type>
+uapi_timespec TempFileSystem::Node<_interface, _handle_type>::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Check that the handle was not opened in read-only mode and the mount is not read-only
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->mtime = m_node->ctime = mtime;
+	m_handle->node->mtime = m_handle->node->ctime = mtime;
 	return mtime;
 }
-		
+
 //---------------------------------------------------------------------------
 // TempFileSystem::Node::SetUserId
 //
@@ -1268,16 +1448,17 @@ uapi_timespec TempFileSystem::Node<_interface, _node_type>::SetModificationTime(
 //	mount		- Mount point on which to perform this operation
 //	uid			- New owner user id to be set
 
-template <class _interface, typename _node_type>
-uapi_uid_t TempFileSystem::Node<_interface, _node_type>::SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid)
+template <class _interface, typename _handle_type>
+uapi_uid_t TempFileSystem::Node<_interface, _handle_type>::SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Check that the handle was not opened in read-only mode and the mount is not read-only
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	m_node->uid = uid;
+	m_handle->node->uid = uid;
 	return uid;
 }
 
@@ -1288,18 +1469,19 @@ uapi_uid_t TempFileSystem::Node<_interface, _node_type>::SetUserId(VirtualMachin
 //
 // Arguments:
 //
-//	mount		- Mount point on which to perform the operation
+//	mount		- Mount point on which to perform this operation
 
-template <class _interface, typename _node_type>
-void TempFileSystem::Node<_interface, _node_type>::Sync(VirtualMachine::Mount const* mount) const
+template <class _interface, typename _handle_type>
+void TempFileSystem::Node<_interface, _handle_type>::Sync(VirtualMachine::Mount const* mount) const
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Check that the handle was not opened in read-only mode and the mount is not read-only
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	// This is a no-operation in TempFileSystem
+	// NO-OP
 }
 
 //---------------------------------------------------------------------------
@@ -1309,20 +1491,19 @@ void TempFileSystem::Node<_interface, _node_type>::Sync(VirtualMachine::Mount co
 //
 // Arguments:
 //
-// Arguments:
-//
-//	mount		- Mount point on which to perform the operation
+//	mount		- Mount point on which to perform this operation
 
-template <class _interface, typename _node_type>
-void TempFileSystem::Node<_interface, _node_type>::SyncData(VirtualMachine::Mount const* mount) const
+template <class _interface, typename _handle_type>
+void TempFileSystem::Node<_interface, _handle_type>::SyncData(VirtualMachine::Mount const* mount) const
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Check that the handle was not opened in read-only mode and the mount is not read-only
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	// This is a no-operation in TempFileSystem
+	// NO-OP
 }
 
 //---------------------------------------------------------------------------
@@ -1330,10 +1511,10 @@ void TempFileSystem::Node<_interface, _node_type>::SyncData(VirtualMachine::Moun
 //
 // Gets the currently set owner user identifier for the file
 
-template <class _interface, typename _node_type>
-uapi_uid_t TempFileSystem::Node<_interface, _node_type>::getUserId(void) const
+template <class _interface, typename _handle_type>
+uapi_uid_t TempFileSystem::Node<_interface, _handle_type>::getUserId(void) const
 {
-	return m_node->uid;
+	return m_handle->node->uid;
 }
 
 //
@@ -1345,73 +1526,58 @@ uapi_uid_t TempFileSystem::Node<_interface, _node_type>::getUserId(void) const
 //
 // Arguments:
 //
-//	node		- Shared node_t instance
+//	node			- Shared node_t instance
+//	flags			- Instance-specific handle flags
 
-TempFileSystem::SymbolicLink::SymbolicLink(std::shared_ptr<node_t> const& node) : Node(std::dynamic_pointer_cast<symlink_node_t>(node))
+TempFileSystem::SymbolicLink::SymbolicLink(std::shared_ptr<symlink_node_t> const& node, uint32_t flags) : SymbolicLink(std::make_shared<handle_t<symlink_node_t>>(node), flags)
 {
-	_ASSERTE(m_node);
-	_ASSERTE((m_node->mode & UAPI_S_IFMT) == UAPI_S_IFLNK);
-}
-
-//-----------------------------------------------------------------------------
-// TempFileSystem::SymbolicLink::getLength
-//
-// Gets the length of the node data
-
-size_t TempFileSystem::SymbolicLink::getLength(void) const
-{
-	return m_node->target.size();
+	_ASSERTE(m_handle);
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLink::Read
-//
-// Reads data from the underlying node into a buffer
+// TempFileSystem::SymbolicLink Constructor
 //
 // Arguments:
 //
-//	mount		- Mount point on which to perform the operation
-//	offset		- Offset from which to begin reading the data
-//	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to read into the buffer
+//	handle_t		- Shared handle_t instance
 
-size_t TempFileSystem::SymbolicLink::Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count)
+TempFileSystem::SymbolicLink::SymbolicLink(std::shared_ptr<handle_t<symlink_node_t>> const& handle, uint32_t flags) : Node(handle, flags)
 {
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-
-	// Determine the number of bytes to actually read from the target string
-	if(offset >= m_node->target.size()) return 0;
-	count = std::min(count, m_node->target.size() - offset);
-
-	// Copy the requested data from the target string into the provided buffer
-	memcpy(buffer, &m_node->target.data()[offset], count);
-
-	return count;
+	_ASSERTE(m_handle);
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLink::SetLength
+// TempFileSystem::SymbolicLink::Duplicate
 //
-// Sets the length of the node
+// Duplicates this node handle
+//
+// Arguments:
+//
+//	flags		- New flags to be applied to the duplicate handle
+
+std::unique_ptr<VirtualMachine::Node> TempFileSystem::SymbolicLink::Duplicate(uint32_t flags) const
+{
+	return std::make_unique<SymbolicLink>(m_handle, flags);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::Seek
+//
+// Changes the file position
 //
 // Arguments:
 //
 //	mount		- Mount point on which to perform this operation
-//	length		- New length to assign to the file
+//	offset		- Delta from specified whence position
+//	whence		- Position from which to apply the specified delta
 
-size_t TempFileSystem::SymbolicLink::SetLength(VirtualMachine::Mount const* mount, size_t length)
+size_t TempFileSystem::SymbolicLink::Seek(VirtualMachine::Mount const* mount, ssize_t offset, int whence)
 {
-	UNREFERENCED_PARAMETER(length);
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(whence);
 
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
 	throw LinuxException(UAPI_EPERM);
 }
@@ -1423,33 +1589,7 @@ size_t TempFileSystem::SymbolicLink::SetLength(VirtualMachine::Mount const* moun
 
 char_t const* TempFileSystem::SymbolicLink::getTarget(void) const
 {
-	return m_node->target.c_str();
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLink::Write
-//
-// Writes data into the node at the specified position
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform the operation
-//	offset		- Offset from which to begin writing the data
-//	buffer		- Source data input buffer
-//	count		- Maximum number of bytes to write from the buffer
-
-size_t TempFileSystem::SymbolicLink::Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(offset);
-
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system and it's not read-only
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-	if(mount->Flags & UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-	
-	throw LinuxException(UAPI_EPERM);
+	return m_handle->node->target.c_str();
 }
 
 //---------------------------------------------------------------------------

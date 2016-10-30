@@ -51,7 +51,7 @@ Namespace::Namespace(std::unique_ptr<VirtualMachine::Mount>&& rootmount)
 	// initially refers to the absolute root of the namespace file system
 	m_rootpath = std::make_shared<path_t>();
 	m_rootpath->mount = mountpoint;
-	m_rootpath->node = mountpoint->GetRootNode();
+	m_rootpath->node = mountpoint->RootNode->Duplicate(UAPI_O_PATH);
 	m_rootpath->name = "/";
 	m_rootpath->parent = nullptr;
 }
@@ -91,7 +91,7 @@ std::unique_ptr<Namespace::Path> Namespace::AddMount(std::unique_ptr<VirtualMach
 	auto mountpath = std::make_shared<path_t>();
 	mountpath->mount = mountpoint;
 	mountpath->name = path->m_path->name;
-	mountpath->node = mountpoint->GetRootNode();
+	mountpath->node = mountpoint->RootNode->Duplicate(UAPI_O_PATH);
 	mountpath->parent = path->m_path->parent;
 
 	// Acquire an exclusive lock against the mount collection
@@ -180,7 +180,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 	while(mountpoint != m_mounts.end()) { 
 
 		current->mount = mountpoint->second;
-		current->node = mountpoint->second->GetRootNode();
+		current->node = mountpoint->second->RootNode->Duplicate(UAPI_O_PATH);
 		mountpoint = m_mounts.find(current);
 	}
 
@@ -207,7 +207,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 			child->mount = current->mount;
 			child->parent = current;
 			child->name = iterator;
-			child->node = directory->Lookup(current->mount.get(), iterator);
+			child->node = directory->OpenNode(current->mount.get(), iterator, UAPI_O_DIRECTORY | UAPI_O_PATH, 0, 0, 0);	// <--- todo; hacked for now
 
 			current = child;			// move to the child node
 		}
@@ -235,7 +235,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 		while(mountpoint != m_mounts.end()) { 
 
 			current->mount = mountpoint->second;
-			current->node = mountpoint->second->GetRootNode();
+			current->node = mountpoint->second->RootNode->Duplicate(UAPI_O_PATH);
 			mountpoint = m_mounts.find(current);
 		}
 	}

@@ -89,13 +89,6 @@ std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source,
 
 class TempFileSystem : public VirtualMachine::FileSystem
 {
-	// FORWARD DECLARATIONS
-	//
-	class node_t;
-	class Directory;
-	class File;
-	class Mount;
-
 	// MOUNT_FLAGS
 	//
 	// Supported creation/mount operation flags
@@ -347,6 +340,41 @@ private:
 		node_t& operator=(node_t const&)=delete;
 	};
 
+	// handle_t
+	//
+	// Internal representation of a file system handle
+	template <typename _node_type>
+	class handle_t
+	{
+	public:
+
+		// Instance Constructor
+		//
+		handle_t(std::shared_ptr<_node_type> const& nodeptr);
+
+		// Destructor
+		//
+		virtual ~handle_t()=default;
+
+		//-------------------------------------------------------------------
+		// Fields
+
+		// node
+		//
+		// Shared pointer to the referenced node instance
+		std::shared_ptr<_node_type> const node;
+
+		// position
+		//
+		// Maintains the current file pointer
+		std::atomic<size_t> position;
+
+	private:
+
+		handle_t(const handle_t& rhs)=delete;
+		handle_t& operator=(const handle_t& rhs)=delete;
+	};
+
 	// directory_node_t
 	//
 	// Specialization of node_t for directory nodes
@@ -487,14 +515,10 @@ private:
 	// Node
 	//
 	// Implements VirtualMachine::Node
-	template <class _interface, typename _node_type>
+	template <class _interface, typename _handle_type>
 	class Node : public _interface
 	{
 	public:
-
-		// Instance Constructor
-		//
-		Node(std::shared_ptr<_node_type> const& node);
 
 		// Destructor
 		//
@@ -503,42 +527,42 @@ private:
 		//-------------------------------------------------------------------
 		// Member Functions
 
-		// SetAccessTime (VirtualMachine::Node)
+		// SetAccessTime (VirtualMachine::Handle)
 		//
 		// Changes the access time of this node
 		virtual uapi_timespec SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime) override;
 
-		// SetChangeTime (VirtualMachine::Node)
+		// SetChangeTime (VirtualMachine::Handle)
 		//
 		// Changes the change time of this node
 		virtual uapi_timespec SetChangeTime(VirtualMachine::Mount const* mount, uapi_timespec ctime) override;
 
-		// SetGroupId (VirtualMachine::Node)
+		// SetGroupId (VirtualMachine::Handle)
 		//
 		// Changes the owner group id for this node
 		virtual uapi_gid_t SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid) override;
 
-		// SetMode (VirtualMachine::Node)
+		// SetMode (VirtualMachine::Handle)
 		//
 		// Changes the mode flags for this node
 		virtual uapi_mode_t SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode) override;
 
-		// SetModificationTime (VirtualMachine::Node)
+		// SetModificationTime (VirtualMachine::Handle)
 		//
 		// Changes the modification time of this node
 		virtual uapi_timespec SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime) override;
 
-		// SetUserId (VirtualMachine::Node)
+		// SetUserId (VirtualMachine::Handle)
 		//
 		// Changes the owner user id for this node
 		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
 
-		// Sync (VirtualMachine::Node)
+		// Sync (VirtualMachine::Handle)
 		//
 		// Synchronizes all metadata and data associated with the file to storage
 		virtual void Sync(VirtualMachine::Mount const* mount) const override;
 
-		// SyncData (VirtualMachine::Node)
+		// SyncData (VirtualMachine::Handle)
 		//
 		// Synchronizes all data associated with the file to storage, not metadata
 		virtual void SyncData(VirtualMachine::Mount const* mount) const override;
@@ -557,6 +581,12 @@ private:
 		// Gets the change time of the node
 		__declspec(property(get=getChangeTime)) uapi_timespec ChangeTime;
 		virtual uapi_timespec getChangeTime(void) const override;
+
+		// Flags (VirtualMachine::Node)
+		//
+		// Gets the handle-level flags applied to this instance
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const override;
 
 		// GroupId (VirtualMachine::Node)
 		//
@@ -593,23 +623,29 @@ private:
 		Node(Node const&)=delete;
 		Node& operator=(Node const&)=delete;
 
+		// Instance Constructor
+		//
+		Node(std::shared_ptr<_handle_type> const& handle, uint32_t flags);
+
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<_node_type>		m_node;		// Shared node instance
+		std::shared_ptr<_handle_type> const	m_handle;	// Shared handle instance
+		std::atomic<uint32_t>				m_flags;	// Instance specific flags
 	};
 
 	// Directory
 	//
 	// Implements a directory node for this file system
-	class Directory : public Node<VirtualMachine::Directory, directory_node_t>
+	class Directory : public Node<VirtualMachine::Directory, handle_t<directory_node_t>>
 	{
 	friend class TempFileSystem;
 	public:
 
 		// Instance Constructors
 		//
-		Directory(std::shared_ptr<node_t> const& node);
+		Directory(std::shared_ptr<directory_node_t> const& node, uint32_t flags);
+		Directory(std::shared_ptr<handle_t<directory_node_t>> const& handle, uint32_t flags);
 
 		// Destructor
 		//
@@ -620,20 +656,25 @@ private:
 
 		// CreateDirectory (VirtualMachine::Directory)
 		//
-		// Creates or opens a directory node as a child of this directory
-		virtual std::unique_ptr<VirtualMachine::Directory> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+		// Creates a directory node as a child of this directory
+		virtual void CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
 		// CreateFile (VirtualMachine::Directory)
 		//
-		// Creates or opens a regular file node as a child of this directory
-		virtual std::unique_ptr<VirtualMachine::File> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+		// Creates a regular file node as a child of this directory
+		virtual void CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
 		// CreateSymbolicLink (VirtualMachine::Directory)
 		//
-		// Creates or opens a symbolic link as a child of this directory
-		virtual std::unique_ptr<VirtualMachine::SymbolicLink> CreateSymbolicLink(VirtualMachine::Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_gid_t gid) override;
+		// Creates a symbolic link as a child of this directory
+		virtual void CreateSymbolicLink(VirtualMachine::Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_gid_t gid) override;
 
-		// Enumerate  (VirtualMachine::Directory)
+		// Duplicate (VirtualMachine::Node)
+		//
+		// Duplicates this node instance
+		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(uint32_t flags) const override;
+
+		// Enumerate (VirtualMachine::Directory)
 		//
 		// Enumerates all of the entries in this directory
 		virtual void Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func) const override;
@@ -643,39 +684,20 @@ private:
 		// Links an existing node as a child of this directory
 		virtual void LinkNode(VirtualMachine::Mount const* mount, VirtualMachine::Node const* node, char_t const* name) override;
 
-		// Lookup (VirtualMachine::Directory)
+		// OpenNode (VirtualMachine::Directory)
 		//
-		// Accesses a child node of this directory by name
-		virtual std::unique_ptr<VirtualMachine::Node> Lookup(VirtualMachine::Mount const* mount, char_t const* name) const override;
+		// Opens or creates a child node of this directory by name
+		virtual std::unique_ptr<VirtualMachine::Node> OpenNode(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) const override;
 
-		// Read (VirtualMachine::Node)
+		// Seek (VirtualMachine::Node)
 		//
-		// Reads data from the node at the specified position
-		virtual size_t Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count) override;
-
-		// SetLength (VirtualMachine::Node)
-		//
-		// Sets the length of the node data
-		virtual size_t SetLength(VirtualMachine::Mount const* mount, size_t length) override;
+		// Changes the file position
+		virtual size_t Seek(VirtualMachine::Mount const* mount, ssize_t offset, int whence) override;
 
 		// UnlinkNode (VirtualMachine::Directory)
 		//
 		// Unlinks a child node from this directory
 		virtual void UnlinkNode(VirtualMachine::Mount const* mount, char_t const* name) override;
-
-		// Write (VirtualMachine::Node)
-		//
-		// Writes data into the node at the specified position
-		virtual size_t Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count) override;
-
-		//-------------------------------------------------------------------
-		// Properties
-
-		// Length (VirtualMachine::Node)
-		//
-		// Gets the length of the node data
-		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const override;
 
 	private:
 
@@ -686,14 +708,15 @@ private:
 	// File
 	//
 	// Implements VirtualMachine::File
-	class File : public Node<VirtualMachine::File, file_node_t>
+	class File : public Node<VirtualMachine::File, handle_t<file_node_t>>
 	{
 	friend class TempFileSystem;
 	public:
 
 		// Instance Constructor
 		//
-		File(std::shared_ptr<node_t> const& node);
+		File(std::shared_ptr<file_node_t> const& node, uint32_t flags);
+		File(std::shared_ptr<handle_t<file_node_t>> const& handle, uint32_t flags);
 
 		// Destructor
 		//
@@ -702,25 +725,45 @@ private:
 		//-------------------------------------------------------------------
 		// Member Functions
 
-		// Read (VirtualMachine::Node)
+		// Duplicate (VirtualMachine::Node)
 		//
-		// Reads data from the node at the specified position
-		virtual size_t Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count) override;
+		// Duplicates the Mount instance
+		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(uint32_t flags) const override;
 
-		// SetLength (VirtualMachine::Node)
+		// Read (VirtualMachine::File)
 		//
-		// Sets the length of the file
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t Read(VirtualMachine::Mount const* mount, void* buffer, size_t count) override;
+
+		// ReadAt (VirtualMachine::File)
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t ReadAt(VirtualMachine::Mount const* mount, ssize_t offset, int whence, void* buffer, size_t count) override;
+
+		// Seek (VirtualMachine::Node)
+		//
+		// Changes the file position
+		virtual size_t Seek(VirtualMachine::Mount const* mount, ssize_t offset, int whence) override;
+
+		// SetLength (VirtualMachine::File)
+		//
+		// Sets the length of the node data
 		virtual size_t SetLength(VirtualMachine::Mount const* mount, size_t length) override;
 
-		// Write (VirtualMachine::Node)
+		// Write (VirtualMachine::File)
 		//
-		// Writes data into the node at the specified position
-		virtual size_t Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count) override;
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t Write(VirtualMachine::Mount const* mount, const void* buffer, size_t count) override;
+
+		// WriteAt (VirtualMachine::File)
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t WriteAt(VirtualMachine::Mount const* mount, ssize_t offset, int whence, const void* buffer, size_t count) override;
 
 		//-------------------------------------------------------------------
 		// Properties
 
-		// Length (VirtualMachine::Node)
+		// Length (VirtualMachine::File)
 		//
 		// Gets the length of the node data
 		__declspec(property(get=getLength)) size_t Length;
@@ -730,6 +773,14 @@ private:
 
 		File(File const&)=delete;
 		File& operator=(File const&)=delete;
+
+		//-------------------------------------------------------------------
+		// Private Member Functions
+
+		// AdjustPosition
+		//
+		// Generates an adjusted file pointer position based on a delta
+		size_t AdjustPosition(sync::reader_writer_lock::scoped_lock const& lock, ssize_t delta, int whence) const;
 	};
 
 	// Mount
@@ -741,7 +792,7 @@ private:
 
 		// Instance Constructor
 		//
-		Mount(std::shared_ptr<TempFileSystem> const& fs, std::shared_ptr<directory_node_t> const& rootdir, uint32_t flags);
+		Mount(std::shared_ptr<TempFileSystem> const& fs, std::shared_ptr<Directory> const& rootdir, uint32_t flags);
 
 		// Copy Constructor
 		//
@@ -759,11 +810,6 @@ private:
 		// Duplicates this mount instance
 		virtual std::unique_ptr<VirtualMachine::Mount> Duplicate(void) const override;
 
-		// GetRootNode (VirtualMachine::Mount)
-		//
-		// Gets the root node of the mount point
-		virtual std::unique_ptr<VirtualMachine::Node> GetRootNode(void) const override;
-
 		//-------------------------------------------------------------------
 		// Properties
 
@@ -779,6 +825,12 @@ private:
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
 
+		// RootNode (VirtualMachine::Mount)
+		//
+		// Gets a pointer to the mount point root node instance
+		__declspec(property(get=getRootNode)) VirtualMachine::Node const* RootNode;
+		virtual VirtualMachine::Node const* getRootNode(void) const override;
+
 	private:
 
 		Mount& operator=(Mount const&)=delete;
@@ -787,21 +839,22 @@ private:
 		// Member Variables
 
 		std::shared_ptr<TempFileSystem>		m_fs;		// File system instance
-		std::shared_ptr<directory_node_t>	m_rootdir;	// Root node instance
+		std::shared_ptr<Directory>			m_rootdir;	// Root node instance
 		std::atomic<uint32_t>				m_flags;	// Mount-specific flags
 	};
 
 	// SymbolicLink
 	//
 	// Implements VirtualMachine::SymbolicLink
-	class SymbolicLink : public Node<VirtualMachine::SymbolicLink, symlink_node_t>
+	class SymbolicLink : public Node<VirtualMachine::SymbolicLink, handle_t<symlink_node_t>>
 	{
 	friend class TempFileSystem;
 	public:
 
-		// Instance Constructor
+		// Instance Constructors
 		//
-		SymbolicLink(std::shared_ptr<node_t> const& node);
+		SymbolicLink(std::shared_ptr<symlink_node_t> const& node, uint32_t flags);
+		SymbolicLink(std::shared_ptr<handle_t<symlink_node_t>> const& handle, uint32_t flags);
 
 		// Destructor
 		//
@@ -810,29 +863,18 @@ private:
 		//-------------------------------------------------------------------
 		// Member Functions
 
-		// Read (VirtualMachine::Node)
+		// Duplicate (VirtualMachine::Node)
 		//
-		// Reads data from the node at the specified position
-		virtual size_t Read(VirtualMachine::Mount const* mount, size_t offset, void* buffer, size_t count) override;
+		// Duplicates the Mount instance
+		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(uint32_t flags) const override;
 
-		// SetLength (VirtualMachine::Node)
+		// Seek (VirtualMachine::Node)
 		//
-		// Sets the length of the node data
-		virtual size_t SetLength(VirtualMachine::Mount const* mount, size_t length) override;
-
-		// Write (VirtualMachine::Node)
-		//
-		// Writes data into the node at the specified position
-		virtual size_t Write(VirtualMachine::Mount const* mount, size_t offset, void const* buffer, size_t count) override;
+		// Changes the file position
+		virtual size_t Seek(VirtualMachine::Mount const* mount, ssize_t offset, int whence) override;
 
 		//---------------------------------------------------------------------
 		// Properties
-
-		// Length (VirtualMachine::Node)
-		//
-		// Gets the length of the node data
-		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const override;
 
 		// Target (VirtualMachine::SymbolicLink)
 		//

@@ -100,14 +100,13 @@ void InstanceService::ExtractInitialRamFileSystem(Namespace const* ns, Namespace
 	// WriteNodeData (local)
 	//
 	// Writes the contents of a CpioFile data stream into a file system node instance
-	auto WriteNodeData = [](VirtualMachine::Mount const* mount, VirtualMachine::Node* node, CpioFile const& file) -> void 
+	auto WriteNodeData = [](VirtualMachine::Mount const* mount, VirtualMachine::File* node, CpioFile const& file) -> void 
 	{ 
-		size_t offset = 0;
 		std::vector<uint8_t> buffer(SystemInformation::PageSize << 2);
 
 		// Write all of the data from the CpioFile data stream into the destination node
 		node->SetLength(mount, file.Data.Length);
-		while(auto read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2)) offset += node->Write(mount, offset, &buffer[0], read);
+		while(auto read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2)) node->Write(mount, &buffer[0], read);
 	};
 
 	LogMessage(VirtualMachine::LogLevel::Informational, TEXT("Extracting initramfs archive "), cpioarchive.c_str());
@@ -158,16 +157,24 @@ void InstanceService::ExtractInitialRamFileSystem(Namespace const* ns, Namespace
 
 				// Create the hard link, overwrite any existing file data, and touch the modification time
 				auto existing = ns->LookupPath(destination, link->second.c_str(), UAPI_O_NOFOLLOW);
+				// todo: throw if existing is not a file
 				branchdir->LinkNode(existing->Mount, existing->Node, filepath.leaf());
-				WriteNodeData(existing->Mount, existing->Node, file);
+				WriteNodeData(existing->Mount, dynamic_cast<VirtualMachine::File*>(existing->Node), file);
 				existing->Node->SetModificationTime(branchpath->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
 			}
 				
 			else {
 				
 				// Create a new regular file node as a child of the branch directory and touch the modification time
-				auto node = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
-				WriteNodeData(branchpath->Mount, node.get(), file);
+				
+				// todo - clean up - CreateFile should return the File*, this is why
+				//auto node = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+				//WriteNodeData(branchpath->Mount, node.get(), file);
+				branchdir->CreateFile(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+				auto node = branchdir->OpenNode(branchpath->Mount, filepath.leaf(), UAPI_O_WRONLY, 0, 0, 0);
+				WriteNodeData(branchpath->Mount, dynamic_cast<VirtualMachine::File*>(node.get()), file);
+				/////////////////
+
 				node->SetModificationTime(branchpath->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
 			}
 		}
@@ -177,7 +184,13 @@ void InstanceService::ExtractInitialRamFileSystem(Namespace const* ns, Namespace
 		else if((file.Mode & UAPI_S_IFMT) == UAPI_S_IFDIR) {
 
 			// Create a new directory node as a child of the branch directory and touch the modification time
-			auto node = branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+
+			// todo - clean up - CreateDirectory should return the Directory*, this is why
+			//auto node = branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+			branchdir->CreateDirectory(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
+			auto node = branchdir->OpenNode(branchpath->Mount, filepath.leaf(), UAPI_O_DIRECTORY | UAPI_O_WRONLY, 0, 0, 0);
+			////////////////////
+
 			node->SetModificationTime(branchpath->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
 		}
 
@@ -191,7 +204,12 @@ void InstanceService::ExtractInitialRamFileSystem(Namespace const* ns, Namespace
 			target[file.Data.Length] = '\0';
 
 			// Create a new symbolic link node as a child of the branch directory and touch the modification time
-			auto node = branchdir->CreateSymbolicLink(branchpath->Mount, filepath.leaf(), target.get(), file.UserId, file.GroupId);
+
+			// todo - clean up - CreateSymbolicLink should return the SymbolicLink*, this is why
+			//auto node = branchdir->CreateSymbolicLink(branchpath->Mount, filepath.leaf(), target.get(), file.UserId, file.GroupId);
+			branchdir->CreateSymbolicLink(branchpath->Mount, filepath.leaf(), target.get(), file.UserId, file.GroupId);
+			auto node = branchdir->OpenNode(branchpath->Mount, filepath.leaf(), UAPI_O_NOFOLLOW | UAPI_O_WRONLY, 0, 0, 0);
+			///////////
 			node->SetModificationTime(branchpath->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
 		}
 

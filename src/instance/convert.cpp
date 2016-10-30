@@ -27,9 +27,25 @@
 
 #pragma warning(push, 4)
 
+// LARGE_INTEGER --> uapi_timespec
+//
+template<> uapi_timespec convert<uapi_timespec>(LARGE_INTEGER const& rhs)
+{
+	int64_t unixtime = (static_cast<uint64_t>(rhs.QuadPart) - 116444736000000000i64);
+	
+	// Convert the timespec components individually so they can be range checked
+	int64_t tv_sec = unixtime / 10000000i64;
+	int64_t tv_nsec = (unixtime * 100ui64) % 1000000000i64;
+
+	if(tv_sec > std::numeric_limits<uapi___kernel_time_t>::max()) throw std::out_of_range("tv_sec");
+	if(tv_nsec > std::numeric_limits<long>::max()) throw std::out_of_range("tv_nsec");
+
+	return{ static_cast<uapi___kernel_time_t>(tv_sec), static_cast<long>(tv_nsec) };
+}
+
 // datetime --> uapi_timespec
 //
-template<> uapi_timespec convert<uapi_timespec>(const datetime& rhs)
+template<> uapi_timespec convert<uapi_timespec>(datetime const& rhs)
 {
 	int64_t unixtime = (static_cast<uint64_t>(rhs) - 116444736000000000i64);
 	
@@ -45,9 +61,27 @@ template<> uapi_timespec convert<uapi_timespec>(const datetime& rhs)
 
 // uapi_timespec --> datetime
 //
-template<> datetime convert<datetime>(const uapi_timespec& rhs)
+template<> datetime convert<datetime>(uapi_timespec const& rhs)
 {
 	return datetime((rhs.tv_sec * 10000000i64) + (rhs.tv_nsec / 100i64) + 116444736000000000i64);
+}
+
+// uapi_timespec --> LARGE_INTEGER
+//
+template<> LARGE_INTEGER convert<LARGE_INTEGER>(uapi_timespec const& rhs)
+{
+	LARGE_INTEGER result;
+	result.QuadPart = ((rhs.tv_sec * 10000000i64) + (rhs.tv_nsec / 100i64) + 116444736000000000i64);
+
+	return result;
+}
+
+// uapi_timespec --> FILETIME
+//
+template<> FILETIME convert<FILETIME>(uapi_timespec const& rhs)
+{
+	LARGE_INTEGER largeint = convert<LARGE_INTEGER>(rhs);
+	return{ largeint.LowPart, static_cast<DWORD>(largeint.HighPart) };
 }
 
 //-----------------------------------------------------------------------------
