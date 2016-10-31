@@ -464,7 +464,7 @@ std::shared_ptr<TempFileSystem::symlink_node_t> TempFileSystem::symlink_node_t::
 //	nodeptr			- Shared reference to the node instance
 
 template <typename _node_type>
-TempFileSystem::handle_t<_node_type>::handle_t(std::shared_ptr<_node_type> const& nodeptr) : node(nodeptr)
+TempFileSystem::handle_t<_node_type>::handle_t(std::shared_ptr<_node_type> const& nodeptr) : node(nodeptr), position(0)
 {
 }
 
@@ -532,6 +532,9 @@ void TempFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mou
 	// Attempt to insert the new node into the collection
 	auto result = m_handle->node->nodes.emplace(name, node);
 	if(result.second == false) throw LinuxException(UAPI_EEXIST);
+
+	// Update mtime and ctime for this node
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 }
 
 //---------------------------------------------------------------------------
@@ -568,6 +571,9 @@ void TempFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, c
 	// Attempt to insert the new node into the collection
 	auto result = m_handle->node->nodes.emplace(name, node);
 	if(result.second == false) throw LinuxException(UAPI_EEXIST);
+
+	// Update mtime and ctime for this node
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 }
 
 //---------------------------------------------------------------------------
@@ -602,6 +608,9 @@ void TempFileSystem::Directory::CreateSymbolicLink(VirtualMachine::Mount const* 
 	// Attempt to insert the new node into the collection
 	auto result = m_handle->node->nodes.emplace(name, node);
 	if(result.second == false) throw LinuxException(UAPI_EEXIST);
+
+	// Update mtime and ctime for this node
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 }
 
 //---------------------------------------------------------------------------
@@ -615,6 +624,8 @@ void TempFileSystem::Directory::CreateSymbolicLink(VirtualMachine::Mount const* 
 
 std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Duplicate(uint32_t flags) const
 {
+	// todo: flags need to be checked/filtered here
+
 	// Duplicates reference the same handle but have their own flags
 	return std::make_unique<Directory>(m_handle, flags);
 }
@@ -629,7 +640,7 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Duplicate(uint3
 //	mount		- Mount point on which to perform this operation
 //	func		- Callback function to invoke for each entry; return false to stop
 
-void TempFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func) const
+void TempFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(func == nullptr) throw LinuxException(UAPI_EFAULT);
@@ -647,6 +658,9 @@ void TempFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, st
 		// The callback function can return false to stop the enumeration
 		if(!func({ entry.second->index, entry.second->mode, entry.first.c_str() })) break;
 	}
+
+	// Update atime for this node
+	UpdateAccessTime(mount, { 0, UAPI_UTIME_NOW });
 }
 
 //---------------------------------------------------------------------------
@@ -696,6 +710,9 @@ void TempFileSystem::Directory::LinkNode(VirtualMachine::Mount const* mount, Vir
 	// Attempt to insert the node into the collection with the new name
 	auto result = m_handle->node->nodes.emplace(name, nodeptr);
 	if(result.second == false) throw LinuxException(UAPI_EEXIST);
+
+	// Update mtime and ctime for this node
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 }
 
 //-----------------------------------------------------------------------------
@@ -712,8 +729,10 @@ void TempFileSystem::Directory::LinkNode(VirtualMachine::Mount const* mount, Vir
 //	uid			- Owner user id to assign if creating the node
 //	gid			- Owner group id to assign if creating the node
 
-std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::OpenNode(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) const
+std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::OpenNode(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
+	std::unique_ptr<VirtualMachine::Node>		result;			// Resultant Node instance
+
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -735,12 +754,26 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::OpenNode(Virtua
 	// Return the appropriate type of VirtualMachine::Node instance to the caller
 	switch(found->second->mode & UAPI_S_IFMT) {
 
-		case UAPI_S_IFDIR: return std::make_unique<Directory>(std::dynamic_pointer_cast<directory_node_t>(found->second), flags);
-		case UAPI_S_IFREG: return std::make_unique<File>(std::dynamic_pointer_cast<file_node_t>(found->second), flags);
-		case UAPI_S_IFLNK: return std::make_unique<SymbolicLink>(std::dynamic_pointer_cast<symlink_node_t>(found->second), flags);
+		case UAPI_S_IFDIR: 
+			result = std::make_unique<Directory>(std::dynamic_pointer_cast<directory_node_t>(found->second), flags);
+			break;
+
+		case UAPI_S_IFREG: 
+			result = std::make_unique<File>(std::dynamic_pointer_cast<file_node_t>(found->second), flags);
+			break;
+
+		case UAPI_S_IFLNK: 
+			result = std::make_unique<SymbolicLink>(std::dynamic_pointer_cast<symlink_node_t>(found->second), flags);
+			break;
+
+		// todo: other valid node types (block device, fifo, char device, etc)
+		default: throw LinuxException(UAPI_ENXIO);
 	}
 
-	throw LinuxException(UAPI_ENXIO);
+	// Update atime for this node
+	UpdateAccessTime(mount, { 0, UAPI_UTIME_NOW });
+
+	return result;										
 }
 
 //---------------------------------------------------------------------------
@@ -806,6 +839,9 @@ void TempFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, c
 	// Unlink the node by removing it from this directory; the node itself will
 	// die off when it's no longer in use but this prevents it from being looked up
 	m_handle->node->nodes.erase(found->first);
+
+	// Update mtime and ctime for this node
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 }
 
 //
@@ -894,6 +930,11 @@ size_t TempFileSystem::File::AdjustPosition(sync::reader_writer_lock::scoped_loc
 
 std::unique_ptr<VirtualMachine::Node> TempFileSystem::File::Duplicate(uint32_t flags) const
 {
+	// O_DIRECTORY is not applicable to file nodes, throw ENOTDIR
+	if((flags & UAPI_O_DIRECTORY) == UAPI_O_DIRECTORY) throw LinuxException(UAPI_ENOTDIR);
+
+	// todo: flags need to be checked/filtered here
+
 	// Duplicates reference the same handle but have their own flags
 	return std::make_unique<File>(m_handle, flags);
 }
@@ -925,6 +966,12 @@ size_t TempFileSystem::File::Read(VirtualMachine::Mount const* mount, void* buff
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
+	//
+	// TODO: O_PATH here and elsewhere -- the semantics are easy for Files.  For directories
+	// it may be a little different, but perhaps operations like mknodat() would duplicate the
+	// O_PATH handle before accessing the directory node?  See open(2)
+	//
+
 	// Verify the provided mount point and ensure that the handle is not write-only
 	if(mount->FileSystem != m_handle->node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
@@ -941,6 +988,9 @@ size_t TempFileSystem::File::Read(VirtualMachine::Mount const* mount, void* buff
 	if(count > 0) memcpy(buffer, &m_handle->node->data[pos], count);
 
 	m_handle->position = (pos + count);		// Set the new position
+
+	// Update atime for this node
+	UpdateAccessTime(mount, { 0, UAPI_UTIME_NOW });
 
 	return count;
 }
@@ -978,6 +1028,9 @@ size_t TempFileSystem::File::ReadAt(VirtualMachine::Mount const* mount, ssize_t 
 
 	// Copy the requested data from the file into the provided buffer
 	if(count > 0) memcpy(buffer, &m_handle->node->data[pos], count);
+
+	// Update atime for this node
+	UpdateAccessTime(mount, { 0, UAPI_UTIME_NOW });
 
 	return count;
 }
@@ -1036,6 +1089,9 @@ size_t TempFileSystem::File::SetLength(VirtualMachine::Mount const* mount, size_
 	// If the new length is less than the original length, trim the buffer
 	if(shrink) m_handle->node->data.shrink_to_fit();
 
+	// Update mtime and ctime for this node
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
+
 	return m_handle->node->data.size();
 }
 
@@ -1061,7 +1117,8 @@ size_t TempFileSystem::File::Write(VirtualMachine::Mount const* mount, const voi
 
 	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
 
-	size_t pos = m_handle->position;		// Copy the current position
+	// O_APPEND: Always move the position to the end of the file data
+	size_t pos = ((m_flags & UAPI_O_APPEND) == UAPI_O_APPEND) ? m_handle->node->data.size() : m_handle->position;
 
 	// Ensure that the node buffer is large enough to accept the data
 	if((pos + count) > m_handle->node->data.size()) {
@@ -1074,6 +1131,9 @@ size_t TempFileSystem::File::Write(VirtualMachine::Mount const* mount, const voi
 	if(count > 0) memcpy(&m_handle->node->data[pos], buffer, count);
 	
 	m_handle->position = (pos + count);		// Set the new position
+
+	// Update mtime and ctime for this node
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return count;
 }
@@ -1114,6 +1174,9 @@ size_t TempFileSystem::File::WriteAt(VirtualMachine::Mount const* mount, ssize_t
 
 	// Copy the data from the input buffer into the node data buffer
 	if(count > 0) memcpy(&m_handle->node->data[pos], buffer, count);
+
+	// Update mtime and ctime for this node
+	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return count;
 }
@@ -1303,7 +1366,7 @@ uapi_timespec TempFileSystem::Node<_interface, _handle_type>::getModificationTim
 //
 // Changes the access time of this node
 //
-// Arugments:
+// Arguments:
 //
 //	mount		- Mount point on which to perform this operation
 //	atime		- New access time to be set
@@ -1317,25 +1380,15 @@ uapi_timespec TempFileSystem::Node<_interface, _handle_type>::SetAccessTime(Virt
 	// Check that the handle was not opened in read-only mode and the mount is not read-only
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-	
-	// If the handle or the underlying mount was opened with NOATIME, there is nothing to do
-	if((m_flags & UAPI_O_NOATIME) == UAPI_O_NOATIME) return m_handle->node->atime;
-	if((mount->Flags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME) return m_handle->node->atime;
 
-	bool update = false;								// Flag to actually update atime
-	datetime newatime = convert<datetime>(atime);		// Convert into a datetime value
+	// UTIME_OMIT - Don't actually change the access time
+	if(atime.tv_nsec == UAPI_UTIME_OMIT) return m_handle->node->atime;
 
-	// Update atime if previous atime is more than 24 hours in the past (see mount(2))
-	if(newatime > (convert<datetime>(m_handle->node->atime.load()) + timespan::days(1))) update = true;
+	// UTIME_NOW - Use the current datetime as the timestamp
+	if(atime.tv_nsec == UAPI_UTIME_NOW) atime = convert<uapi_timespec>(datetime::now());
 
-	// MS_STRICTATIME - always update atime
-	else if((mount->Flags & UAPI_MS_STRICTATIME) == UAPI_MS_STRICTATIME) update = true;
-
-	// Default (MS_RELATIME) - update atime if it is more recent than ctime or mtime
-	else if((newatime >= convert<datetime>(m_handle->node->ctime.load())) || (newatime >= convert<datetime>(m_handle->node->mtime.load()))) update = true;
-
-	if(update) m_handle->node->atime = atime;
-	return m_handle->node->atime;
+	m_handle->node->atime = atime;
+	return atime;
 }
 
 //---------------------------------------------------------------------------
@@ -1343,7 +1396,7 @@ uapi_timespec TempFileSystem::Node<_interface, _handle_type>::SetAccessTime(Virt
 //
 // Changes the change time of this node
 //
-// Arugments:
+// Arguments:
 //
 //	mount		- Mount point on which to perform this operation
 //	ctime		- New change time to be set
@@ -1357,6 +1410,12 @@ uapi_timespec TempFileSystem::Node<_interface, _handle_type>::SetChangeTime(Virt
 	// Check that the handle was not opened in read-only mode and the mount is not read-only
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// UTIME_OMIT - Don't actually change the access time
+	if(ctime.tv_nsec == UAPI_UTIME_OMIT) return m_handle->node->atime;
+
+	// UTIME_NOW - Use the current datetime as the timestamp
+	if(ctime.tv_nsec == UAPI_UTIME_NOW) ctime = convert<uapi_timespec>(datetime::now());
 
 	m_handle->node->ctime = ctime;
 	return ctime;
@@ -1383,6 +1442,10 @@ uapi_gid_t TempFileSystem::Node<_interface, _handle_type>::SetGroupId(VirtualMac
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	m_handle->node->gid = gid;
+
+	// Update ctime for this node
+	m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
+
 	return gid;
 }
 
@@ -1411,6 +1474,10 @@ uapi_mode_t TempFileSystem::Node<_interface, _handle_type>::SetMode(VirtualMachi
 	mode = ((mode & UAPI_S_IALLUGO) | (m_handle->node->mode.load() & ~UAPI_S_IALLUGO));
 
 	m_handle->node->mode = mode;
+
+	// Update ctime for this node
+	m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
+
 	return mode;
 }
 
@@ -1419,7 +1486,7 @@ uapi_mode_t TempFileSystem::Node<_interface, _handle_type>::SetMode(VirtualMachi
 //
 // Changes the modification time of this node
 //
-// Arugments:
+// Arguments:
 //
 //	mount		- Mount point on which to perform this operation
 //	mtime		- New modification time to be set
@@ -1434,6 +1501,13 @@ uapi_timespec TempFileSystem::Node<_interface, _handle_type>::SetModificationTim
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
+	// UTIME_OMIT - Don't actually change the access time
+	if(mtime.tv_nsec == UAPI_UTIME_OMIT) return m_handle->node->atime;
+
+	// UTIME_NOW - Use the current datetime as the timestamp
+	if(mtime.tv_nsec == UAPI_UTIME_NOW) mtime = convert<uapi_timespec>(datetime::now());
+
+	// Setting the modification time also sets the change time
 	m_handle->node->mtime = m_handle->node->ctime = mtime;
 	return mtime;
 }
@@ -1459,6 +1533,10 @@ uapi_uid_t TempFileSystem::Node<_interface, _handle_type>::SetUserId(VirtualMach
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	m_handle->node->uid = uid;
+
+	// Update the ctime for this node
+	m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
+
 	return uid;
 }
 
@@ -1504,6 +1582,51 @@ void TempFileSystem::Node<_interface, _handle_type>::SyncData(VirtualMachine::Mo
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	// NO-OP
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Node::UpdateAccessTime (private)
+//
+// Changes the access time of this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	atime		- New access time to be set
+
+template <class _interface, typename _handle_type>
+uapi_timespec TempFileSystem::Node<_interface, _handle_type>::UpdateAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
+{
+	bool update = false;								// Flag to actually change the atime
+
+	_ASSERTE(mount);
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// O_NOATIME on the handle, MS_NOATIME on the mount or UTIME_OMIT on the timestamp -- do nothing
+	if((m_flags & UAPI_O_NOATIME) == UAPI_O_NOATIME) return m_handle->node->atime;
+	if((mount->Flags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME) return m_handle->node->atime;
+	if(atime.tv_nsec == UAPI_UTIME_OMIT) return m_handle->node->atime;
+
+	// If this is a directory node, also do nothing if MS_NODIRATIME has been set
+	if(((m_handle->node->mode & UAPI_S_IFMT) == UAPI_S_IFDIR) && ((mount->Flags & UAPI_MS_NODIRATIME) == UAPI_MS_NODIRATIME)) return m_handle->node->atime;
+
+	// If UTIME_NOW has been specified, use the current date/time otherwise convert the provided timespec
+	datetime newatime = (atime.tv_nsec == UAPI_UTIME_NOW) ? datetime::now() : convert<datetime>(atime);
+
+	// Update atime if previous atime is more than 24 hours in the past (see mount(2))
+	if(newatime > (convert<datetime>(m_handle->node->atime.load()) + timespan::days(1))) update = true;
+
+	// MS_STRICTATIME - always update atime
+	else if((mount->Flags & UAPI_MS_STRICTATIME) == UAPI_MS_STRICTATIME) update = true;
+
+	// Default (MS_RELATIME) - update atime if it is more recent than ctime or mtime
+	else if((newatime >= convert<datetime>(m_handle->node->ctime.load())) || (newatime >= convert<datetime>(m_handle->node->mtime.load()))) update = true;
+
+	// Convert from a datetime back into a timespec and update the node timestamp
+	atime = convert<uapi_timespec>(newatime);
+	if(update) m_handle->node->atime = atime;
+
+	return atime;
 }
 
 //---------------------------------------------------------------------------
@@ -1589,6 +1712,7 @@ size_t TempFileSystem::SymbolicLink::Seek(VirtualMachine::Mount const* mount, ss
 
 char_t const* TempFileSystem::SymbolicLink::getTarget(void) const
 {
+	// todo: need to update atime, therefore this must be a method instead that accepts a Mount*
 	return m_handle->node->target.c_str();
 }
 

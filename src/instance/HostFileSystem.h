@@ -263,7 +263,7 @@ private:
 		// Enumerate (VirtualMachine::Directory)
 		//
 		// Enumerates all of the entries in this directory
-		virtual void Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func) const override;
+		virtual void Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func) override;
 
 		// LinkNode (VirtualMachine::Directory)
 		//
@@ -273,7 +273,7 @@ private:
 		// OpenNode (VirtualMachine::Directory)
 		//
 		// Opens a child node of this directory by name
-		virtual std::unique_ptr<VirtualMachine::Node> OpenNode(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) const override;
+		virtual std::unique_ptr<VirtualMachine::Node> OpenNode(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
 		// Seek (VirtualMachine::Node)
 		//

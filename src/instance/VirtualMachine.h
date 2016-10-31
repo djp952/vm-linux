@@ -369,7 +369,7 @@ public:
 		// Enumerate
 		//
 		// Enumerates all of the entries in this directory
-		virtual void Enumerate(Mount const* mount, std::function<bool(DirectoryEntry const&)> func) const = 0;
+		virtual void Enumerate(Mount const* mount, std::function<bool(DirectoryEntry const&)> func) = 0;
 
 		// LinkNode
 		//
@@ -379,7 +379,7 @@ public:
 		// OpenNode
 		//
 		// Opens a child node of this directory by name
-		virtual std::unique_ptr<Node> OpenNode(Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) const = 0;
+		virtual std::unique_ptr<Node> OpenNode(Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 
 		// UnlinkNode
 		//

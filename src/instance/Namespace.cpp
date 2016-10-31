@@ -168,6 +168,11 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 
 	UNREFERENCED_PARAMETER(lock);		// Unused; ensures the caller holds a scoped_lock
 
+	//
+	// todo: lookups should not alter the access time of directories, need to specify
+	// O_NOATIME when the node is duplicated?
+	//
+
 	if(path == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(numlinks == nullptr) throw LinuxException(UAPI_EFAULT);
 

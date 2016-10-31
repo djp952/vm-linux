@@ -122,10 +122,12 @@ void InstanceService::ExtractInitialRamFileSystem(Namespace const* ns, Namespace
 		// If a . entry was specified in the CPIO archive, apply the metadata to the current directory
 		if(strcmp(filepath.leaf(), ".") == 0) {
 
-			destination->Node->SetMode(destination->Mount, file.Mode);
-			destination->Node->SetUserId(destination->Mount, file.UserId);
-			destination->Node->SetGroupId(destination->Mount, file.GroupId);
-			destination->Node->SetModificationTime(destination->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
+			// The node pointed to by path needs to be duplicated in order to get write access
+			auto node = destination->Node->Duplicate(UAPI_O_WRONLY | UAPI_O_DIRECTORY);
+			node->SetMode(destination->Mount, file.Mode);
+			node->SetUserId(destination->Mount, file.UserId);
+			node->SetGroupId(destination->Mount, file.GroupId);
+			node->SetModificationTime(destination->Mount, uapi_timespec{ static_cast<uapi___kernel_time_t>(file.ModificationTime), 0 });
 
 			return;
 		}

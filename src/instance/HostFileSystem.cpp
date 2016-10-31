@@ -315,7 +315,7 @@ std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::Duplicate(uint3
 //	mount		- Mount point on which to perform this operation
 //	func		- Callback function to invoke for each entry; return false to stop
 
-void HostFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func) const
+void HostFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
 {
 	// todo
 	throw LinuxException(UAPI_EPERM);
@@ -402,7 +402,7 @@ HANDLE HostFileSystem::Directory::OpenHandle(wchar_t const* path, uint32_t flags
 //	gid			- Owner group id to assign to the node if created
 
 std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::OpenNode(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags,
-	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) const 
+	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) 
 {
 	std::unique_ptr<VirtualMachine::Node>		node;		// Resultant Node instance
 
