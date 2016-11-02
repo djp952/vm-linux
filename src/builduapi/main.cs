@@ -70,13 +70,15 @@ namespace zuki.vm.linux
 				if (commandline.Switches.ContainsKey("nodecls")) nodecls = true;
 
 				// -m64 / -x64 --> x64 build target
-				if (commandline.Switches.ContainsKey("m64") || commandline.Switches.ContainsKey("x64")) clangargs.Add("-m64");
+				if (commandline.Switches.ContainsKey("m64") || commandline.Switches.ContainsKey("x64"))
+					clangargs.AddRange(new string[] { "-target", "x86_64-pc-linux-gnu" });
 
 				// -mx32 / -x32 --> x32 build target
-				else if (commandline.Switches.ContainsKey("mx32") || commandline.Switches.ContainsKey("x32")) clangargs.Add("-mx32");
+				else if (commandline.Switches.ContainsKey("mx32") || commandline.Switches.ContainsKey("x32"))
+					clangargs.AddRange(new string[] { "-target", "x86_64-pc-linux-gnux32" });
 
 				// -m32 / -x86 --> x86 build target (default)
-				else clangargs.Add("-m32");
+				else clangargs.AddRange(new string[] { "-target", "i686-pc-linux-gnu" });
 
 				// Verify that the input file and include directory exist
 				if (!SysFile.Exists(infile)) throw new FileNotFoundException("Translation unit input file not found", infile);

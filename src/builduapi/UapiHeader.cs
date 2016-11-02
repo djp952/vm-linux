@@ -91,14 +91,22 @@ namespace zuki.vm.linux
 						else if (cursor.Kind == CursorKind.TypedefDecl) EmitTypedef(writer, cursor, prefix);
 						else if (cursor.Kind == CursorKind.UnionDecl) EmitUnion(writer, cursor, prefix);
 
+						// Default to emitting the expected alignment of the declaration, but don't do
+						// it for POD types; GCC and Visual C++ default align 8-byte integers differently
+						bool emitalignment = true;
+						if ((cursor.Kind == CursorKind.TypedefDecl) && (cursor.UnderlyingTypedefType.IsPOD)) emitalignment = false;
+
 						// Apply a static_assert in the output to verify that the compiled size of
 						// structures, typedefs and unions matches what the clang API calculated
 						if ((cursor.Kind != CursorKind.EnumDecl) && (cursor.Type.Size != null))
 						{
 							writer.WriteLine();
 							writer.WriteLine("#if !defined(__midl)");
-							writer.WriteLine("static_assert(alignof(" + prefix.ToLower() + "_" + cursor.DisplayName + ") == " + cursor.Type.Alignment.ToString() +
+
+							// Emitting the alignment is optional, it was removed for POD types
+							if(emitalignment) writer.WriteLine("static_assert(alignof(" + prefix.ToLower() + "_" + cursor.DisplayName + ") == " + cursor.Type.Alignment.ToString() +
 								", \"" + prefix.ToLower() + "_" + cursor.DisplayName + ": incorrect alignment\");");
+
 							writer.WriteLine("static_assert(sizeof(" + prefix.ToLower() + "_" + cursor.DisplayName + ") == " + cursor.Type.Size.ToString() +
 								", \"" + prefix.ToLower() + "_" + cursor.DisplayName + ": incorrect size\");");
 							writer.WriteLine("#endif");
@@ -229,7 +237,7 @@ namespace zuki.vm.linux
 			{
 				if (type.DeclarationCursor.Kind == CursorKind.StructDecl) EmitStruct(writer, type.DeclarationCursor, prefix);
 				else if (type.DeclarationCursor.Kind == CursorKind.UnionDecl) EmitUnion(writer, type.DeclarationCursor, prefix);
-				else throw new Exception("Unexpected anonymous type dectected for field " + cursor.DisplayName);
+				else throw new Exception("Unexpected anonymous type detected for field " + cursor.DisplayName);
 			}
 
 			// Not an anonymous struct/union, just spit out the data type
@@ -357,8 +365,15 @@ namespace zuki.vm.linux
 			//
 			if (ClangFile.IsNull(type.DeclarationCursor.Location.File))
 			{
-				// Built-in types just get emitted as written in the source file
-				writer.Write(type.Spelling + suffix);
+				// Built-in types just get emitted as written in the source file, with
+				// the exception of "long" and "unsigned long".  For those types use the
+				// special VC++ "__int3264" data type which will be 4 bytes long on 32-bit
+				// builds and 8 bytes long on 64-bit builds to match GCC
+
+				if (type.Kind == TypeKind.Long) writer.Write("__int3264" + suffix);
+				else if (type.Kind == TypeKind.ULong) writer.Write("__int3264" + suffix);
+				else writer.Write(type.Spelling + suffix);
+
 				return;
 			}
 
@@ -394,7 +409,7 @@ namespace zuki.vm.linux
 			{
 				if (type.DeclarationCursor.Kind == CursorKind.StructDecl) EmitStruct(writer, type.DeclarationCursor, prefix);
 				else if (type.DeclarationCursor.Kind == CursorKind.UnionDecl) EmitUnion(writer, type.DeclarationCursor, prefix);
-				else throw new Exception("Unexpected anonymous type dectected for typedef " + prefix.ToLower() + "_" + cursor.DisplayName);
+				else throw new Exception("Unexpected anonymous type detected for typedef " + prefix.ToLower() + "_" + cursor.DisplayName);
 
 				writer.WriteLine(prefix.ToLower() + "_" + cursor.DisplayName + ";");
 			}
