@@ -91,22 +91,11 @@ namespace zuki.vm.linux
 						else if (cursor.Kind == CursorKind.TypedefDecl) EmitTypedef(writer, cursor, prefix);
 						else if (cursor.Kind == CursorKind.UnionDecl) EmitUnion(writer, cursor, prefix);
 
-						// Default to emitting the expected alignment of the declaration, but don't do
-						// it for POD types; GCC and Visual C++ default align 8-byte integers differently
-						bool emitalignment = true;
-						if ((cursor.Kind == CursorKind.TypedefDecl) && (cursor.UnderlyingTypedefType.IsPOD)) emitalignment = false;
-
 						// Apply a static_assert in the output to verify that the compiled size of
 						// structures, typedefs and unions matches what the clang API calculated
 						if ((cursor.Kind != CursorKind.EnumDecl) && (cursor.Type.Size != null))
 						{
-							writer.WriteLine();
 							writer.WriteLine("#if !defined(__midl)");
-
-							// Emitting the alignment is optional, it was removed for POD types
-							if(emitalignment) writer.WriteLine("static_assert(alignof(" + prefix.ToLower() + "_" + cursor.DisplayName + ") == " + cursor.Type.Alignment.ToString() +
-								", \"" + prefix.ToLower() + "_" + cursor.DisplayName + ": incorrect alignment\");");
-
 							writer.WriteLine("static_assert(sizeof(" + prefix.ToLower() + "_" + cursor.DisplayName + ") == " + cursor.Type.Size.ToString() +
 								", \"" + prefix.ToLower() + "_" + cursor.DisplayName + ": incorrect size\");");
 							writer.WriteLine("#endif");
