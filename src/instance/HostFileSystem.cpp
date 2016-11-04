@@ -67,6 +67,64 @@ static LinuxException MapHostException(DWORD code)
 	return LinuxException(linuxcode, Win32Exception(code));
 }
 
+//-----------------------------------------------------------------------------
+// NormalizePath (local)
+//
+// Gets the normalized path for a Windows file system object.  Note that this
+// an expensive operation - intended only to normalize the path of a base object
+// like a mount point directory
+//
+// Arguments:
+//
+//	objectpath		- Path to normalize
+
+static windows_path NormalizePath(wchar_t const* objectpath)
+{
+	std::unique_ptr<wchar_t[]>	path;					// Normalized file system path
+	DWORD						cch, pathlen = 0;		// Path string lengths
+
+	// Get the object attributes to determine if this is a directory object or not
+	DWORD attributes = GetFileAttributes(objectpath);
+	if(attributes == INVALID_FILE_ATTRIBUTES) throw LinuxException(UAPI_ENOENT);
+
+	// Calcuate the required CreateFile() flags
+	DWORD flags = FILE_FLAG_POSIX_SEMANTICS;
+	if((attributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY) flags |= FILE_FLAG_BACKUP_SEMANTICS;
+
+	// Open a query-only handle against the file system object
+	HANDLE handle = CreateFile(objectpath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, flags, nullptr);
+	if(handle == INVALID_HANDLE_VALUE) throw MapHostException(GetLastError());
+
+	try {
+
+		// There is a possibility that the file system object could be renamed externally between calls to
+		// GetFinalPathNameByHandle so this must be done in a loop to ensure that it ultimately succeeds
+		do {
+
+			// If the buffer is too small, this will return the required size including the null terminator
+			// otherwise it will return the number of characters copied into the output buffer
+			cch = GetFinalPathNameByHandleW(handle, path.get(), pathlen, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+			if(cch == 0) throw MapHostException(GetLastError());
+
+			if(cch > pathlen) {
+
+				// The buffer is too small for the current object path, reallocate it
+				path = std::make_unique<wchar_t[]>(pathlen = cch);
+				if(!path) throw LinuxException(UAPI_ENOMEM);
+			}
+
+		} while(cch >= pathlen);
+
+		CloseHandle(handle);			// Finished with the object handle
+
+		// Use (cch + 1) as the path buffer length rather than pathlen here, if the
+		// object was renamed the buffer may actually be longer than necessary
+		return windows_path{ std::move(path), cch + 1 };
+	}
+
+	catch(...) { CloseHandle(handle); throw; }
+}
+
 //---------------------------------------------------------------------------
 // MountHostFileSystem
 //
@@ -90,9 +148,10 @@ std::unique_ptr<VirtualMachine::Mount> MountHostFileSystem(char_t const* source,
 	// Verify that the specified flags are supported for a creation operation
 	if(options.Flags & ~HostFileSystem::MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
 
-	// Construct the shared file system instance and root node instance
+	// Construct the shared file system instance and root node instance.  Use a fully normalized
+	// path (expensive operation) to the source directory, don't rely on what was provided
 	auto fs = std::make_shared<HostFileSystem>(options.Flags & ~UAPI_MS_PERMOUNT_MASK);
-	auto rootnode = std::make_shared<HostFileSystem::node_t>(fs, windows_path(std::to_wstring(source).c_str()));
+	auto rootnode = std::make_shared<HostFileSystem::node_t>(fs, NormalizePath(std::to_wstring(source).c_str()));
 
 	// Create and return the mount point instance to the caller, wrapping the root node into a Directory
 	return std::make_unique<HostFileSystem::Mount>(fs, std::make_unique<HostFileSystem::Directory>(rootnode), options.Flags & UAPI_MS_PERMOUNT_MASK);
@@ -125,7 +184,7 @@ HostFileSystem::HostFileSystem(uint32_t flags) : Flags(flags)
 //	hostpath		- Path to the node on the host file system
 
 HostFileSystem::node_t::node_t(std::shared_ptr<HostFileSystem> const& filesystem, windows_path&& hostpath) : 
-	node_t(filesystem, std::move(hostpath), GetFileAttributes(path))
+	node_t(filesystem, std::move(hostpath), GetFileAttributes(hostpath))
 {
 }
 
@@ -139,7 +198,7 @@ HostFileSystem::node_t::node_t(std::shared_ptr<HostFileSystem> const& filesystem
 //	attributes		- Attributes of the target node on the host file system
 
 HostFileSystem::node_t::node_t(std::shared_ptr<HostFileSystem> const& filesystem, windows_path&& hostpath, DWORD nodeattrs) :
-	fs(filesystem), path(hostpath), attributes(nodeattrs)
+	fs(filesystem), path(std::move(hostpath)), attributes(nodeattrs)
 {
 	_ASSERTE(fs);
 
