@@ -45,7 +45,21 @@
 // MS_XXXXX flags that apply to a mount rather than an entire file system
 #define MS_PERMOUNT_MASK (MS_NODEV | MS_NOEXEC | MS_NOSUID | MS_NOATIME | MS_NODIRATIME | MS_RELATIME)
 
-// include/linux/stat.h
+// asm-generic/fcntl.h
+//
+#define O_EXEC 4		// Special flag for EXECUTE access on handles, should not be obeyed by system calls
+
+// asm/stat.h
+//
+// Define a generic stat that compiles on either platform as stat3264.  x86 should use
+// stat64, whereas x64 should use stat
+#ifdef __x86_64__
+typedef struct stat stat3264;
+#else
+typedef struct stat64 stat3264;
+#endif
+
+// linux/stat.h
 //
 #define S_IRWXUGO	(S_IRWXU | S_IRWXG | S_IRWXO)
 #define S_IALLUGO	(S_ISUID | S_ISGID | S_ISVTX | S_IRWXUGO)

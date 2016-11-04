@@ -51,7 +51,7 @@ Namespace::Namespace(std::unique_ptr<VirtualMachine::Mount>&& rootmount)
 	// initially refers to the absolute root of the namespace file system
 	m_rootpath = std::make_shared<path_t>();
 	m_rootpath->mount = mountpoint;
-	m_rootpath->node = mountpoint->RootNode->Duplicate(UAPI_O_PATH);
+	m_rootpath->node = mountpoint->RootNode->Duplicate();
 	m_rootpath->name = "/";
 	m_rootpath->parent = nullptr;
 }
@@ -91,7 +91,7 @@ std::unique_ptr<Namespace::Path> Namespace::AddMount(std::unique_ptr<VirtualMach
 	auto mountpath = std::make_shared<path_t>();
 	mountpath->mount = mountpoint;
 	mountpath->name = path->m_path->name;
-	mountpath->node = mountpoint->RootNode->Duplicate(UAPI_O_PATH);
+	mountpath->node = mountpoint->RootNode->Duplicate();
 	mountpath->parent = path->m_path->parent;
 
 	// Acquire an exclusive lock against the mount collection
@@ -168,11 +168,6 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 
 	UNREFERENCED_PARAMETER(lock);		// Unused; ensures the caller holds a scoped_lock
 
-	//
-	// todo: lookups should not alter the access time of directories, need to specify
-	// O_NOATIME when the node is duplicated?
-	//
-
 	if(path == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(numlinks == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -185,7 +180,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 	while(mountpoint != m_mounts.end()) { 
 
 		current->mount = mountpoint->second;
-		current->node = mountpoint->second->RootNode->Duplicate(UAPI_O_PATH);
+		current->node = mountpoint->second->RootNode->Duplicate();
 		mountpoint = m_mounts.find(current);
 	}
 
@@ -212,7 +207,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 			child->mount = current->mount;
 			child->parent = current;
 			child->name = iterator;
-			child->node = directory->OpenNode(current->mount.get(), iterator, UAPI_O_DIRECTORY | UAPI_O_PATH, 0, 0, 0);	// <--- todo; hacked for now
+			child->node = directory->Lookup(current->mount.get(), iterator);
 
 			current = child;			// move to the child node
 		}
@@ -240,7 +235,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 		while(mountpoint != m_mounts.end()) { 
 
 			current->mount = mountpoint->second;
-			current->node = mountpoint->second->RootNode->Duplicate(UAPI_O_PATH);
+			current->node = mountpoint->second->RootNode->Duplicate();
 			mountpoint = m_mounts.find(current);
 		}
 	}

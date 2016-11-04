@@ -67,46 +67,6 @@ static LinuxException MapHostException(DWORD code)
 	return LinuxException(linuxcode, Win32Exception(code));
 }
 
-//-----------------------------------------------------------------------------
-// GetNormalizedPath (local)
-//
-// Gets the normalized path for a Windows file system handle
-//
-// Arguments:
-//
-//	handle		- Windows file system handle to get the path for
-
-windows_path GetNormalizedPath(HANDLE const handle)
-{
-	std::unique_ptr<wchar_t[]>	pathstr;				// Normalized file system path
-	DWORD						cch, pathlen = 0;		// Path string lengths
-
-	_ASSERTE((handle) && (handle != INVALID_HANDLE_VALUE));
-	if((handle == nullptr) || (handle == INVALID_HANDLE_VALUE)) throw LinuxException(UAPI_EINVAL);
-
-	// There is a possibility that the file system object could be renamed externally between calls to
-	// GetFinalPathNameByHandle so this must be done in a loop to ensure that it ultimately succeeds
-	do {
-
-		// If the buffer is too small, this will return the required size including the null terminator
-		// otherwise it will return the number of characters copied into the output buffer
-		cch = GetFinalPathNameByHandleW(handle, pathstr.get(), pathlen, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
-		if(cch == 0) throw MapHostException(GetLastError());
-
-		if(cch > pathlen) {
-
-			// The buffer is too small for the current object path, reallocate it
-			pathstr = std::make_unique<wchar_t[]>(pathlen = cch);
-			if(!pathstr) throw LinuxException(UAPI_ENOMEM);
-		}
-
-	} while(cch >= pathlen);
-
-	// Use (cch + 1) as the path buffer length rather than pathlen here, if the
-	// object was renamed the buffer may actually be longer than necessary
-	return windows_path(std::move(pathstr), cch + 1);
-}
-
 //---------------------------------------------------------------------------
 // MountHostFileSystem
 //
@@ -121,8 +81,6 @@ windows_path GetNormalizedPath(HANDLE const handle)
 
 std::unique_ptr<VirtualMachine::Mount> MountHostFileSystem(char_t const* source, uint32_t flags, void const* data, size_t datalength)
 {
-	bool sandbox = true;						// Flag to sandbox the virtual file system
-
 	// Source is ignored, but has to be specified by contract
 	if(source == nullptr) throw LinuxException(UAPI_EFAULT);
 
@@ -132,30 +90,12 @@ std::unique_ptr<VirtualMachine::Mount> MountHostFileSystem(char_t const* source,
 	// Verify that the specified flags are supported for a creation operation
 	if(options.Flags & ~HostFileSystem::MOUNT_FLAGS) throw LinuxException(UAPI_EINVAL);
 
-	try {
+	// Construct the shared file system instance and root node instance
+	auto fs = std::make_shared<HostFileSystem>(options.Flags & ~UAPI_MS_PERMOUNT_MASK);
+	auto rootnode = std::make_shared<HostFileSystem::node_t>(fs, windows_path(std::to_wstring(source).c_str()));
 
-		// sandbox
-		//
-		// Sets the option to check all nodes are within the base mounting path
-		if(options.Arguments.Contains("sandbox")) sandbox = true;
-
-		// nosandbox
-		//
-		// Clears the option to check all nodes are within the base mounting path
-		if(options.Arguments.Contains("nosandbox")) sandbox = false;
-	}
-
-	catch(...) { throw LinuxException(UAPI_EINVAL); }
-
-	// Construct the shared file system instance
-	auto fs = std::make_shared<HostFileSystem>(options.Flags & ~UAPI_MS_PERMOUNT_MASK, sandbox);
-
-	// Construct the root directory instance as a path-only directory handle
-	std::wstring wpath = std::to_wstring(source);
-	auto rootdir = std::make_shared<HostFileSystem::Directory>(fs, wpath.c_str(), UAPI_O_DIRECTORY | UAPI_O_PATH);
-
-	// Create and return the mount point instance to the caller
-	return std::make_unique<HostFileSystem::Mount>(fs, rootdir, options.Flags & UAPI_MS_PERMOUNT_MASK);
+	// Create and return the mount point instance to the caller, wrapping the root node into a Directory
+	return std::make_unique<HostFileSystem::Mount>(fs, std::make_unique<HostFileSystem::Directory>(rootnode), options.Flags & UAPI_MS_PERMOUNT_MASK);
 }
 
 //---------------------------------------------------------------------------
@@ -164,13 +104,47 @@ std::unique_ptr<VirtualMachine::Mount> MountHostFileSystem(char_t const* source,
 // Arguments:
 //
 //	flags		- Initial file system level flags
-//	sandbox		- Initial [no]sandbox option indicator
 
-HostFileSystem::HostFileSystem(uint32_t flags, bool sandbox) : Flags(flags), Sandbox(sandbox)
+HostFileSystem::HostFileSystem(uint32_t flags) : Flags(flags)
 {
 	// The specified flags should not include any that apply to the mount point
 	_ASSERTE((flags & UAPI_MS_PERMOUNT_MASK) == 0);
 	if((flags & UAPI_MS_PERMOUNT_MASK) != 0) throw LinuxException(UAPI_EINVAL);
+}
+
+//
+// HOSTFILESYSTEM::NODE_T IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// HostFileSystem:node_t Constructor
+//
+// Arguments:
+//
+//	filesystem		- Shared file system instance
+//	hostpath		- Path to the node on the host file system
+
+HostFileSystem::node_t::node_t(std::shared_ptr<HostFileSystem> const& filesystem, windows_path&& hostpath) : 
+	node_t(filesystem, std::move(hostpath), GetFileAttributes(path))
+{
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem:node_t Constructor
+//
+// Arguments:
+//
+//	filesystem		- Shared file system instance
+//	hostpath		- Path to the node on the host file system
+//	attributes		- Attributes of the target node on the host file system
+
+HostFileSystem::node_t::node_t(std::shared_ptr<HostFileSystem> const& filesystem, windows_path&& hostpath, DWORD nodeattrs) :
+	fs(filesystem), path(hostpath), attributes(nodeattrs)
+{
+	_ASSERTE(fs);
+
+	// Ensure that the target node attributes are valid, the object may not actually exist
+	if(attributes == INVALID_FILE_ATTRIBUTES) throw LinuxException(UAPI_ENOENT);
 }
 
 //
@@ -182,28 +156,12 @@ HostFileSystem::HostFileSystem(uint32_t flags, bool sandbox) : Flags(flags), San
 //
 // Arguments:
 //
-//	fs			- Shared file system instance
-//	path		- Path to the host operating system object
-//	flags		- Instance-specific handle flags
+//	node		- Shared node_t instance
 
-HostFileSystem::Directory::Directory(std::shared_ptr<HostFileSystem> const& fs, wchar_t const* path, uint32_t flags) : Node(fs, OpenHandle(path, flags), flags)
+HostFileSystem::Directory::Directory(std::shared_ptr<node_t> const& node) : Node(node)
 {
-	_ASSERTE(m_handle);
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::Directory Constructor
-//
-// Arguments:
-//
-//	rhs			- Existing File instance to duplicate
-//	flags		- Instance-specific handle flags
-
-HostFileSystem::Directory::Directory(Directory const& rhs, uint32_t flags) : Node(rhs.m_fs, OpenHandle(rhs.m_path, flags), flags)
-{
-	// todo: this could be more efficient by using ReOpenFile and copying the windows_path
-	// but that requires some additional support that isn't entirely necessary right now
-	_ASSERTE(m_handle);
+	// The supplied node_t should be a directory object
+	_ASSERTE((m_node->attributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY);
 }
 
 //---------------------------------------------------------------------------
@@ -219,18 +177,24 @@ HostFileSystem::Directory::Directory(Directory const& rhs, uint32_t flags) : Nod
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
-void HostFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
 	UNREFERENCED_PARAMETER(mode);
 	UNREFERENCED_PARAMETER(uid);
 	UNREFERENCED_PARAMETER(gid);
 
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	// Attempt to create the directory on the host file system
-	if(!::CreateDirectoryW(m_path.append(name), nullptr)) throw MapHostException(GetLastError());
+	// Attempt to create the directory object on the host file system
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+	auto path = m_node->path.append(name);
+
+	if(!::CreateDirectory(path, nullptr)) throw MapHostException(GetLastError());
+
+	// Wrap the path to the object into a node_t and return it as a Directory node
+	return std::make_unique<Directory>(std::make_shared<node_t>(m_node->fs, std::move(path)));
 }
 
 //---------------------------------------------------------------------------
@@ -246,24 +210,51 @@ void HostFileSystem::Directory::CreateDirectory(VirtualMachine::Mount const* mou
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
-void HostFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
+std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid)
 {
 	UNREFERENCED_PARAMETER(mode);
 	UNREFERENCED_PARAMETER(uid);
 	UNREFERENCED_PARAMETER(gid);
 
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	// Attempt to create the new file on the host file system
-	HANDLE handle = ::CreateFileW(m_path.append(name), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_FLAG_POSIX_SEMANTICS | FILE_ATTRIBUTE_NORMAL, nullptr);
+	// Attempt to create the file object on the host file system
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+	auto path = m_node->path.append(name);
+
+	HANDLE handle = ::CreateFile(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_FLAG_POSIX_SEMANTICS | FILE_ATTRIBUTE_NORMAL, nullptr);
 	if(handle == INVALID_HANDLE_VALUE) throw MapHostException(GetLastError());
 
-	// This function does not return a handle/node type, close the OS handle
-	CloseHandle(handle);
+	CloseHandle(handle);					// Always close the handle
+
+	// Wrap the path to the object into a node_t and return it as a File node
+	return std::make_unique<File>(std::make_shared<node_t>(m_node->fs, std::move(path)));
 }
 
+//---------------------------------------------------------------------------
+// HostFileSystem::Directory::CreateHandle
+//
+// Opens a Handle instance against this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	flags		- Requested handle flags
+
+std::unique_ptr<VirtualMachine::Handle> HostFileSystem::Directory::CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// Translate the mount level MS_NODIRATIME/MS_NOATIME into O_NOATIME, the handle does not have access
+	// access to the mount specific flags, only the file system level flags
+	if(((mount->Flags & UAPI_MS_NODIRATIME) == UAPI_MS_NODIRATIME) || ((mount->Flags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME)) flags |= UAPI_O_NOATIME;
+
+	return std::make_unique<DirectoryHandle>(m_node, OpenHandle(flags), flags);
+}
+		
 //---------------------------------------------------------------------------
 // HostFileSystem::Directory::CreateSymbolicLink
 //
@@ -277,32 +268,32 @@ void HostFileSystem::Directory::CreateFile(VirtualMachine::Mount const* mount, c
 //	uid			- Initial owner user id to assign to the node
 //	gid			- Initial owner group id to assign to the node
 
-void HostFileSystem::Directory::CreateSymbolicLink(VirtualMachine::Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_gid_t gid)
+std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::CreateSymbolicLink(VirtualMachine::Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_gid_t gid)
 {
-	UNREFERENCED_PARAMETER(mount);
 	UNREFERENCED_PARAMETER(name);
 	UNREFERENCED_PARAMETER(target);
 	UNREFERENCED_PARAMETER(uid);
 	UNREFERENCED_PARAMETER(gid);
 
-	// HostFileSystem does not support creation of symbolic links
-	throw LinuxException(UAPI_EPERM);
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	throw LinuxException(UAPI_EPERM);			// Not supported
 }
 
 //---------------------------------------------------------------------------
 // HostFileSystem::Directory::Duplicate
 //
-// Duplicates this node handle
+// Duplicates this node instance
 //
 // Arguments:
 //
-//	flags		- New flags to be applied to the duplicate handle
+//	NONE
 
-std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::Duplicate(uint32_t flags) const
+std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::Duplicate(void) const
 {
-	// todo - this should duplicate the handle or use ReOpenFile - the file pointer
-	// should remain shared among all duplicates
-	return std::unique_ptr<Directory>(new Directory(*this, flags));
+	return std::make_unique<Directory>(m_node);
 }
 
 //---------------------------------------------------------------------------
@@ -317,12 +308,15 @@ std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::Duplicate(uint3
 
 void HostFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
 {
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
 	// todo
 	throw LinuxException(UAPI_EPERM);
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::Directory::LinkNode
+// HostFileSystem::Directory::Link
 //
 // Links an existing node as a child of this directory
 //
@@ -332,14 +326,16 @@ void HostFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, st
 //	node		- Node to be linked into this directory
 //	name		- Name to assign to the new link
 
-void HostFileSystem::Directory::LinkNode(VirtualMachine::Mount const* mount, VirtualMachine::Node const* node, char_t const* name)
+void HostFileSystem::Directory::Link(VirtualMachine::Mount const* mount, VirtualMachine::Node const* node, char_t const* name)
 {
+	UNREFERENCED_PARAMETER(node);
+	UNREFERENCED_PARAMETER(name);
+
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
-	// HostFileSystem does not support hard links
-	throw LinuxException(UAPI_EPERM);
+	throw LinuxException(UAPI_EPERM);			// Not supported
 }
 
 //---------------------------------------------------------------------------
@@ -353,42 +349,51 @@ uapi_mode_t HostFileSystem::Directory::getMode(void) const
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::Directory::OpenHandle (private, static)
+// HostFileSystem::Directory::OpenHandle (protected)
 //
-// Opens the Win32 handle for the directory object
+// Opens a host operating system handle against the node
 //
 // Arguments:
 //
-//	path			- Host path to the directory node
-//	flags			- Handle flags and attributes
+//	flags		- Standard O_XXXX handle flags
 
-HANDLE HostFileSystem::Directory::OpenHandle(wchar_t const* path, uint32_t flags)
+HANDLE HostFileSystem::Directory::OpenHandle(uint32_t flags) const
 {
-	// Directories can only be opened in read-only mode
-	if((flags & UAPI_O_ACCMODE) != UAPI_O_RDONLY) throw LinuxException(UAPI_EISDIR);
+	DWORD				access = 0;				// Default to query-only access (O_PATH)
 
-	// Verify that only valid flags for use with directories have been specified, even if they are ignored
-	if((flags & ~UAPI_O_ACCMODE) & ~(UAPI_O_CLOEXEC | UAPI_O_DIRECTORY | UAPI_O_NOATIME | UAPI_O_PATH)) throw LinuxException(UAPI_EINVAL);
+	// Check for flags that aren't compatible with directory objects
+	if(flags & (UAPI_O_APPEND | UAPI_FASYNC | UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TMPFILE | UAPI_O_TRUNC)) throw LinuxException(UAPI_EINVAL);
 
-	// Open a query-only handle against the target directory node, which must already exist
-	HANDLE handle = ::CreateFile(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_FLAG_POSIX_SEMANTICS | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-	if(handle == INVALID_HANDLE_VALUE) throw MapHostException(GetLastError());
+	// Determine the access rights required for the directory handle
+	if((flags & UAPI_O_PATH) == 0) {
 
-	try {
+		switch(flags & UAPI_O_ACCMODE) {
 
-		// Get the basic information about the handle to ensure that it represents a directory node
-		FILE_BASIC_INFO info;
-		if(!GetFileInformationByHandleEx(handle, FileBasicInfo, &info, sizeof(FILE_BASIC_INFO))) throw MapHostException(GetLastError());
-		if((info.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) != FILE_ATTRIBUTE_DIRECTORY) throw LinuxException(UAPI_ENOTDIR);
+			case UAPI_O_RDONLY: access = GENERIC_READ; break;
+			case UAPI_O_WRONLY: access = GENERIC_WRITE; break;
+			case UAPI_O_RDWR: access = GENERIC_READ | GENERIC_WRITE; break;
+		
+			default: throw LinuxException(UAPI_EINVAL);
+		}
 	}
 
-	catch(...) { CloseHandle(handle); throw; }
+	// Attempt to open the Win32 handle against the directory, the only valid disposition is OPEN_EXISTING
+	HANDLE handle = ::CreateFile(m_node->path, access, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+		OPEN_EXISTING, FILE_FLAG_POSIX_SEMANTICS | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+	if(handle == INVALID_HANDLE_VALUE) throw MapHostException(GetLastError());
+
+	// O_NOATIME - Set the handle to not track access times for this object
+	if((flags & UAPI_O_NOATIME) == UAPI_O_NOATIME) {
+
+		FILETIME noatime{ 0xFFFFFFFF, 0xFFFFFFFF };
+		SetFileTime(handle, nullptr, &noatime, nullptr);
+	}
 
 	return handle;
 }
 
 //-----------------------------------------------------------------------------
-// HostFileSystem::Directory::OpenNode
+// HostFileSystem::Directory::Lookup
 //
 // Opens a child node of this directory by name
 //
@@ -396,108 +401,69 @@ HANDLE HostFileSystem::Directory::OpenHandle(wchar_t const* path, uint32_t flags
 //
 //	mount		- Mount point on which to perform the operation
 //	name		- Name of the child node to be looked up
-//	flags		- Open operation flags
-//	mode		- Permission mask to assign to the node if created
-//	uid			- Owner user id to assign to the node if created
-//	gid			- Owner group id to assign to the node if created
 
-std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::OpenNode(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags,
-	uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) 
+std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::Lookup(VirtualMachine::Mount const* mount, char_t const* name) 
 {
-	std::unique_ptr<VirtualMachine::Node>		node;		// Resultant Node instance
-
+	// Check the provided mount and ensure the file system is not read only
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Check the provided mount and ensure the file system/handle is not read only
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	// Combine the requested name with the normalized directory path
-	auto hostpath = m_path.append(name);
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+	auto path = m_node->path.append(name);
 
 	// Determine if the object exists and what kind of node needs to be created
-	DWORD attributes = GetFileAttributes(hostpath);
+	DWORD attributes = GetFileAttributes(path);
 	if(attributes == INVALID_FILE_ATTRIBUTES) throw LinuxException(UAPI_ENOENT);
 
-	// Generate the flags required to open the node handle; directories require BACKUP_SEMANTICS
-	//////DWORD flags = FILE_FLAG_POSIX_SEMANTICS;
-	///////if((attributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY) flags |= FILE_FLAG_BACKUP_SEMANTICS;
-
-	// Attempt to open a query-only handle against the host file system object
-	//HANDLE handle = ::CreateFile(hostpath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, flags, nullptr);
-	//if(handle == INVALID_HANDLE_VALUE) throw MapHostException(GetLastError());
-
-	///////// TODO TESTING
-	///auto nodeptr = std::make_shared<directory_node_t>(m_handle->node->fs, hostpath);
-	/*auto handleptr = std::make_shared<directory_handle_t>(nodeptr);*/
-	////return std::make_unique<Directory>(nodeptr, 0);
-	return nullptr;
-
-	//////// Create the appropriate node type to return to the caller
-	//////if((attributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY) node = std::make_unique<Directory>(std::make_shared<directory_node_t>(m_node->fs, handle));
-	//////else node = std::make_unique<File>(std::make_shared<file_node_t>(m_handle->node->fs, handle));
-
-	//////// todo: check sandbox option against the generated node before returning it
-
-	//////return node;
+	// Construct a node_t around the path and attributes and create the Node instance
+	auto node = std::make_shared<node_t>(m_node->fs, std::move(path), attributes);
+	if((attributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY) return std::make_unique<Directory>(node);
+	else return std::make_unique<File>(node);
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::Directory::Seek
+// HostFileSystem::Directory::SetMode
 //
-// Changes the file position
+// Changes the mode flags for this node
 //
 // Arguments:
 //
 //	mount		- Mount point on which to perform this operation
-//	offset		- Delta from specified whence position
-//	whence		- Position from which to apply the specified delta
+//	mode		- New mode flags to be set on the node
 
-size_t HostFileSystem::Directory::Seek(VirtualMachine::Mount const* mount, ssize_t offset, int whence)
+uapi_mode_t HostFileSystem::Directory::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
 {
+	UNREFERENCED_PARAMETER(mode);
+
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	return (S_IFDIR | 0777);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Directory::Stat
+//
+// Gets statistical information about this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	stat		- Generic stat structure to receive the results
+
+void HostFileSystem::Directory::Stat(VirtualMachine::Mount const* mount, uapi_stat3264* stat)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
 	// todo
-	return 0;
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::Directory::Sync
-//
-// Synchronizes all metadata and data associated with the file to storage
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform this operation
-
-void HostFileSystem::Directory::Sync(VirtualMachine::Mount const* mount) const
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
-	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	// no-op
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::Directory::SyncData
-//
-// Synchronizes all data associated with the file to storage, not metadata
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform this operation
-
-void HostFileSystem::Directory::SyncData(VirtualMachine::Mount const* mount) const
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
-	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	// no-op
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::Directory::UnlinkNode
+// HostFileSystem::Directory::Unlink
 //
 // Unlinks a child node from this directory
 //
@@ -506,10 +472,214 @@ void HostFileSystem::Directory::SyncData(VirtualMachine::Mount const* mount) con
 //	mount		- Mount point on which to perform the operation
 //	name		- Name of the node to be unlinked
 
-void HostFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, char_t const* name)
+void HostFileSystem::Directory::Unlink(VirtualMachine::Mount const* mount, char_t const* name)
+{
+	BOOL				result;				// Result from the unlink operation
+
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// Create the path to the child node based on this node's path
+	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
+	auto path = m_node->path.append(name);
+
+	// Access the attributes of the child node to find out what kind of node it is
+	DWORD attributes = GetFileAttributes(path);
+	if(attributes == INVALID_FILE_ATTRIBUTES) throw LinuxException(UAPI_ENOENT);
+
+	// Attempt to clear any read-only flag on the node prior to deletion
+	if((attributes & FILE_ATTRIBUTE_READONLY) == FILE_ATTRIBUTE_READONLY) SetFileAttributes(path, FILE_ATTRIBUTE_NORMAL);
+
+	// Call RemoveDirectory or DeleteFile as appropriate to unlink the target node
+	result = ((attributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY) ? RemoveDirectory(path) : DeleteFile(path);
+	if(!result) throw MapHostException(GetLastError());
+}
+
+//
+// HOSTFILESYSTEM::DIRECTORYHANDLE IMPLEMENTATION
+//
+
+//-----------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle Constructor
+//
+// Arguments:
+//
+//	node		- Shared node_t instance
+//	handle		- Native object handle
+//	flags		- Handle instance flags
+
+HostFileSystem::DirectoryHandle::DirectoryHandle(std::shared_ptr<node_t> const& node, HANDLE handle, uint32_t flags) : m_node(node), m_handle(handle), m_flags(flags)
+{
+	_ASSERTE(node);
+	_ASSERTE((m_handle) && (m_handle != INVALID_HANDLE_VALUE));
+	_ASSERTE((node->attributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY);
+}
+
+//-----------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::Duplicate
+//
+// Duplicates this handle instance
+//
+// Arguments:
+//
+//	flags		- Flags to apply to the duplicate handle instance
+
+std::unique_ptr<VirtualMachine::Handle> HostFileSystem::DirectoryHandle::Duplicate(uint32_t flags) const
 {
 	// todo
-	throw LinuxException(UAPI_EPERM);
+	return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::getFlags
+//
+// Gets the currently set of handle flags for this instance
+
+uint32_t HostFileSystem::DirectoryHandle::getFlags(void) const
+{
+	return m_flags;
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::getLength
+//
+// Gets the length of the file
+
+size_t HostFileSystem::DirectoryHandle::getLength(void) const
+{
+	// todo: this may be valid
+	throw LinuxException(UAPI_EISDIR);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::Read
+//
+// Synchronously reads data from the underlying node into a buffer
+//
+// Arguments:
+//
+//	buffer		- Destination data buffer
+//	count		- Maximum number of bytes to read into the buffer
+
+size_t HostFileSystem::DirectoryHandle::Read(void* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	// todo: this may be valid
+	throw LinuxException(UAPI_EISDIR);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::ReadAt
+//
+// Synchronously reads data from the underlying node into a buffer
+//
+// Arguments:
+//
+//	offset		- Delta from specified starting position
+//	buffer		- Destination data buffer
+//	count		- Maximum number of bytes to read into the buffer
+
+size_t HostFileSystem::DirectoryHandle::ReadAt(size_t offset, void* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EISDIR);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::Seek
+//
+// Changes the file position
+//
+// Arguments:
+//
+//	offset		- Delta from specified whence position
+//	whence		- Position from which to apply the specified delta
+
+size_t HostFileSystem::DirectoryHandle::Seek(ssize_t offset, int whence)
+{
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(whence);
+
+	// todo: this may be valid
+	throw LinuxException(UAPI_EISDIR);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::SetLength
+//
+// Sets the length of the file
+//
+// Arguments:
+//
+//	length		- New length to assign to the file
+
+size_t HostFileSystem::DirectoryHandle::SetLength(size_t length)
+{
+	UNREFERENCED_PARAMETER(length);
+	throw LinuxException(UAPI_EISDIR);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::Sync
+//
+// Synchronizes all data associated with the file to storage
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+
+void HostFileSystem::DirectoryHandle::Sync(void) const
+{
+	// Ensure that the file system isn't read-only and the handle isn't read-only
+	if((m_node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
+	// no-operation
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::Write
+//
+// Synchronously writes data from a buffer to the underlying node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform the operation
+//	buffer		- Source data buffer
+//	count		- Maximum number of bytes to write from the buffer
+
+size_t HostFileSystem::DirectoryHandle::Write(const void* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EISDIR);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::WriteAt
+//
+// Synchronously writes data from a buffer to the underlying node
+//
+// Arguments:
+//
+//	offset		- Delta from the specifieed whence position
+//	buffer		- Source data buffer
+//	count		- Maximum number of bytes to write from the buffer
+
+size_t HostFileSystem::DirectoryHandle::WriteAt(size_t offset, const void* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EISDIR);
 }
 
 //
@@ -521,97 +691,99 @@ void HostFileSystem::Directory::UnlinkNode(VirtualMachine::Mount const* mount, c
 //
 // Arguments:
 //
-//	fs			- Shared file system instance
-//	path		- Path to the host operating system object
-//	flags		- Instance-specific handle flags
+//	node		- Shared node_t instance
 
-HostFileSystem::File::File(std::shared_ptr<HostFileSystem> const& fs, wchar_t const* path, uint32_t flags) : Node(fs, OpenHandle(path, flags), flags)
+HostFileSystem::File::File(std::shared_ptr<node_t> const& node) : Node(node)
 {
-	_ASSERTE(m_handle);
+	// The supplied node_t should not be a directory object
+	_ASSERTE((m_node->attributes & FILE_ATTRIBUTE_DIRECTORY) == 0);
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::File Constructor
+// HostFileSystem::File::CreateHandle
+//
+// Opens a Handle instance against this node
 //
 // Arguments:
 //
-//	rhs			- Existing File instance to duplicate
-//	flags		- Instance-specific handle flags
+//	mount		- Mount point on which to perform this operation
+//	flags		- Requested handle flags
 
-HostFileSystem::File::File(File const& rhs, uint32_t flags) : Node(rhs.m_fs, OpenHandle(rhs.m_path, flags), flags)
+std::unique_ptr<VirtualMachine::Handle> HostFileSystem::File::CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
 {
-	// todo: this could be more efficient by using ReOpenFile and copying the windows_path
-	// but that requires some additional support that isn't entirely necessary right now
-	_ASSERTE(m_handle);
-}
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
+	// Ensure that the mount-level MS_NOEXEC flag isn't set in conjunction with O_EXEC
+	if(((mount->Flags & UAPI_MS_NOEXEC) == UAPI_MS_NOEXEC) && ((flags & UAPI_O_EXEC) == UAPI_O_EXEC)) throw LinuxException(UAPI_EACCES);
+
+	// Translate the mount level MS_NOATIME into O_NOATIME, the handle does not have access
+	// to the mount specific flags, only file system level flags
+	if((mount->Flags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME) flags |= UAPI_O_NOATIME;
+
+	return std::make_unique<FileHandle>(m_node, OpenHandle(flags), flags);
+}
+		
 //---------------------------------------------------------------------------
 // HostFileSystem::File::Duplicate
 //
-// Duplicates this node handle
+// Duplicates this node instance
 //
 // Arguments:
 //
-//	flags		- New flags to be applied to the duplicate handle
+//	NONE
 
-std::unique_ptr<VirtualMachine::Node> HostFileSystem::File::Duplicate(uint32_t flags) const
+std::unique_ptr<VirtualMachine::Node> HostFileSystem::File::Duplicate(void) const
 {
-	return std::unique_ptr<File>(new File(*this, flags));
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::File::getLength
-//
-// Gets the length of the file
-
-size_t HostFileSystem::File::getLength(void) const
-{
-	LARGE_INTEGER size;
-	if(!GetFileSizeEx(m_handle, &size)) throw MapHostException(GetLastError());
-
-	return (size.QuadPart > std::numeric_limits<size_t>::max()) ? std::numeric_limits<size_t>::max() : static_cast<size_t>(size.QuadPart);
+	return std::make_unique<File>(m_node);
 }
 
 //---------------------------------------------------------------------------
 // HostFileSystem::File::getMode
 //
-// Gets the type and permissions mask for the node
+// Gets the type and permission masks from the node
 
 uapi_mode_t HostFileSystem::File::getMode(void) const
 {
-	return (UAPI_S_IFREG | 0777);
+	return (S_IFREG | 0777);
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::File::OpenHandle (private, static)
+// HostFileSystem::File::OpenHandle (protected)
 //
-// Opens the handle against the native operating system object
+// Opens a host operating system handle against the node
 //
 // Arguments:
 //
-//	path			- Host path to the file node
-//	flags			- Handle flags and attributes
+//	flags		- Standard O_XXXX handle flags
 
-HANDLE HostFileSystem::File::OpenHandle(wchar_t const* path, uint32_t flags)
+HANDLE HostFileSystem::File::OpenHandle(uint32_t flags) const
 {
-	DWORD			access = 0;						// Win32 CreateFile() access mask
-	DWORD			disposition = OPEN_EXISTING;	// Win32 CreateFile() creation disposition
-	DWORD			attributes = 0;					// Win32 CreateFile() flags and attributes
+	DWORD		access = 0;									// Default to query-only access (O_PATH)
+	DWORD		disposition = OPEN_EXISTING;				// Default to opening an existing file
+	DWORD		attributes = FILE_FLAG_POSIX_SEMANTICS;		// Default handle attributes
 
-	// O_DIRECTORY and O_TMPFILE are not compatible with the file handle implementation
-	if((flags & UAPI_O_DIRECTORY) == UAPI_O_DIRECTORY) throw LinuxException(UAPI_ENOTDIR);
-	if((flags & UAPI_O_TMPFILE) == UAPI_O_TMPFILE) throw LinuxException(UAPI_EOPNOTSUPP);
+	// Check for flags that aren't compatible with file objects
+	if(flags & (UAPI_O_DIRECTORY | UAPI_FASYNC | UAPI_O_TMPFILE)) throw LinuxException(UAPI_EINVAL);
 
-	// Determine the access mask to specify for the file handle
-	switch(flags & UAPI_O_ACCMODE) {
+	// O_PATH, O_RDONLY, O_WRONLY, O_RDWR, O_EXEC - Use appropriate access rights
+	if((flags & UAPI_O_PATH) == 0) {
 
-		case UAPI_O_RDONLY: access = FILE_GENERIC_READ;
-		case UAPI_O_WRONLY: access = FILE_GENERIC_WRITE;
-		case UAPI_O_RDWR: access = FILE_GENERIC_READ | FILE_GENERIC_WRITE;
-		default: throw LinuxException(UAPI_EINVAL);
+		switch(flags & UAPI_O_ACCMODE) {
+
+			case UAPI_O_RDONLY: access = GENERIC_READ; break;
+			case UAPI_O_WRONLY: access = GENERIC_WRITE; break;
+			case UAPI_O_RDWR: access = GENERIC_READ | GENERIC_WRITE; break;
+		
+			default: throw LinuxException(UAPI_EINVAL);
+		}
+
+		// O_EXEC is a special flag not included in standard Linux, but using O_PATH or adding a special
+		// method call just to add EXECUTE rights to the handle seems like overkill
+		if((flags & UAPI_O_EXEC) == UAPI_O_EXEC) access |= GENERIC_EXECUTE;
 	}
 
-	// Determine the creation disposition to use for the file
+	// O_CREAT, O_EXCL, O_TRUNC - Use an appropriate handle disposition flag
 	switch(flags & (UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TRUNC)) {
 
 		case 0: disposition = OPEN_EXISTING;
@@ -621,58 +793,150 @@ HANDLE HostFileSystem::File::OpenHandle(wchar_t const* path, uint32_t flags)
 		default: throw LinuxException(UAPI_EINVAL);
 	}
 
-	// O_DIRECT, O_DSYNC, O_SYNC -- A write-through handle is a reasonable approximation
+	// O_DIRECT, O_DSYNC, O_SYNC -- A write-through handle is a reasonable approximation for these
 	if((flags & UAPI_O_DIRECT) == UAPI_O_DIRECT) attributes |= FILE_FLAG_WRITE_THROUGH;
 	if((flags & UAPI_O_DSYNC) == UAPI_O_DSYNC) attributes |= FILE_FLAG_WRITE_THROUGH;
 	if((flags & UAPI_O_SYNC) == UAPI_O_SYNC) attributes |= FILE_FLAG_WRITE_THROUGH;
 
-	// Open a handle against the target file node using the desired access and attributes
-	HANDLE handle = ::CreateFile(path, (flags & UAPI_O_PATH) ? 0 : access, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, disposition, 
-		FILE_FLAG_POSIX_SEMANTICS | attributes, nullptr);
+	// Attempt to open the Win32 handle against the file using the generated access and disposition
+	HANDLE handle = ::CreateFile(m_node->path, access, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 
+		nullptr, disposition, attributes, nullptr);
 	if(handle == INVALID_HANDLE_VALUE) throw MapHostException(GetLastError());
 
-	try {
+	// O_NOATIME - Set the handle to not track access times for this object
+	if((flags & UAPI_O_NOATIME) == UAPI_O_NOATIME) {
 
-		// Get the basic information about the handle to ensure that it does not represent a directory node
-		FILE_BASIC_INFO	info;
-		if(!GetFileInformationByHandleEx(handle, FileBasicInfo, &info, sizeof(FILE_BASIC_INFO))) throw MapHostException(GetLastError());
-		if((info.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY) throw LinuxException(UAPI_EISDIR);
-
-		// O_NOATIME is handled by Windows via a special call to SetFileTime
-		if((flags & UAPI_O_NOATIME) == UAPI_O_NOATIME) {
-
-			FILETIME noatime{ 0xFFFFFFFF, 0xFFFFFFFF };
-			SetFileTime(handle, nullptr, &noatime, nullptr);
-		}
+		FILETIME noatime{ 0xFFFFFFFF, 0xFFFFFFFF };
+		SetFileTime(handle, nullptr, &noatime, nullptr);
 	}
-
-	catch(...) { CloseHandle(handle); throw; }
 
 	return handle;
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::File::Read
+// HostFileSystem::File::SetMode
+//
+// Changes the mode flags for this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	mode		- New mode flags to be set on the node
+
+uapi_mode_t HostFileSystem::File::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
+{
+	UNREFERENCED_PARAMETER(mode);
+
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	return (S_IFREG | 0777);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::File::Stat
+//
+// Gets statistical information about this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	stat		- Generic stat structure to receive the results
+
+void HostFileSystem::File::Stat(VirtualMachine::Mount const* mount, uapi_stat3264* stat)
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// todo
+}
+
+//
+// HOSTFILESYSTEM::FILEHANDLE IMPLEMENTATION
+//
+
+//-----------------------------------------------------------------------------
+// HostFileSystem::FileHandle Constructor
+//
+// Arguments:
+//
+//	node		- Shared node_t instance
+//	handle		- Native object handle
+//	flags		- Handle instance flags
+
+HostFileSystem::FileHandle::FileHandle(std::shared_ptr<node_t> const& node, HANDLE handle, uint32_t flags) : m_node(node), m_handle(handle), m_flags(flags)
+{
+	_ASSERTE(node);
+	_ASSERTE((m_handle) && (m_handle != INVALID_HANDLE_VALUE));
+	_ASSERTE((node->attributes & FILE_ATTRIBUTE_DIRECTORY) == 0);
+}
+
+//-----------------------------------------------------------------------------
+// HostFileSystem::FileHandle::Duplicate
+//
+// Duplicates this handle instance
+//
+// Arguments:
+//
+//	flags		- Flags to apply to the duplicate handle instance
+
+std::unique_ptr<VirtualMachine::Handle> HostFileSystem::FileHandle::Duplicate(uint32_t flags) const
+{
+	// todo
+	return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+// HostFileSystem::FileHandle::getFlags
+//
+// Gets the currently set of handle flags for this instance
+
+uint32_t HostFileSystem::FileHandle::getFlags(void) const
+{
+	return m_flags;
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::FileHandle::getLength
+//
+// Gets the length of the file
+
+size_t HostFileSystem::FileHandle::getLength(void) const
+{
+	LARGE_INTEGER size;
+	if(!GetFileSizeEx(m_handle, &size)) throw MapHostException(GetLastError());
+
+#ifdef _M_X64
+	// 64-bit size_t can handle all of a LONGLONG
+	return size.QuadPart;
+#else
+	// 32-bit size_t can't handle all of a LONGLONG, apply a ceiling to the value
+	return (size.QuadPart > std::numeric_limits<size_t>::max()) ? std::numeric_limits<size_t>::max() : static_cast<size_t>(size.QuadPart);
+#endif
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::FileHandle::Read
 //
 // Synchronously reads data from the underlying node into a buffer
 //
 // Arguments:
 //
-//	mount		- Mount point on which to perform this operation
 //	buffer		- Destination data buffer
 //	count		- Maximum number of bytes to read into the buffer
 
-size_t HostFileSystem::File::Read(VirtualMachine::Mount const* mount, void* buffer, size_t count)
+size_t HostFileSystem::FileHandle::Read(void* buffer, size_t count)
 {
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
-	// Verify the provided mount point and ensure that the handle is not write-only
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	// Ensure that the handle was not opened in write-only mode
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
 
-	// ReadFile() can only read up to MAXDWORD bytes from the underlying file
+	// If no data is being requested there is no reason to bother
 	if(count == 0) return 0;
+
+	// ReadFile() can only read up to MAXDWORD bytes from the underlying file
 	if(count >= MAXDWORD) throw LinuxException(UAPI_EINVAL);
 
 	// Attempt to read the specified number of bytes from the file into the buffer
@@ -683,40 +947,57 @@ size_t HostFileSystem::File::Read(VirtualMachine::Mount const* mount, void* buff
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::File::ReadAt
+// HostFileSystem::FileHandle::ReadAt
 //
 // Synchronously reads data from the underlying node into a buffer
 //
 // Arguments:
 //
-//	mount		- Mount point on which to perform this operation
 //	offset		- Delta from specified starting position
-//	whence		- Starting position from which to apply the delta
 //	buffer		- Destination data buffer
 //	count		- Maximum number of bytes to read into the buffer
 
-size_t HostFileSystem::File::ReadAt(VirtualMachine::Mount const* mount, ssize_t offset, int whence, void* buffer, size_t count)
+size_t HostFileSystem::FileHandle::ReadAt(size_t offset, void* buffer, size_t count)
 {
-	// todo - needs offset/whence functionality
-	return 0;
+	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// Ensure that the handle was not opened in write-only mode
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
+	// If no data is being requested there is no reason to bother
+	if(count == 0) return 0;
+
+	// ReadFile() can only read up to MAXDWORD bytes from the underlying file
+	if(count >= MAXDWORD) throw LinuxException(UAPI_EINVAL);
+
+	// OVERLAPPED structure can be used to read from a specific position
+	OVERLAPPED overlapped = { 0 };
+	overlapped.Offset = static_cast<DWORD>(offset & 0xFFFFFFFF);
+#ifdef _M_X64
+	overlapped.OffsetHigh = (offset >> 32);
+#else
+	overlapped.OffsetHigh = 0;
+#endif
+
+	// Attempt to read the specified number of bytes from the file into the buffer
+	DWORD read = static_cast<DWORD>(count);
+	if(!ReadFile(m_handle, buffer, read, &read, &overlapped)) throw MapHostException(GetLastError());
+
+	return static_cast<size_t>(read);
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::File::Seek
+// HostFileSystem::FileHandle::Seek
 //
 // Changes the file position
 //
 // Arguments:
 //
-//	mount		- Mount point on which to perform this operation
 //	offset		- Delta from specified whence position
 //	whence		- Position from which to apply the specified delta
 
-size_t HostFileSystem::File::Seek(VirtualMachine::Mount const* mount, ssize_t offset, int whence)
+size_t HostFileSystem::FileHandle::Seek(ssize_t offset, int whence)
 {
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
-
 	LARGE_INTEGER delta;
 	delta.QuadPart = offset;
 
@@ -725,71 +1006,55 @@ size_t HostFileSystem::File::Seek(VirtualMachine::Mount const* mount, ssize_t of
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::File::Sync
-//
-// Synchronizes all metadata and data associated with the file to storage
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform this operation
-
-void HostFileSystem::File::Sync(VirtualMachine::Mount const* mount) const
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
-	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	FlushFileBuffers(m_handle);			// Do not throw exception on failure
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::File::SyncData
-//
-// Synchronizes all data associated with the file to storage, not metadata
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform this operation
-
-void HostFileSystem::File::SyncData(VirtualMachine::Mount const* mount) const
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
-	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	FlushFileBuffers(m_handle);			// Do not throw exception on failure
-}
-		
-//---------------------------------------------------------------------------
-// HostFileSystem::File::SetLength
+// HostFileSystem::FileHandle::SetLength
 //
 // Sets the length of the file
 //
 // Arguments:
 //
-//	mount		- Mount point on which to perform the operation
 //	length		- New length to assign to the file
 
-size_t HostFileSystem::File::SetLength(VirtualMachine::Mount const* mount, size_t length)
+size_t HostFileSystem::FileHandle::SetLength(size_t length)
 {
 	LARGE_INTEGER current, delta;
 	current.QuadPart = delta.QuadPart = 0;
 
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
-	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	// Ensure that the file system isn't read-only and the handle isn't read-only
+	if((m_node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
 
-	// On Windows, this is unfortunately a multi-step operation that can't be accomplished atomically
-	if(!SetFilePointerEx(m_handle, current, &current, FILE_CURRENT)) throw MapHostException(GetLastError());
-	if(!SetFilePointerEx(m_handle, delta, &delta, FILE_BEGIN)) throw MapHostException(GetLastError());
+	// Get the current file pointer so that it can be restored and then move it to the desired end point
+	if(!SetFilePointerEx(m_handle, current, &current, FILE_CURRENT) || !SetFilePointerEx(m_handle, delta, &delta, FILE_BEGIN)) throw MapHostException(GetLastError());
+	
+	// Attempt to truncate/expand the length of the file by setting EOF to the current position
 	if(!SetEndOfFile(m_handle)) throw MapHostException(GetLastError());
-	if(!SetFilePointerEx(m_handle, current, &current, FILE_BEGIN)) throw MapHostException(GetLastError());
+
+	// Attempt to restore the original file pointer
+	SetFilePointerEx(m_handle, current, &current, FILE_BEGIN);
 
 	return length;
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::File::Write
+// HostFileSystem::FileHandle::Sync
+//
+// Synchronizes all data associated with the file to storage
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+
+void HostFileSystem::FileHandle::Sync(void) const
+{
+	// Ensure that the file system isn't read-only and the handle isn't read-only
+	if((m_node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
+	FlushFileBuffers(m_handle);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::FileHandle::Write
 //
 // Synchronously writes data from a buffer to the underlying node
 //
@@ -799,19 +1064,22 @@ size_t HostFileSystem::File::SetLength(VirtualMachine::Mount const* mount, size_
 //	buffer		- Source data buffer
 //	count		- Maximum number of bytes to write from the buffer
 
-size_t HostFileSystem::File::Write(VirtualMachine::Mount const* mount, const void* buffer, size_t count)
+size_t HostFileSystem::FileHandle::Write(const void* buffer, size_t count)
 {
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
-	// Verify the mount point and file system/handle level write flags
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
-	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	// Ensure that the file system isn't read-only and the handle isn't read-only
+	if((m_node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
+	// If no data is being written, there is no reason to bother calling WriteFile
+	if(count == 0) return 0;
 
 	// WriteFile() can only write up to MAXDWORD bytes from the underlying file
-	if(count == 0) return 0;
 	if(count >= MAXDWORD) throw LinuxException(UAPI_EINVAL);
+
+	// O_APPEND - Move the pointer to the end of the file before every write
+	if((m_flags & UAPI_O_APPEND) == UAPI_O_APPEND) SetFilePointerEx(m_handle, { 0, 0 }, nullptr, FILE_END);
 
 	// Attempt to write the specified number of bytes into the file into the buffer
 	DWORD written = static_cast<DWORD>(count);
@@ -821,23 +1089,44 @@ size_t HostFileSystem::File::Write(VirtualMachine::Mount const* mount, const voi
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::File::WriteAt
+// HostFileSystem::FileHandle::WriteAt
 //
-// Synchronously writes data from a buffer to the underlying node, does not
-// modify the file pointer
+// Synchronously writes data from a buffer to the underlying node
 //
 // Arguments:
 //
-//	mount		- Mount point on which to perform the operation
 //	offset		- Delta from the specifieed whence position
-//	whence		- Position from which to apply the delta
 //	buffer		- Source data buffer
 //	count		- Maximum number of bytes to write from the buffer
 
-size_t HostFileSystem::File::WriteAt(VirtualMachine::Mount const* mount, ssize_t offset, int whence, const void* buffer, size_t count)
+size_t HostFileSystem::FileHandle::WriteAt(size_t offset, const void* buffer, size_t count)
 {
-	// todo - needs offset/whence functionality
-	return 0;
+	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// Ensure that the file system isn't read-only and the handle isn't read-only
+	if((m_node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+
+	// If no data is being written, there is no reason to bother calling WriteFile
+	if(count == 0) return 0;
+
+	// WriteFile() can only write up to MAXDWORD bytes from the underlying file
+	if(count >= MAXDWORD) throw LinuxException(UAPI_EINVAL);
+
+	// OVERLAPPED structure can be used to write to a specific position
+	OVERLAPPED overlapped = { 0 };
+	overlapped.Offset = static_cast<DWORD>(offset & 0xFFFFFFFF);
+#ifdef _M_X64
+	overlapped.OffsetHigh = (offset >> 32);
+#else
+	overlapped.OffsetHigh = 0;
+#endif
+
+	// Attempt to write the specified number of bytes from the buffer into the file
+	DWORD written = static_cast<DWORD>(count);
+	if(!WriteFile(m_handle, buffer, written, &written, &overlapped)) throw MapHostException(GetLastError());
+
+	return static_cast<size_t>(written);
 }
 
 //
@@ -853,8 +1142,8 @@ size_t HostFileSystem::File::WriteAt(VirtualMachine::Mount const* mount, ssize_t
 //	rootdir		- Root directory node instance
 //	flags		- Mount-specific flags
 
-HostFileSystem::Mount::Mount(std::shared_ptr<HostFileSystem> const& fs, std::shared_ptr<Directory> const& rootdir, uint32_t flags) : 
-	m_fs(fs), m_rootdir(rootdir), m_flags(flags)
+HostFileSystem::Mount::Mount(std::shared_ptr<HostFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags) : 
+	m_fs(fs), m_rootdir(std::move(rootdir)), m_flags(flags)
 {
 	_ASSERTE(m_fs);
 	_ASSERTE(m_rootdir);
@@ -921,7 +1210,7 @@ uint32_t HostFileSystem::Mount::getFlags(void) const
 //
 //	NONE
 
-VirtualMachine::Node const* HostFileSystem::Mount::getRootNode(void) const
+VirtualMachine::Node* HostFileSystem::Mount::getRootNode(void) const
 {
 	return m_rootdir.get();
 }
@@ -935,17 +1224,12 @@ VirtualMachine::Node const* HostFileSystem::Mount::getRootNode(void) const
 //
 // Arguments:
 //
-//	fs			- Shared file system instance
-//	handle		- Native Win32 object handle
-//	flags		- Handle-level flags applicable to this instance
+//	node		- Shared node_t instance
 
 template <class _interface>
-HostFileSystem::Node<_interface>::Node(std::shared_ptr<HostFileSystem> const& fs, HANDLE handle, uint32_t flags) : 
-	m_fs(fs), m_handle(handle), m_path(GetNormalizedPath(handle)), m_flags(flags)
+HostFileSystem::Node<_interface>::Node(std::shared_ptr<node_t> const& node) : m_node(node)
 {
-	_ASSERTE(m_fs);
-	_ASSERTE((m_handle) && (m_handle != INVALID_HANDLE_VALUE));
-	_ASSERTE(m_path);
+	_ASSERTE(m_node);
 }
 
 //---------------------------------------------------------------------------
@@ -956,10 +1240,10 @@ HostFileSystem::Node<_interface>::Node(std::shared_ptr<HostFileSystem> const& fs
 template <class _interface>
 uapi_timespec HostFileSystem::Node<_interface>::getAccessTime(void) const
 {
-	FILE_BASIC_INFO				info;				// Basic file information
+	WIN32_FILE_ATTRIBUTE_DATA		data;		// File attributes
 
-	if(!GetFileInformationByHandleEx(m_handle, FileBasicInfo, &info, sizeof(FILE_BASIC_INFO))) throw MapHostException(GetLastError());
-	return convert<uapi_timespec>(info.LastAccessTime);
+	if(!GetFileAttributesEx(m_node->path, GetFileExInfoStandard, &data)) throw MapHostException(GetLastError());
+	return convert<uapi_timespec>(data.ftLastAccessTime);
 }
 
 //---------------------------------------------------------------------------
@@ -970,21 +1254,10 @@ uapi_timespec HostFileSystem::Node<_interface>::getAccessTime(void) const
 template <class _interface>
 uapi_timespec HostFileSystem::Node<_interface>::getChangeTime(void) const
 {
-	FILE_BASIC_INFO				info;				// Basic file information
+	WIN32_FILE_ATTRIBUTE_DATA		data;		// File attributes
 
-	if(!GetFileInformationByHandleEx(m_handle, FileBasicInfo, &info, sizeof(FILE_BASIC_INFO))) throw MapHostException(GetLastError());
-	return convert<uapi_timespec>(info.ChangeTime);
-}
-		
-//---------------------------------------------------------------------------
-// HostFileSystem::Node::getFlags
-//
-// Gets the handle-level flags applied to this instance
-
-template <class _interface>
-uint32_t HostFileSystem::Node<_interface>::getFlags(void) const
-{
-	return m_flags;
+	if(!GetFileAttributesEx(m_node->path, GetFileExInfoStandard, &data)) throw MapHostException(GetLastError());
+	return convert<uapi_timespec>(data.ftLastWriteTime);
 }
 		
 //---------------------------------------------------------------------------
@@ -1006,15 +1279,30 @@ uapi_gid_t HostFileSystem::Node<_interface>::getGroupId(void) const
 template <class _interface>
 intptr_t HostFileSystem::Node<_interface>::getIndex(void) const
 {
-	BY_HANDLE_FILE_INFORMATION		info;			// File information
+	// TODO: Trying this instead .... inode numbers are important
+	// but they also need to be fast for Path to work right
+	return intptr_t(m_node.get());
 
-	if(!GetFileInformationByHandle(m_handle, &info)) throw MapHostException(GetLastError());
-
-#ifndef _M_X64
-	return intptr_t(info.nFileIndexLow);
-#else
-	return intptr_t(info.nFileIndexHigh) << 32 | info.nFileIndexLow;
-#endif
+////	BY_HANDLE_FILE_INFORMATION		info;			// File information
+////
+////	// Accessing the node index requires a query handle to the node
+////	HANDLE handle = OpenHandle(UAPI_O_PATH);
+////
+////	try {
+////		
+////		// Attempt to access the BY_HANDLE_FILE_INFORMATION for this node
+////		if(!GetFileInformationByHandle(handle, &info)) throw MapHostException(GetLastError());
+////		CloseHandle(handle);
+////	}
+////	catch(...) { CloseHandle(handle); throw; }
+////
+////#ifndef _M_X64
+////	// 32-bit builds can't handle the entire index, use the lower 32 bits only
+////	return intptr_t(info.nFileIndexLow);
+////#else
+////	// 64-bit builds can handle the entire 64-bit index value, combine them
+////	return intptr_t(info.nFileIndexHigh) << 32 | info.nFileIndexLow;
+////#endif
 }
 
 //---------------------------------------------------------------------------
@@ -1025,10 +1313,10 @@ intptr_t HostFileSystem::Node<_interface>::getIndex(void) const
 template <class _interface>
 uapi_timespec HostFileSystem::Node<_interface>::getModificationTime(void) const
 {
-	FILE_BASIC_INFO				info;				// Basic file information
+	WIN32_FILE_ATTRIBUTE_DATA		data;		// File attributes
 
-	if(!GetFileInformationByHandleEx(m_handle, FileBasicInfo, &info, sizeof(FILE_BASIC_INFO))) throw MapHostException(GetLastError());
-	return convert<uapi_timespec>(info.LastWriteTime);
+	if(!GetFileAttributesEx(m_node->path, GetFileExInfoStandard, &data)) throw MapHostException(GetLastError());
+	return convert<uapi_timespec>(data.ftLastWriteTime);
 }
 		
 //---------------------------------------------------------------------------
@@ -1045,11 +1333,21 @@ template <class _interface>
 uapi_timespec HostFileSystem::Node<_interface>::SetAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	FILETIME accesstime = convert<FILETIME>(atime);
-	if(!SetFileTime(m_handle, nullptr, &accesstime, nullptr)) throw MapHostException(GetLastError());
+
+	// Changing the access time requires a write handle to the node
+	HANDLE handle = OpenHandle(UAPI_O_WRONLY);
+
+	try {
+
+		// Attempt to change the access time stamp on the node
+		if(!SetFileTime(handle, nullptr, &accesstime, nullptr)) throw MapHostException(GetLastError());
+		CloseHandle(handle);
+	}
+	catch(...) { CloseHandle(handle); throw; }
 
 	return atime;
 }
@@ -1087,32 +1385,10 @@ uapi_gid_t HostFileSystem::Node<_interface>::SetGroupId(VirtualMachine::Mount co
 	UNREFERENCED_PARAMETER(gid);
 
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	return 0;
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::Node::SetMode
-//
-// Changes the mode flags for this node
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform this operation
-//	mode		- New permission flags to be set
-
-template <class _interface>
-uapi_mode_t HostFileSystem::Node<_interface>::SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode)
-{
-	UNREFERENCED_PARAMETER(mode);
-
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
-	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
-
-	return (UAPI_S_IFDIR | 0777);
 }
 
 //---------------------------------------------------------------------------
@@ -1129,11 +1405,21 @@ template <class _interface>
 uapi_timespec HostFileSystem::Node<_interface>::SetModificationTime(VirtualMachine::Mount const* mount, uapi_timespec mtime)
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	FILETIME modificationtime = convert<FILETIME>(mtime);
-	if(!SetFileTime(m_handle, nullptr, nullptr, &modificationtime)) throw MapHostException(GetLastError());
+
+	// Changing the access time requires a write handle to the node
+	HANDLE handle = OpenHandle(UAPI_O_WRONLY);
+
+	try {
+
+		// Attempt to change the access time stamp on the node
+		if(!SetFileTime(handle, nullptr, nullptr, &modificationtime)) throw MapHostException(GetLastError());
+		CloseHandle(handle);
+	}
+	catch(...) { CloseHandle(handle); throw; }
 
 	return mtime;
 }
@@ -1154,10 +1440,29 @@ uapi_uid_t HostFileSystem::Node<_interface>::SetUserId(VirtualMachine::Mount con
 	UNREFERENCED_PARAMETER(uid);
 
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_fs.get()) throw LinuxException(UAPI_EXDEV);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
 	return 0;
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Node::Sync
+//
+// Synchronizes all metadata and data associated with the file to storage
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+
+template <class _interface>
+void HostFileSystem::Node<_interface>::Sync(VirtualMachine::Mount const* mount) const
+{
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+
+	// no-op
 }
 
 //---------------------------------------------------------------------------

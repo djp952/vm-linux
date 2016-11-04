@@ -55,8 +55,6 @@ std::unique_ptr<VirtualMachine::Mount> MountHostFileSystem(char_t const* source,
 //	MS_RDONLY
 //	MS_SILENT
 //	MS_SYNCHRONOUS
-//
-//	[no]sandbox		- Controls sandboxing of the virtual file system (see below)
 //	
 // Supported remount options:
 //
@@ -83,13 +81,17 @@ class HostFileSystem : public VirtualMachine::FileSystem
 
 	// FORWARD DECLARATIONS
 	//
+	class Directory;
+	class DirectoryHandle;
+	class File;
+	class FileHandle;
 	class Mount;
 
 public:
 
 	// Instance Constructor
 	//
-	HostFileSystem(uint32_t flags, bool sandbox);
+	HostFileSystem(uint32_t flags);
 
 	// Destructor
 	//
@@ -102,16 +104,51 @@ public:
 	//
 	// File system specific flags
 	std::atomic<uint32_t> Flags = 0;
-
-	// Sandbox
-	//
-	// Flag indicating that file system access should be sandboxed
-	std::atomic<bool> Sandbox = false;
 	
 private:
 
 	HostFileSystem(HostFileSystem const&)=delete;
 	HostFileSystem& operator=(HostFileSystem const&)=delete;
+
+	// node_t
+	//
+	// Internal representation of a file system node
+	class node_t
+	{
+	public:
+
+		// Instance Constructors
+		//
+		node_t(std::shared_ptr<HostFileSystem> const& filesystem, windows_path&& hostpath);
+		node_t(std::shared_ptr<HostFileSystem> const& filesystem, windows_path&& hostpath, DWORD attributes);
+
+		// Destructor
+		//
+		virtual ~node_t()=default;
+
+		//-------------------------------------------------------------------
+		// Fields
+
+		// attributes
+		//
+		// Host file system object attributes
+		DWORD const attributes;
+
+		// fs
+		//
+		// Shared pointer to the parent file system
+		std::shared_ptr<HostFileSystem> const fs;
+
+		// path
+		//
+		// Path to the underlying host file system node
+		windows_path const path;
+
+	private:
+
+		node_t(node_t const&)=delete;
+		node_t& operator=(node_t const&)=delete;
+	};
 
 	// Node
 	//
@@ -143,11 +180,6 @@ private:
 		// Changes the owner group id for this node
 		virtual uapi_gid_t SetGroupId(VirtualMachine::Mount const* mount, uapi_gid_t gid) override;
 
-		// SetMode (VirtualMachine::Node)
-		//
-		// Changes the mode flags for this node
-		virtual uapi_mode_t SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode) override;
-
 		// SetModificationTime (VirtualMachine::Node)
 		//
 		// Changes the modification time of this node
@@ -157,6 +189,11 @@ private:
 		//
 		// Changes the owner user id for this node
 		virtual uapi_uid_t SetUserId(VirtualMachine::Mount const* mount, uapi_uid_t uid) override;
+
+		// Sync (VirtualMachine::Node)
+		//
+		// Synchronizes all metadata and data associated with the node to storage
+		virtual void Sync(VirtualMachine::Mount const* mount) const override;
 
 		//---------------------------------------------------------------------
 		// Properties
@@ -172,12 +209,6 @@ private:
 		// Gets the change time of the node
 		__declspec(property(get=getChangeTime)) uapi_timespec ChangeTime;
 		virtual uapi_timespec getChangeTime(void) const override;
-
-		// Flags (VirtualMachine::Node)
-		//
-		// Gets the handle-level flags applied to this instance
-		__declspec(property(get=getFlags)) uint32_t Flags;
-		virtual uint32_t getFlags(void) const override;
 
 		// GroupId (VirtualMachine::Node)
 		//
@@ -210,15 +241,20 @@ private:
 
 		// Instance Constructor
 		//
-		Node(std::shared_ptr<HostFileSystem> const& fs, HANDLE handle, uint32_t flags);
+		Node(std::shared_ptr<node_t> const& node);
+
+		//-------------------------------------------------------------------
+		// Protected Member Functions
+
+		// OpenHandle
+		//
+		// Opens the host operating system handle againt the node
+		virtual HANDLE OpenHandle(uint32_t flags) const = 0;
 
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<HostFileSystem>	const	m_fs;		// File system instance
-		HANDLE const							m_handle;	// Win32 object handle
-		windows_path const						m_path;		// Win32 object path
-		std::atomic<uint32_t>					m_flags;	// Handle flags
+		std::shared_ptr<node_t>		m_node;		// Shared node_t instance
 	};
 
 	// Directory
@@ -230,8 +266,7 @@ private:
 
 		// Instance Constructors
 		//
-		Directory(std::shared_ptr<HostFileSystem> const& fs, wchar_t const* path, uint32_t flags);
-		Directory(Directory const& rhs, uint32_t flags);
+		Directory(std::shared_ptr<node_t> const& node);
 
 		// Destructor
 		//
@@ -243,79 +278,167 @@ private:
 		// CreateDirectory (VirtualMachine::Directory)
 		//
 		// Creates a directory node as a child of this directory
-		virtual void CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+		virtual std::unique_ptr<VirtualMachine::Node> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
 		// CreateFile (VirtualMachine::Directory)
 		//
 		// Creates a regular file node as a child of this directory
-		virtual void CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+		virtual std::unique_ptr<VirtualMachine::Node> CreateFile(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+
+		// CreateHandle (VirtualMachine::Node)
+		//
+		// Opens a Handle instance against this node
+		virtual std::unique_ptr<VirtualMachine::Handle> CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const override;
 
 		// CreateSymbolicLink (VirtualMachine::Directory)
 		//
 		// Creates a symbolic link node as a child of this directory
-		virtual void CreateSymbolicLink(VirtualMachine::Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_gid_t gid) override;
+		virtual std::unique_ptr<VirtualMachine::Node> CreateSymbolicLink(VirtualMachine::Mount const* mount, char_t const* name, char_t const* target, uapi_uid_t uid, uapi_gid_t gid) override;
 
 		// Duplicate (VirtualMachine::Node)
 		//
 		// Duplicates this node instance
-		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(uint32_t flags) const override;
+		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
 
 		// Enumerate (VirtualMachine::Directory)
 		//
 		// Enumerates all of the entries in this directory
 		virtual void Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func) override;
 
-		// LinkNode (VirtualMachine::Directory)
+		// Link (VirtualMachine::Directory)
 		//
 		// Links an existing node as a child of this directory
-		virtual void LinkNode(VirtualMachine::Mount const* mount, VirtualMachine::Node const* node, char_t const* name) override;
+		virtual void Link(VirtualMachine::Mount const* mount, VirtualMachine::Node const* node, char_t const* name) override;
 
-		// OpenNode (VirtualMachine::Directory)
+		// Lookup (VirtualMachine::Directory)
 		//
-		// Opens a child node of this directory by name
-		virtual std::unique_ptr<VirtualMachine::Node> OpenNode(VirtualMachine::Mount const* mount, char_t const* name, uint32_t flags, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
+		// Looks up a child node of this directory by name
+		virtual std::unique_ptr<VirtualMachine::Node> Lookup(VirtualMachine::Mount const* mount, char_t const* name) override;
 
-		// Seek (VirtualMachine::Node)
+		// SetMode (VirtualMachine::Node)
 		//
-		// Changes the file position
-		virtual size_t Seek(VirtualMachine::Mount const* mount, ssize_t offset, int whence) override;
+		// Changes the mode flags for this node
+		virtual uapi_mode_t SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode) override;
 
-		// Sync (VirtualMachine::Node)
+		// Stat (VirtualMachine::Node)
 		//
-		// Synchronizes all metadata and data associated with the file to storage
-		virtual void Sync(VirtualMachine::Mount const* mount) const override;
-
-		// SyncData (VirtualMachine::Node)
-		//
-		// Synchronizes all data associated with the file to storage, not metadata
-		virtual void SyncData(VirtualMachine::Mount const* mount) const override;
+		// Gets statistical information about this node
+		virtual void Stat(VirtualMachine::Mount const* mount, uapi_stat3264* stat) override;
 
 		// UnlinkNode (VirtualMachine::Directory)
 		//
 		// Unlinks a child node from this directory
-		virtual void UnlinkNode(VirtualMachine::Mount const* mount, char_t const* name) override;
+		virtual void Unlink(VirtualMachine::Mount const* mount, char_t const* name) override;
 
 		//-------------------------------------------------------------------
 		// Properties
 
 		// Mode (VirtualMachine::Node)
 		//
-		// Gets the node type and permission mask for the node
+		// Gets the type and permission masks from the node
 		__declspec(property(get=getMode)) uapi_mode_t Mode;
 		virtual uapi_mode_t getMode(void) const override;
+
+	protected:
+
+		//-------------------------------------------------------------------
+		// Protected Member Functions
+
+		// OpenHandle (Node)
+		//
+		// Opens a host operating system handle against the node
+		virtual HANDLE OpenHandle(uint32_t flags) const override;
 
 	private:
 
 		Directory(Directory const&)=delete;
 		Directory& operator=(Directory const&)=delete;
+	};
+
+	// DirectoryHandle
+	//
+	// Implements VirtualMachine::Handle
+	class DirectoryHandle : public VirtualMachine::Handle
+	{
+	public:
+
+		// Instance Constructor
+		//
+		DirectoryHandle(std::shared_ptr<node_t> const& node, HANDLE handle, uint32_t flags);
+
+		// Destructor
+		//
+		virtual ~DirectoryHandle()=default;
 
 		//-------------------------------------------------------------------
-		// Private Member Functions
+		// Member Functions
 
-		// OpenHandle (static)
+		// Duplicate
 		//
-		// Opens the native Win32 operating system handle
-		static HANDLE OpenHandle(wchar_t const* path, uint32_t flags);
+		// Duplicates this Handle instance
+		virtual std::unique_ptr<Handle> Duplicate(uint32_t flags) const override;
+	
+		// Read
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t Read(void* buffer, size_t count) override;
+
+		// ReadAt
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t ReadAt(size_t offset, void* buffer, size_t count) override;
+
+		// Seek
+		//
+		// Changes the file position
+		virtual size_t Seek(ssize_t offset, int whence) override;
+
+		// SetLength
+		//
+		// Sets the length of the node data
+		virtual size_t SetLength(size_t length) override;
+
+		// Sync
+		//
+		// Synchronizes all data associated with the file to storage, not metadata
+		virtual void Sync(void) const override;
+
+		// Write
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t Write(const void* buffer, size_t count) override;
+
+		// WriteAt
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) override;
+
+		//--------------------------------------------------------------------
+		// Properties
+
+		// Flags
+		//
+		// Gets the handle-level flags applied to this instance
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const override;
+
+		// Length
+		//
+		// Gets the length of the node data
+		__declspec(property(get=getLength)) size_t Length;
+		virtual size_t getLength(void) const override;
+
+	private:
+
+		DirectoryHandle(DirectoryHandle const&)=delete;
+		DirectoryHandle& operator=(DirectoryHandle const&)=delete;
+
+		//-------------------------------------------------------------------
+		// Protected Member Variables
+
+		std::shared_ptr<node_t>		m_node;		// Shared node_t instance
+		HANDLE const				m_handle;	// Native object handle
+		std::atomic<uint32_t>		m_flags;	// Handle instance flags
 	};
 
 	// File
@@ -327,8 +450,7 @@ private:
 
 		// Instance Constructors
 		//
-		File(std::shared_ptr<HostFileSystem> const& fs, wchar_t const* path, uint32_t flags);
-		File(File const& rhs, uint32_t flags);
+		File(std::shared_ptr<node_t> const& node);
 
 		// Destructor
 		//
@@ -337,78 +459,135 @@ private:
 		//-------------------------------------------------------------------
 		// Member Functions
 
+		// CreateHandle (VirtualMachine::Node)
+		//
+		// Opens a Handle instance against this node
+		virtual std::unique_ptr<VirtualMachine::Handle> CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const override;
+
 		// Duplicate (VirtualMachine::Node)
 		//
-		// Duplicates the Mount instance
-		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(uint32_t flags) const override;
+		// Duplicates this node instance
+		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
 
-		// Read (VirtualMachine::File)
+		// SetMode (VirtualMachine::Node)
 		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t Read(VirtualMachine::Mount const* mount, void* buffer, size_t count) override;
+		// Changes the mode flags for this node
+		virtual uapi_mode_t SetMode(VirtualMachine::Mount const* mount, uapi_mode_t mode) override;
 
-		// ReadAt (VirtualMachine::File)
+		// Stat (VirtualMachine::Node)
 		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t ReadAt(VirtualMachine::Mount const* mount, ssize_t offset, int whence, void* buffer, size_t count) override;
-
-		// Seek (VirtualMachine::Node)
-		//
-		// Changes the file position
-		virtual size_t Seek(VirtualMachine::Mount const* mount, ssize_t offset, int whence) override;
-
-		// SetLength (VirtualMachine::File)
-		//
-		// Sets the length of the node data
-		virtual size_t SetLength(VirtualMachine::Mount const* mount, size_t length) override;
-
-		// Sync (VirtualMachine::Node)
-		//
-		// Synchronizes all metadata and data associated with the file to storage
-		virtual void Sync(VirtualMachine::Mount const* mount) const override;
-
-		// SyncData (VirtualMachine::Node)
-		//
-		// Synchronizes all data associated with the file to storage, not metadata
-		virtual void SyncData(VirtualMachine::Mount const* mount) const override;
-
-		// Write (VirtualMachine::File)
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t Write(VirtualMachine::Mount const* mount, const void* buffer, size_t count) override;
-
-		// WriteAt (VirtualMachine::File)
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t WriteAt(VirtualMachine::Mount const* mount, ssize_t offset, int whence, const void* buffer, size_t count) override;
+		// Gets statistical information about this node
+		virtual void Stat(VirtualMachine::Mount const* mount, uapi_stat3264* stat) override;
 
 		//-------------------------------------------------------------------
 		// Properties
 
-		// Length (VirtualMachine::File)
-		//
-		// Gets the length of the node data
-		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const override;
-
 		// Mode (VirtualMachine::Node)
 		//
-		// Gets the node type and permission mask for the node
+		// Gets the type and permission masks from the node
 		__declspec(property(get=getMode)) uapi_mode_t Mode;
 		virtual uapi_mode_t getMode(void) const override;
+
+	protected:
+
+		//-------------------------------------------------------------------
+		// Protected Member Functions
+
+		// OpenHandle (Node)
+		//
+		// Opens a host operating system handle against the node
+		virtual HANDLE OpenHandle(uint32_t flags) const override;
 
 	private:
 
 		File(File const&)=delete;
 		File& operator=(File const&)=delete;
+	};
+
+	// FileHandle
+	//
+	// Implements VirtualMachine::Handle
+	class FileHandle : public VirtualMachine::Handle
+	{
+	public:
+
+		// Instance Constructor
+		//
+		FileHandle(std::shared_ptr<node_t> const& node, HANDLE handle, uint32_t flags);
+
+		// Destructor
+		//
+		virtual ~FileHandle()=default;
 
 		//-------------------------------------------------------------------
-		// Private Member Functions
+		// Member Functions
 
-		// OpenHandle (static)
+		// Duplicate
 		//
-		// Opens the native Win32 operating system handle
-		static HANDLE OpenHandle(wchar_t const* path, uint32_t flags);
+		// Duplicates this Handle instance
+		virtual std::unique_ptr<Handle> Duplicate(uint32_t flags) const override;
+	
+		// Read
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t Read(void* buffer, size_t count) override;
+
+		// ReadAt
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t ReadAt(size_t offset, void* buffer, size_t count) override;
+
+		// Seek
+		//
+		// Changes the file position
+		virtual size_t Seek(ssize_t offset, int whence) override;
+
+		// SetLength
+		//
+		// Sets the length of the node data
+		virtual size_t SetLength(size_t length) override;
+
+		// Sync
+		//
+		// Synchronizes all data associated with the file to storage, not metadata
+		virtual void Sync(void) const override;
+
+		// Write
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t Write(const void* buffer, size_t count) override;
+
+		// WriteAt
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) override;
+
+		//--------------------------------------------------------------------
+		// Properties
+
+		// Flags
+		//
+		// Gets the handle-level flags applied to this instance
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const override;
+
+		// Length
+		//
+		// Gets the length of the node data
+		__declspec(property(get=getLength)) size_t Length;
+		virtual size_t getLength(void) const override;
+
+	private:
+
+		FileHandle(FileHandle const&)=delete;
+		FileHandle& operator=(FileHandle const&)=delete;
+
+		//-------------------------------------------------------------------
+		// Protected Member Variables
+
+		std::shared_ptr<node_t>		m_node;		// Shared node_t instance
+		HANDLE const				m_handle;	// Native object handle
+		std::atomic<uint32_t>		m_flags;	// Handle instance flags
 	};
 
 	// Mount
@@ -420,7 +599,7 @@ private:
 
 		// Instance Constructors
 		//
-		Mount(std::shared_ptr<HostFileSystem> const& fs, std::shared_ptr<Directory> const& rootdir, uint32_t flags);
+		Mount(std::shared_ptr<HostFileSystem> const& fs, std::unique_ptr<Directory>&& rootdir, uint32_t flags);
 		Mount(Mount const& rhs);
 
 		// Destructor
@@ -453,8 +632,8 @@ private:
 		// RootNode (VirtualMachine::Mount)
 		//
 		// Gets a pointer to the mount point root node instance
-		__declspec(property(get=getRootNode)) VirtualMachine::Node const* RootNode;
-		virtual VirtualMachine::Node const* getRootNode(void) const override;
+		__declspec(property(get=getRootNode)) VirtualMachine::Node* RootNode;
+		virtual VirtualMachine::Node* getRootNode(void) const override;
 
 	private:
 
