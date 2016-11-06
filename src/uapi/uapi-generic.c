@@ -47,7 +47,7 @@
 
 // asm-generic/fcntl.h
 //
-#define O_EXEC 4		// Special flag for EXECUTE access on handles, should not be obeyed by system calls
+#define O_KERNEL_EXEC 4		// Special flag for EXECUTE access on handles, should not be obeyed by system calls
 
 // asm/stat.h
 //

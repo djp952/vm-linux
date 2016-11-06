@@ -328,6 +328,14 @@ private:
 		// Node owner user identifier
 		std::atomic<uapi_uid_t> uid;
 
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// touch_atime
+		//
+		// Updates the access time for the node based on NOATIME/RELATIME/STRICTATIME
+		uapi_timespec touch_atime(uapi_timespec accesstime, uint32_t mountflags);
+
 	protected:
 
 		// Instance Constructor
@@ -706,7 +714,7 @@ private:
 
 		// Instance Constructor
 		//
-		DirectoryHandle(std::shared_ptr<handle_t<directory_node_t>> const& handle, uint32_t flags);
+		DirectoryHandle(std::shared_ptr<handle_t<directory_node_t>> const& handle, uint32_t flags, uint32_t mountflags);
 
 		// Destructor
 		//
@@ -764,12 +772,6 @@ private:
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
 
-		// Length
-		//
-		// Gets the length of the node data
-		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const override;
-
 	private:
 
 		DirectoryHandle(DirectoryHandle const&)=delete;
@@ -778,8 +780,9 @@ private:
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<handle_t<directory_node_t>>	m_handle;	// Shared handle_t
-		std::atomic<uint32_t>						m_flags;	// Handle flags
+		std::shared_ptr<handle_t<directory_node_t>>	m_handle;		// Shared handle_t
+		std::atomic<uint32_t>						m_flags;		// Handle flags
+		uint32_t const								m_mountflags;	// Mount flags
 	};
 
 	// File
@@ -826,7 +829,7 @@ private:
 
 		// Instance Constructor
 		//
-		FileHandle(std::shared_ptr<handle_t<file_node_t>> const& handle, uint32_t flags);
+		FileHandle(std::shared_ptr<handle_t<file_node_t>> const& handle, uint32_t flags, uint32_t mountflags);
 
 		// Destructor
 		//
@@ -884,12 +887,6 @@ private:
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
 
-		// Length
-		//
-		// Gets the length of the node data
-		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const override;
-
 	private:
 
 		FileHandle(FileHandle const&)=delete;
@@ -898,8 +895,9 @@ private:
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<handle_t<file_node_t>>	m_handle;	// Shared handle_t
-		std::atomic<uint32_t>					m_flags;	// Handle flags
+		std::shared_ptr<handle_t<file_node_t>>	m_handle;		// Shared handle_t
+		std::atomic<uint32_t>					m_flags;		// Handle flags
+		uint32_t const							m_mountflags;	// Mount flags
 	};
 
 	// Mount
@@ -1015,7 +1013,7 @@ private:
 
 		// Instance Constructor
 		//
-		SymbolicLinkHandle(std::shared_ptr<handle_t<symlink_node_t>> const& handle, uint32_t flags);
+		SymbolicLinkHandle(std::shared_ptr<handle_t<symlink_node_t>> const& handle, uint32_t flags, uint32_t mountflags);
 
 		// Destructor
 		//
@@ -1073,12 +1071,6 @@ private:
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
 
-		// Length
-		//
-		// Gets the length of the node data
-		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const override;
-
 	private:
 
 		SymbolicLinkHandle(SymbolicLinkHandle const&)=delete;
@@ -1087,8 +1079,9 @@ private:
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<handle_t<symlink_node_t>>	m_handle;	// Shared handle_t
-		std::atomic<uint32_t>						m_flags;	// Handle flags
+		std::shared_ptr<handle_t<symlink_node_t>>	m_handle;		// Shared handle_t
+		std::atomic<uint32_t>						m_flags;		// Handle flags
+		uint32_t const								m_mountflags;	// Mount flags
 	};
 
 	//-----------------------------------------------------------------------

@@ -393,12 +393,6 @@ public:
 		// Gets the handle-level flags applied to this instance
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const = 0;
-
-		// Length
-		//
-		// Gets the length of the node data
-		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const = 0;
 	};
 
 	// Directory

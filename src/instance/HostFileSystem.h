@@ -150,6 +150,85 @@ private:
 		node_t& operator=(node_t const&)=delete;
 	};
 
+	// handle_t
+	//
+	// Internal representation of a handle instance
+	class handle_t
+	{
+	public:
+
+		// Instance Constructor
+		//
+		handle_t(std::shared_ptr<node_t> const& nodeptr);
+
+		// Destructor
+		//
+		virtual ~handle_t()=default;
+
+		//-------------------------------------------------------------------
+		// Fields
+
+		// node
+		//
+		// Shared pointer to the referenced node instance
+		std::shared_ptr<node_t> const node;
+
+	private:
+
+		handle_t(handle_t const&)=delete;
+		handle_t& operator=(handle_t const&)=delete;
+	};
+
+	// directory_handle_t
+	//
+	// Internal representation of a directory handle instance
+	class directory_handle_t : public handle_t
+	{
+	public:
+
+		// Instance Constructor
+		//
+		directory_handle_t(std::shared_ptr<node_t> const& nodeptr);
+
+		// Destructor
+		//
+		virtual ~directory_handle_t()=default;
+
+		//-------------------------------------------------------------------
+		// Fields
+
+		// position
+		//
+		// Maintains the current file pointer
+		std::atomic<size_t> position;
+
+	private:
+
+		directory_handle_t(directory_handle_t const&)=delete;
+		directory_handle_t& operator=(directory_handle_t const&)=delete;
+	};
+
+	// file_handle_t
+	//
+	// Internal representation of a file handle instance
+	class file_handle_t : public handle_t
+	{
+	public:
+
+		// Instance Constructor
+		//
+		using handle_t::handle_t;
+
+		// Destructor
+		//
+		virtual ~file_handle_t()=default;
+
+	private:
+
+		file_handle_t(file_handle_t const&)=delete;
+		file_handle_t& operator=(file_handle_t const&)=delete;
+	};
+
 	// Node
 	//
 	// Implements VirtualMachine::Node
@@ -364,7 +443,7 @@ private:
 
 		// Instance Constructor
 		//
-		DirectoryHandle(std::shared_ptr<node_t> const& node, HANDLE handle, uint32_t flags);
+		DirectoryHandle(std::shared_ptr<directory_handle_t> const& handle, HANDLE oshandle, uint32_t flags);
 
 		// Destructor
 		//
@@ -422,12 +501,6 @@ private:
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
 
-		// Length
-		//
-		// Gets the length of the node data
-		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const override;
-
 	private:
 
 		DirectoryHandle(DirectoryHandle const&)=delete;
@@ -436,9 +509,9 @@ private:
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<node_t>		m_node;		// Shared node_t instance
-		HANDLE const				m_handle;	// Native object handle
-		std::atomic<uint32_t>		m_flags;	// Handle instance flags
+		std::shared_ptr<directory_handle_t>	m_handle;		// Shared handle_t instance
+		HANDLE const						m_oshandle;		// Native object handle
+		std::atomic<uint32_t>				m_flags;		// Handle instance flags
 	};
 
 	// File
@@ -513,7 +586,7 @@ private:
 
 		// Instance Constructor
 		//
-		FileHandle(std::shared_ptr<node_t> const& node, HANDLE handle, uint32_t flags);
+		FileHandle(std::shared_ptr<file_handle_t> const& handle, HANDLE oshandle, uint32_t flags);
 
 		// Destructor
 		//
@@ -571,12 +644,6 @@ private:
 		__declspec(property(get=getFlags)) uint32_t Flags;
 		virtual uint32_t getFlags(void) const override;
 
-		// Length
-		//
-		// Gets the length of the node data
-		__declspec(property(get=getLength)) size_t Length;
-		virtual size_t getLength(void) const override;
-
 	private:
 
 		FileHandle(FileHandle const&)=delete;
@@ -585,9 +652,9 @@ private:
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<node_t>		m_node;		// Shared node_t instance
-		HANDLE const				m_handle;	// Native object handle
-		std::atomic<uint32_t>		m_flags;	// Handle instance flags
+		std::shared_ptr<file_handle_t>	m_handle;	// Shared handle_t instance
+		HANDLE const					m_oshandle;	// Native object handle
+		std::atomic<uint32_t>			m_flags;	// Handle instance flags
 	};
 
 	// Mount

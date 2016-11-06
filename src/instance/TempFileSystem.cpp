@@ -45,51 +45,6 @@ static size_t g_maxmemory = []() -> size_t {
 	return static_cast<size_t>(std::min(accessiblemem, static_cast<uint64_t>(std::numeric_limits<size_t>::max())));
 }();
 
-////---------------------------------------------------------------------------
-//// TempFileSystem::Node::UpdateAccessTime (private)
-////
-//// Changes the access time of this node
-////
-//// Arguments:
-////
-////	mount		- Mount point on which to perform this operation
-////	atime		- New access time to be set
-//
-//template <class _interface, typename _node_type>
-//uapi_timespec TempFileSystem::Node<_interface, _node_type>::UpdateAccessTime(VirtualMachine::Mount const* mount, uapi_timespec atime)
-//{
-//	bool update = false;								// Flag to actually change the atime
-//
-//	_ASSERTE(mount);
-//	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-//
-//	// O_NOATIME on the handle, MS_NOATIME on the mount or UTIME_OMIT on the timestamp -- do nothing
-//	if((m_flags & UAPI_O_NOATIME) == UAPI_O_NOATIME) return m_handle->node->atime;
-//	if((mount->Flags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME) return m_handle->node->atime;
-//	if(atime.tv_nsec == UAPI_UTIME_OMIT) return m_handle->node->atime;
-//
-//	// If this is a directory node, also do nothing if MS_NODIRATIME has been set
-//	if(((m_handle->node->mode & UAPI_S_IFMT) == UAPI_S_IFDIR) && ((mount->Flags & UAPI_MS_NODIRATIME) == UAPI_MS_NODIRATIME)) return m_handle->node->atime;
-//
-//	// If UTIME_NOW has been specified, use the current date/time otherwise convert the provided timespec
-//	datetime newatime = (atime.tv_nsec == UAPI_UTIME_NOW) ? datetime::now() : convert<datetime>(atime);
-//
-//	// Update atime if previous atime is more than 24 hours in the past (see mount(2))
-//	if(newatime > (convert<datetime>(m_handle->node->atime.load()) + timespan::days(1))) update = true;
-//
-//	// MS_STRICTATIME - always update atime
-//	else if((mount->Flags & UAPI_MS_STRICTATIME) == UAPI_MS_STRICTATIME) update = true;
-//
-//	// Default (MS_RELATIME) - update atime if it is more recent than ctime or mtime
-//	else if((newatime >= convert<datetime>(m_handle->node->ctime.load())) || (newatime >= convert<datetime>(m_handle->node->mtime.load()))) update = true;
-//
-//	// Convert from a datetime back into a timespec and update the node timestamp
-//	atime = convert<uapi_timespec>(newatime);
-//	if(update) m_handle->node->atime = atime;
-//
-//	return atime;
-//}
-
 //---------------------------------------------------------------------------
 // ParseScaledInteger (local)
 //
@@ -379,6 +334,48 @@ TempFileSystem::node_t::~node_t()
 	fs->NodeIndexPool.Release(index);
 }
 
+//---------------------------------------------------------------------------
+// TempFileSystem::Node::touch_atime
+//
+// Changes the access time of this node
+//
+// Arguments:
+//
+//	accesstime		- New access time to be set
+//	mountflags		- Mount level flags for this operation
+
+uapi_timespec TempFileSystem::node_t::touch_atime(uapi_timespec accesstime, uint32_t mountflags)
+{
+	bool update = false;							// Flag to actually change the atime
+
+	uapi_timespec current = atime;					// Get the current node access time
+
+	// MS_NOATIME on the mount or UTIME_OMIT on the timestamp -- do nothing
+	if((mountflags & UAPI_MS_NOATIME) == UAPI_MS_NOATIME) return current;
+	if(accesstime.tv_nsec == UAPI_UTIME_OMIT) return current;
+
+	// If this is a directory node, also do nothing if MS_NODIRATIME has been set
+	if(((mode & UAPI_S_IFMT) == UAPI_S_IFDIR) && ((mountflags & UAPI_MS_NODIRATIME) == UAPI_MS_NODIRATIME)) return current;
+
+	// If UTIME_NOW has been specified, use the current date/time otherwise convert the provided timespec
+	datetime newatime = (accesstime.tv_nsec == UAPI_UTIME_NOW) ? datetime::now() : convert<datetime>(accesstime);
+
+	// Update atime if previous atime is more than 24 hours in the past (see mount(2))
+	if(newatime > (convert<datetime>(current) + timespan::days(1))) update = true;
+
+	// MS_STRICTATIME - always update atime
+	else if((mountflags & UAPI_MS_STRICTATIME) == UAPI_MS_STRICTATIME) update = true;
+
+	// Default (MS_RELATIME) - update atime if it is more recent than ctime or mtime
+	else if((newatime >= convert<datetime>(ctime.load())) || (newatime >= convert<datetime>(mtime.load()))) update = true;
+
+	// Convert from a datetime back into a timespec and update the node timestamp
+	current = convert<uapi_timespec>(newatime);
+	if(update) atime = current;
+
+	return current;
+}
+
 //
 // TEMPFILESYSTEM::DIRECTORY_NODE_T IMPLEMENTATION
 //
@@ -475,7 +472,7 @@ TempFileSystem::symlink_node_t::symlink_node_t(std::shared_ptr<TempFileSystem> c
 	node_t(filesystem, (UAPI_S_IFLNK | 0777), userid, groupid), target(linktarget, allocator_t<char_t>(filesystem))
 {
 	_ASSERTE(linktarget);
-	if(linktarget == nullptr) throw new LinuxException(UAPI_EFAULT);
+	if(linktarget == nullptr) throw LinuxException(UAPI_EFAULT);
 }
 
 //---------------------------------------------------------------------------
@@ -493,7 +490,7 @@ TempFileSystem::symlink_node_t::symlink_node_t(std::shared_ptr<TempFileSystem> c
 std::shared_ptr<TempFileSystem::symlink_node_t> TempFileSystem::symlink_node_t::allocate_shared(std::shared_ptr<TempFileSystem> const& fs, char_t const* target, uapi_uid_t uid, uapi_gid_t gid)
 {
 	_ASSERTE(target);
-	if(target == nullptr) throw new LinuxException(UAPI_EFAULT);
+	if(target == nullptr) throw LinuxException(UAPI_EFAULT);
 
 	return std::allocate_shared<symlink_node_t, allocator_t<symlink_node_t>>(allocator_t<symlink_node_t>(fs), fs, target, uid, gid);
 }
@@ -626,9 +623,21 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::CreateFile(Virt
 
 std::unique_ptr<VirtualMachine::Handle> TempFileSystem::Directory::CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
 {
-	// todo - all kinds of things
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// O_TMPFILE is not supported for directories -> EINVAL
+	if((flags & UAPI_O_TMPFILE) == UAPI_O_TMPFILE) throw LinuxException(UAPI_EINVAL);
+
+	// O_CREAT, O_EXCL and O_TRUNC are not valid flags when opening a directory handle
+	if((flags & (UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TRUNC)) != 0) throw LinuxException(UAPI_EISDIR);
+
+	// Directories cannot be opened for write access
+	if((flags & UAPI_O_ACCMODE) != UAPI_O_RDONLY) throw LinuxException(UAPI_EISDIR);
+
+	// Create and return the new handle instance
 	auto handle = std::make_shared<handle_t<directory_node_t>>(m_node);
-	return std::make_unique<DirectoryHandle>(handle, flags);
+	return std::make_unique<DirectoryHandle>(handle, flags, mount->Flags);
 }
 		
 //---------------------------------------------------------------------------
@@ -714,8 +723,8 @@ void TempFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, st
 		if(!func({ entry.second->index, entry.second->mode, entry.first.c_str() })) break;
 	}
 
-	// todo: put me back
-	//if((mount->Flags & (UAPI_MS_NODIRATIME | UAPI_MS_NOATIME) != 0) UpdateAccessTime(mount, { 0, UAPI_UTIME_NOW });
+	// Update the access time for this node based on the mount flags
+	m_node->touch_atime({ 0, UAPI_UTIME_NOW }, mount->Flags);
 }
 
 //---------------------------------------------------------------------------
@@ -815,8 +824,8 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Lookup(VirtualM
 		default: throw LinuxException(UAPI_ENXIO);
 	}
 
-	// todo: put me back
-	//if((mount->Flags & (UAPI_MS_NODIRATIME | UAPI_MS_NOATIME) != 0) UpdateAccessTime(mount, { 0, UAPI_UTIME_NOW });
+	// Update the access time for this node based on the mount flags
+	m_node->touch_atime({ 0, UAPI_UTIME_NOW }, mount->Flags);
 
 	return result;										
 }
@@ -877,8 +886,10 @@ void TempFileSystem::Directory::Unlink(VirtualMachine::Mount const* mount, char_
 //
 //	handle		- Shared handle_t instance
 //	flags		- Handle instance specific flags
+//	mountflags	- Mount flags in place at the time the handle was opened
 
-TempFileSystem::DirectoryHandle::DirectoryHandle(std::shared_ptr<handle_t<directory_node_t>> const& handle, uint32_t flags) : m_handle(handle), m_flags(flags)
+TempFileSystem::DirectoryHandle::DirectoryHandle(std::shared_ptr<handle_t<directory_node_t>> const& handle, uint32_t flags, uint32_t mountflags) :
+	m_handle(handle), m_flags(flags), m_mountflags(mountflags)
 {
 	_ASSERTE(m_handle);
 }
@@ -894,8 +905,16 @@ TempFileSystem::DirectoryHandle::DirectoryHandle(std::shared_ptr<handle_t<direct
 
 std::unique_ptr<VirtualMachine::Handle> TempFileSystem::DirectoryHandle::Duplicate(uint32_t flags) const
 {
-	// todo - lots of things
-	return std::make_unique<DirectoryHandle>(m_handle, flags);
+	// O_TMPFILE is not supported for directories -> EINVAL
+	if((flags & UAPI_O_TMPFILE) == UAPI_O_TMPFILE) throw LinuxException(UAPI_EINVAL);
+
+	// O_CREAT, O_EXCL and O_TRUNC are not valid flags when opening a directory handle
+	if((flags & (UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TRUNC)) != 0) throw LinuxException(UAPI_EISDIR);
+
+	// Directories cannot be opened for write access
+	if((flags & UAPI_O_ACCMODE) != UAPI_O_RDONLY) throw LinuxException(UAPI_EISDIR);
+
+	return std::make_unique<DirectoryHandle>(m_handle, flags, m_mountflags);
 }
 
 //---------------------------------------------------------------------------
@@ -906,18 +925,6 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::DirectoryHandle::Duplica
 uint32_t TempFileSystem::DirectoryHandle::getFlags(void) const
 {
 	return m_flags;
-}
-
-
-//---------------------------------------------------------------------------
-// TempFileSystem::DirectoryHandle::getLength
-//
-// Gets the length of the file node data
-
-size_t TempFileSystem::DirectoryHandle::getLength(void) const
-{
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
 }
 
 //---------------------------------------------------------------------------
@@ -932,8 +939,10 @@ size_t TempFileSystem::DirectoryHandle::getLength(void) const
 
 size_t TempFileSystem::DirectoryHandle::Read(void* buffer, size_t count)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EISDIR);
 }
 
 //---------------------------------------------------------------------------
@@ -949,8 +958,11 @@ size_t TempFileSystem::DirectoryHandle::Read(void* buffer, size_t count)
 
 size_t TempFileSystem::DirectoryHandle::ReadAt(size_t offset, void* buffer, size_t count)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EISDIR);
 }
 
 //---------------------------------------------------------------------------
@@ -965,8 +977,41 @@ size_t TempFileSystem::DirectoryHandle::ReadAt(size_t offset, void* buffer, size
 
 size_t TempFileSystem::DirectoryHandle::Seek(ssize_t offset, int whence)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
+
+	size_t pos = m_handle->position;		// Copy the current position
+
+	// Prevent changes to the underlying directory contents during the seek
+	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->nodeslock);
+
+	switch(whence) {
+
+		// UAPI_SEEK_SET - Seeks to an offset relative to the beginning of the file
+		case UAPI_SEEK_SET:
+
+			if(offset < 0) throw LinuxException(UAPI_EINVAL);
+			pos = static_cast<size_t>(offset);
+			break;
+
+		// UAPI_SEEK_CUR - Seeks to an offset relative to the current position
+		case UAPI_SEEK_CUR:
+
+			if((offset < 0) && ((pos - offset) < 0)) throw LinuxException(UAPI_EINVAL);
+			pos += offset;
+			break;
+
+		// UAPI_SEEK_END - Seeks to an offset relative to the end of the file
+		case UAPI_SEEK_END:
+
+			pos = m_handle->node->nodes.size() + offset;
+			break;
+
+		default: throw LinuxException(UAPI_EINVAL);
+	}
+
+	m_handle->position = pos;
+	return pos;
 }
 
 //---------------------------------------------------------------------------
@@ -980,8 +1025,9 @@ size_t TempFileSystem::DirectoryHandle::Seek(ssize_t offset, int whence)
 
 size_t TempFileSystem::DirectoryHandle::SetLength(size_t length)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(length);
+
+	throw LinuxException(UAPI_EISDIR);
 }
 
 //---------------------------------------------------------------------------
@@ -995,8 +1041,14 @@ size_t TempFileSystem::DirectoryHandle::SetLength(size_t length)
 
 void TempFileSystem::DirectoryHandle::Sync(void) const
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
+
+	// Ensure that the file system isn't read-only and the handle isn't read-only
+	if((m_handle->node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
+
+	// no-operation
 }
 
 //---------------------------------------------------------------------------
@@ -1011,8 +1063,11 @@ void TempFileSystem::DirectoryHandle::Sync(void) const
 
 size_t TempFileSystem::DirectoryHandle::Write(const void* buffer, size_t count)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	// Directory handles cannot be open for write access -> EBADF
+	throw LinuxException(UAPI_EBADF);
 }
 
 //---------------------------------------------------------------------------
@@ -1029,8 +1084,12 @@ size_t TempFileSystem::DirectoryHandle::Write(const void* buffer, size_t count)
 
 size_t TempFileSystem::DirectoryHandle::WriteAt(size_t offset, const void* buffer, size_t count)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	// Directory handles cannot be open for write access -> EBADF
+	throw LinuxException(UAPI_EBADF);
 }
 
 //
@@ -1063,7 +1122,7 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::File::CreateHandle(Virtu
 {
 	// todo - all kinds of things
 	auto handle = std::make_shared<handle_t<file_node_t>>(m_node);
-	return std::make_unique<FileHandle>(handle, flags);
+	return std::make_unique<FileHandle>(handle, flags, mount->Flags);
 }
 
 //---------------------------------------------------------------------------
@@ -1091,8 +1150,10 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::File::Duplicate(void) cons
 //
 //	handle		- Shared handle_t instance
 //	flags		- Handle instance specific flags
+//	mountflags	- Mount flags in effect when handle was opened
 
-TempFileSystem::FileHandle::FileHandle(std::shared_ptr<handle_t<file_node_t>> const& handle, uint32_t flags) : m_handle(handle), m_flags(flags)
+TempFileSystem::FileHandle::FileHandle(std::shared_ptr<handle_t<file_node_t>> const& handle, uint32_t flags, uint32_t mountflags) : 
+	m_handle(handle), m_flags(flags), m_mountflags(mountflags)
 {
 	_ASSERTE(m_handle);
 }
@@ -1109,7 +1170,7 @@ TempFileSystem::FileHandle::FileHandle(std::shared_ptr<handle_t<file_node_t>> co
 std::unique_ptr<VirtualMachine::Handle> TempFileSystem::FileHandle::Duplicate(uint32_t flags) const
 {
 	// todo - lots of things
-	return std::make_unique<FileHandle>(m_handle, flags);
+	return std::make_unique<FileHandle>(m_handle, flags, m_mountflags);
 }
 
 //---------------------------------------------------------------------------
@@ -1120,18 +1181,6 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::FileHandle::Duplicate(ui
 uint32_t TempFileSystem::FileHandle::getFlags(void) const
 {
 	return m_flags;
-}
-
-
-//---------------------------------------------------------------------------
-// TempFileSystem::FileHandle::getLength
-//
-// Gets the length of the file node data
-
-size_t TempFileSystem::FileHandle::getLength(void) const
-{
-	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
-	return m_handle->node->data.size();
 }
 
 //---------------------------------------------------------------------------
@@ -1149,7 +1198,7 @@ size_t TempFileSystem::FileHandle::Read(void* buffer, size_t count)
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
 	// Verify that the handle was not opened in write-only mode
-	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
 
 	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
 
@@ -1164,8 +1213,8 @@ size_t TempFileSystem::FileHandle::Read(void* buffer, size_t count)
 
 	m_handle->position = (pos + count);		// Set the new position
 
-	// Update atime for this node
-	// TODO PUT ME BACK WITH NOATIME CHECK UpdateAccessTime(mount, { 0, UAPI_UTIME_NOW });
+	// Update atime for this node if O_NOATIME was not set on this handle
+	if((m_flags & UAPI_O_NOATIME) == 0) m_handle->node->touch_atime({ 0, UAPI_UTIME_NOW }, m_mountflags);
 
 	return count;
 }
@@ -1186,7 +1235,7 @@ size_t TempFileSystem::FileHandle::ReadAt(size_t offset, void* buffer, size_t co
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
 	// Verify that the handle was not opened in write-only mode
-	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EACCES);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
 
 	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
 
@@ -1197,8 +1246,8 @@ size_t TempFileSystem::FileHandle::ReadAt(size_t offset, void* buffer, size_t co
 	// Copy the requested data from the file into the provided buffer
 	if(count > 0) memcpy(buffer, &m_handle->node->data[offset], count);
 
-	// Update atime for this node
-	/// TODO PUT ME BACK WITH NOATIME CHECK UpdateAccessTime(mount, { 0, UAPI_UTIME_NOW });
+	// Update atime for this node if O_NOATIME was not set on this handle
+	if((m_flags & UAPI_O_NOATIME) == 0) m_handle->node->touch_atime({ 0, UAPI_UTIME_NOW }, m_mountflags);
 
 	return count;
 }
@@ -1222,7 +1271,7 @@ size_t TempFileSystem::FileHandle::Seek(ssize_t offset, int whence)
 	
 	switch(whence) {
 
-		// UAPI_SEEK_SET - Seeks to an offset relative to the beginning of the file;
+		// UAPI_SEEK_SET - Seeks to an offset relative to the beginning of the file
 		case UAPI_SEEK_SET:
 
 			if(offset < 0) throw LinuxException(UAPI_EINVAL);
@@ -1261,7 +1310,7 @@ size_t TempFileSystem::FileHandle::Seek(ssize_t offset, int whence)
 size_t TempFileSystem::FileHandle::SetLength(size_t length)
 {
 	// Verify that the handle was not opened in read-only mode
-	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EBADF);
 
 	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
 
@@ -1310,7 +1359,7 @@ size_t TempFileSystem::FileHandle::Write(const void* buffer, size_t count)
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
 	// Verify that the handle was not opened in read-only mode
-	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EBADF);
 
 	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
 
@@ -1350,7 +1399,7 @@ size_t TempFileSystem::FileHandle::Write(const void* buffer, size_t count)
 size_t TempFileSystem::FileHandle::WriteAt(size_t offset, const void* buffer, size_t count)
 {
 	// Verify that the handle was not opened in read-only mode
-	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EACCES);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EBADF);
 
 	sync::reader_writer_lock::scoped_lock_write writer(m_handle->node->datalock);
 
@@ -1804,7 +1853,7 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::SymbolicLink::CreateHand
 {
 	// todo - all kinds of things
 	auto handle = std::make_shared<handle_t<symlink_node_t>>(m_node);
-	return std::make_unique<SymbolicLinkHandle>(handle, flags);
+	return std::make_unique<SymbolicLinkHandle>(handle, flags, mount->Flags);
 }
 		
 //---------------------------------------------------------------------------
@@ -1843,8 +1892,10 @@ char_t const* TempFileSystem::SymbolicLink::getTarget(void) const
 //
 //	handle		- Shared handle_t instance
 //	flags		- Handle instance specific flags
+//	mountflags	- Mount flags in place when the handle was created
 
-TempFileSystem::SymbolicLinkHandle::SymbolicLinkHandle(std::shared_ptr<handle_t<symlink_node_t>> const& handle, uint32_t flags) : m_handle(handle), m_flags(flags)
+TempFileSystem::SymbolicLinkHandle::SymbolicLinkHandle(std::shared_ptr<handle_t<symlink_node_t>> const& handle, uint32_t flags, uint32_t mountflags) : 
+	m_handle(handle), m_flags(flags), m_mountflags(mountflags)
 {
 	_ASSERTE(m_handle);
 }
@@ -1861,7 +1912,7 @@ TempFileSystem::SymbolicLinkHandle::SymbolicLinkHandle(std::shared_ptr<handle_t<
 std::unique_ptr<VirtualMachine::Handle> TempFileSystem::SymbolicLinkHandle::Duplicate(uint32_t flags) const
 {
 	// todo - lots of things
-	return std::make_unique<SymbolicLinkHandle>(m_handle, flags);
+	return std::make_unique<SymbolicLinkHandle>(m_handle, flags, m_mountflags);
 }
 
 //---------------------------------------------------------------------------
@@ -1872,18 +1923,6 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::SymbolicLinkHandle::Dupl
 uint32_t TempFileSystem::SymbolicLinkHandle::getFlags(void) const
 {
 	return m_flags;
-}
-
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLinkHandle::getLength
-//
-// Gets the length of the file node data
-
-size_t TempFileSystem::SymbolicLinkHandle::getLength(void) const
-{
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
 }
 
 //---------------------------------------------------------------------------

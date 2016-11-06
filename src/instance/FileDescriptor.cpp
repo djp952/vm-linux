@@ -76,7 +76,7 @@ size_t FileDescriptor::AdjustPosition(ssize_t delta, int whence) const
 
 	switch(whence) {
 
-		// UAPI_SEEK_SET - Seeks to an offset relative to the beginning of the file;
+		// UAPI_SEEK_SET - Seeks to an offset relative to the beginning of the file
 		case UAPI_SEEK_SET:
 
 			if(delta < 0) throw LinuxException(UAPI_EINVAL);
