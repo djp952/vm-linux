@@ -23,6 +23,7 @@
 #include "stdafx.h"
 #include "HostFileSystem.h"
 
+#include <align.h>
 #include <convert.h>
 
 #include "LinuxException.h"
@@ -405,7 +406,9 @@ void HostFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, st
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// todo
+	// todo - needs to move to Handle anyway since lseek() can move the pointer
+	// into the operation.  FindFirstFile/etc maintains it's own pointer as part
+	// of the underlying handle, but I don't think it can be seeked?
 	throw LinuxException(UAPI_EPERM);
 }
 
@@ -545,10 +548,60 @@ uapi_mode_t HostFileSystem::Directory::SetMode(VirtualMachine::Mount const* moun
 
 void HostFileSystem::Directory::Stat(VirtualMachine::Mount const* mount, uapi_stat3264* stat)
 {
+	BY_HANDLE_FILE_INFORMATION		info;		// File information
+	FILE_STORAGE_INFO				storage;	// Storage information
+
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(stat == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// No special permissions are required to get statistics, but still check the mount
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// todo
+	// Initialize the [out] structure; do not use optimized macros to only set padding 
+	// to zeros since the underlying stat3264 structure is different for each platform
+	memset(stat, 0, sizeof(uapi_stat3264));
+
+	// Open a query-only O_PATH handle against the node in order to get the stats
+	HANDLE handle = OpenHandle(UAPI_O_PATH);
+
+	try {
+
+		// The bulk of the information needed is provided in BY_HANDLE_FILE_INFORMATION
+		if(!GetFileInformationByHandle(handle, &info)) throw MapHostException(GetLastError());
+	
+		// Retrieve the FILE_STORAGE_INFO for the to determine the performance block size
+		if(!GetFileInformationByHandleEx(handle, FileStorageInfo, &storage, sizeof(FILE_STORAGE_INFO)))
+			throw LinuxException(MapHostException(GetLastError()));
+
+		CloseHandle(handle);
+	}
+
+	catch(...) { CloseHandle(handle); throw; }
+
+	// Convert the last access time and last modification time into timespecs
+	auto atime = convert<uapi_timespec>(info.ftLastAccessTime);
+	auto mtime = convert<uapi_timespec>(info.ftLastWriteTime);
+
+	//stat->st_dev = 0;							// todo - no device support yet
+	stat->st_ino = reinterpret_cast<__int3264>(m_node.get());
+	stat->st_nlink = info.nNumberOfLinks;
+	stat->st_mode = UAPI_S_IFDIR | 0777;
+	stat->st_uid = 0;
+	stat->st_gid = 0;
+	//stat->st_rdev = 0;						// todo - no device support yet
+#ifdef _M_X64
+	stat->st_size = static_cast<int64_t>(info.nFileSizeHigh) << 32 | info.nFileSizeLow;
+#else
+	stat->st_size = info.nFileSizeLow;
+#endif
+	stat->st_blksize = storage.PhysicalBytesPerSectorForPerformance;
+	stat->st_blocks = align::up(stat->st_size, 512) / 512;
+	stat->st_atime = atime.tv_sec;
+	stat->st_atime_nsec;
+	stat->st_mtime = mtime.tv_sec;
+	stat->st_mtime_nsec = mtime.tv_nsec;
+	stat->st_ctime = mtime.tv_sec;				// Note: uses mtime here
+	stat->st_ctime_nsec = mtime.tv_nsec;		// Note: uses mtime here
 }
 
 //---------------------------------------------------------------------------
@@ -790,7 +843,6 @@ size_t HostFileSystem::DirectoryHandle::Write(const void* buffer, size_t count)
 	UNREFERENCED_PARAMETER(buffer);
 	UNREFERENCED_PARAMETER(count);
 
-	// Directory handles cannot be open for write access -> EBADF
 	throw LinuxException(UAPI_EBADF);
 }
 
@@ -811,7 +863,6 @@ size_t HostFileSystem::DirectoryHandle::WriteAt(size_t offset, const void* buffe
 	UNREFERENCED_PARAMETER(buffer);
 	UNREFERENCED_PARAMETER(count);
 
-	// Directory handles cannot be open for write access -> EBADF
 	throw LinuxException(UAPI_EBADF);
 }
 
@@ -979,10 +1030,60 @@ uapi_mode_t HostFileSystem::File::SetMode(VirtualMachine::Mount const* mount, ua
 
 void HostFileSystem::File::Stat(VirtualMachine::Mount const* mount, uapi_stat3264* stat)
 {
+	BY_HANDLE_FILE_INFORMATION		info;		// File information
+	FILE_STORAGE_INFO				storage;	// Storage information
+
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(stat == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// No special permissions are required to get statistics, but still check the mount
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 
-	// todo
+	// Initialize the [out] structure; do not use optimized macros to only set padding 
+	// to zeros since the underlying stat3264 structure is different for each platform
+	memset(stat, 0, sizeof(uapi_stat3264));
+
+	// Open a query-only O_PATH handle against the node in order to get the stats
+	HANDLE handle = OpenHandle(UAPI_O_PATH);
+
+	try {
+
+		// The bulk of the information needed is provided in BY_HANDLE_FILE_INFORMATION
+		if(!GetFileInformationByHandle(handle, &info)) throw MapHostException(GetLastError());
+	
+		// Retrieve the FILE_STORAGE_INFO for the to determine the performance block size
+		if(!GetFileInformationByHandleEx(handle, FileStorageInfo, &storage, sizeof(FILE_STORAGE_INFO)))
+			throw LinuxException(MapHostException(GetLastError()));
+
+		CloseHandle(handle);
+	}
+
+	catch(...) { CloseHandle(handle); throw; }
+
+	// Convert the last access time and last modification time into timespecs
+	auto atime = convert<uapi_timespec>(info.ftLastAccessTime);
+	auto mtime = convert<uapi_timespec>(info.ftLastWriteTime);
+
+	//stat->st_dev = 0;							// todo - no device support yet
+	stat->st_ino = reinterpret_cast<__int3264>(m_node.get());
+	stat->st_nlink = info.nNumberOfLinks;
+	stat->st_mode = UAPI_S_IFREG | 0777;
+	stat->st_uid = 0;
+	stat->st_gid = 0;
+	//stat->st_rdev = 0;						// todo - no device support yet
+#ifdef _M_X64
+	stat->st_size = static_cast<int64_t>(info.nFileSizeHigh) << 32 | info.nFileSizeLow;
+#else
+	stat->st_size = info.nFileSizeLow;
+#endif
+	stat->st_blksize = storage.PhysicalBytesPerSectorForPerformance;
+	stat->st_blocks = align::up(stat->st_size, 512) / 512;
+	stat->st_atime = atime.tv_sec;
+	stat->st_atime_nsec;
+	stat->st_mtime = mtime.tv_sec;
+	stat->st_mtime_nsec = mtime.tv_nsec;
+	stat->st_ctime = mtime.tv_sec;				// Note: uses mtime here
+	stat->st_ctime_nsec = mtime.tv_nsec;		// Note: uses mtime here
 }
 
 //
@@ -1017,8 +1118,44 @@ HostFileSystem::FileHandle::FileHandle(std::shared_ptr<file_handle_t> const& han
 
 std::unique_ptr<VirtualMachine::Handle> HostFileSystem::FileHandle::Duplicate(uint32_t flags) const
 {
-	// todo
-	return nullptr;
+	DWORD		access = 0;									// Default to query-only access (O_PATH)
+	DWORD		attributes = FILE_FLAG_POSIX_SEMANTICS;		// Default handle attributes
+
+	// Check for flags that aren't compatible with duplicating file objects; note that O_KERNEL_EXEC
+	// is listed here - that special flag can only be applied by the virtual machine against new handles
+	if(flags & (UAPI_O_DIRECTORY | UAPI_FASYNC | UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TMPFILE | UAPI_O_TRUNC | UAPI_O_KERNEL_EXEC)) 
+		throw LinuxException(UAPI_EINVAL);
+
+	// O_PATH, O_RDONLY, O_WRONLY, O_RDWR - Use appropriate access rights
+	if((flags & UAPI_O_PATH) == 0) {
+
+		switch(flags & UAPI_O_ACCMODE) {
+
+			case UAPI_O_RDONLY: access = GENERIC_READ; break;
+			case UAPI_O_WRONLY: access = GENERIC_WRITE; break;
+			case UAPI_O_RDWR: access = GENERIC_READ | GENERIC_WRITE; break;
+
+			default: throw LinuxException(UAPI_EINVAL);
+		}
+	}
+
+	// O_DIRECT, O_DSYNC, O_SYNC -- A write-through handle is a reasonable approximation for these
+	if((flags & UAPI_O_DIRECT) == UAPI_O_DIRECT) attributes |= FILE_FLAG_WRITE_THROUGH;
+	if((flags & UAPI_O_DSYNC) == UAPI_O_DSYNC) attributes |= FILE_FLAG_WRITE_THROUGH;
+	if((flags & UAPI_O_SYNC) == UAPI_O_SYNC) attributes |= FILE_FLAG_WRITE_THROUGH;
+
+	// Attempt to reopen the Win32 handle against the file with the new flags
+	HANDLE oshandle = ReOpenFile(m_oshandle, access, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, attributes);
+	if(oshandle == INVALID_HANDLE_VALUE) throw MapHostException(GetLastError());
+
+	// O_NOATIME - Set the handle to not track access times for this object
+	if((flags & UAPI_O_NOATIME) == UAPI_O_NOATIME) {
+
+		FILETIME noatime{ 0xFFFFFFFF, 0xFFFFFFFF };
+		SetFileTime(oshandle, nullptr, &noatime, nullptr);
+	}
+
+	return std::make_unique<FileHandle>(m_handle, oshandle, flags);
 }
 
 //-----------------------------------------------------------------------------
@@ -1044,6 +1181,9 @@ uint32_t HostFileSystem::FileHandle::getFlags(void) const
 size_t HostFileSystem::FileHandle::Read(void* buffer, size_t count)
 {
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
 
 	// Ensure that the handle was not opened in write-only mode
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
@@ -1075,6 +1215,9 @@ size_t HostFileSystem::FileHandle::Read(void* buffer, size_t count)
 size_t HostFileSystem::FileHandle::ReadAt(size_t offset, void* buffer, size_t count)
 {
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
 
 	// Ensure that the handle was not opened in write-only mode
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
@@ -1116,6 +1259,9 @@ size_t HostFileSystem::FileHandle::Seek(ssize_t offset, int whence)
 	LARGE_INTEGER delta;
 	delta.QuadPart = offset;
 
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
+
 	if(!SetFilePointerEx(m_oshandle, delta, &delta, static_cast<DWORD>(whence))) throw MapHostException(GetLastError());
 	return static_cast<size_t>(delta.QuadPart);
 }
@@ -1133,6 +1279,9 @@ size_t HostFileSystem::FileHandle::SetLength(size_t length)
 {
 	LARGE_INTEGER current, delta;
 	current.QuadPart = delta.QuadPart = 0;
+
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
 
 	// Ensure that the file system isn't read-only and the handle isn't read-only
 	if((m_handle->node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
@@ -1161,6 +1310,9 @@ size_t HostFileSystem::FileHandle::SetLength(size_t length)
 
 void HostFileSystem::FileHandle::Sync(void) const
 {
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
+
 	// Ensure that the file system isn't read-only and the handle isn't read-only
 	if((m_handle->node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
@@ -1182,6 +1334,9 @@ void HostFileSystem::FileHandle::Sync(void) const
 size_t HostFileSystem::FileHandle::Write(const void* buffer, size_t count)
 {
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
 
 	// Ensure that the file system isn't read-only and the handle isn't read-only
 	if((m_handle->node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
@@ -1217,6 +1372,9 @@ size_t HostFileSystem::FileHandle::Write(const void* buffer, size_t count)
 size_t HostFileSystem::FileHandle::WriteAt(size_t offset, const void* buffer, size_t count)
 {
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
 
 	// Ensure that the file system isn't read-only and the handle isn't read-only
 	if((m_handle->node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
@@ -1394,30 +1552,11 @@ uapi_gid_t HostFileSystem::Node<_interface>::getGroupId(void) const
 template <class _interface>
 intptr_t HostFileSystem::Node<_interface>::getIndex(void) const
 {
-	// TODO: Trying this instead .... inode numbers are important
-	// but they also need to be fast for Path to work right
+	// The node index is actually available via GetFileInformationByHandle(), but it's
+	// returned as a 64-bit value which can't be used directly on 32-bit builds, and
+	// it's an expensive operation for something that needs to be very fast.  Use the
+	// address of the node pointer as a pseudo inode number
 	return intptr_t(m_node.get());
-
-////	BY_HANDLE_FILE_INFORMATION		info;			// File information
-////
-////	// Accessing the node index requires a query handle to the node
-////	HANDLE handle = OpenHandle(UAPI_O_PATH);
-////
-////	try {
-////		
-////		// Attempt to access the BY_HANDLE_FILE_INFORMATION for this node
-////		if(!GetFileInformationByHandle(handle, &info)) throw MapHostException(GetLastError());
-////		CloseHandle(handle);
-////	}
-////	catch(...) { CloseHandle(handle); throw; }
-////
-////#ifndef _M_X64
-////	// 32-bit builds can't handle the entire index, use the lower 32 bits only
-////	return intptr_t(info.nFileIndexLow);
-////#else
-////	// 64-bit builds can handle the entire 64-bit index value, combine them
-////	return intptr_t(info.nFileIndexHigh) << 32 | info.nFileIndexLow;
-////#endif
 }
 
 //---------------------------------------------------------------------------

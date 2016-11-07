@@ -50,6 +50,8 @@ std::unique_ptr<VirtualMachine::Mount> MountTempFileSystem(char_t const* source,
 // block device method that can be easily overcome by doing it this way; let the 
 // operating system do the heavy lifting
 //
+// TODO: This list needs to be updated, OR the support for the options has to be added
+//
 // Supported mount options:
 //
 //	MS_DIRSYNC
@@ -989,14 +991,19 @@ private:
 		// Duplicates this node instance
 		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
 
+		// ReadLink (VirtualMachine::SymbolicLink)
+		//
+		// Reads the value of the symbolic link
+		virtual size_t ReadLink(VirtualMachine::Mount const* mount, char_t* buffer, size_t count) override;
+
 		//-------------------------------------------------------------------
 		// Properties
 
-		// Target
+		// Length (VirtualMachine::SymbolicLink)
 		//
-		// Exposes the symbolic link target
-		__declspec(property(get=getTarget)) char_t const* Target;
-		virtual char_t const* getTarget(void) const override;
+		// Gets the length of the symbolic link target
+		__declspec(property(get=getLength)) size_t Length;
+		virtual size_t getLength(void) const override;
 
 	private:
 

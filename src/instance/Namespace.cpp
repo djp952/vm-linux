@@ -221,10 +221,16 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 			// Ensure that the maximum number of symbolic links has not been reached
 			if(++(*numlinks) > VirtualMachine::MaxSymbolicLinks) throw LinuxException(UAPI_ELOOP);
 
+			// Read the symbolic link target (changed to a method to allow for access time updates)
+			size_t length = symlink->Length;
+			auto target = std::make_unique<char_t[]>(length + 1);
+			symlink->ReadLink(current->mount.get(), &target[0], length);
+			target[length] = TEXT('\0');
+			
 			// Move current to the target of the symbolic link; note that the lookup is
 			// relative to the symbolic link's parent, not the symbolic link itself
 			_ASSERTE(current->parent);
-			current = LookupPath(lock, current->parent, symlink->Target, flags, numlinks);
+			current = LookupPath(lock, current->parent, &target[0], flags, numlinks);
 		}
 
 		// LOOKUP ERROR
@@ -249,10 +255,16 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 		// Ensure that the maximum number of symbolic links has not been reached
 		if(++(*numlinks) > VirtualMachine::MaxSymbolicLinks) throw LinuxException(UAPI_ELOOP);
 
+		// Read the symbolic link target (changed to a method to allow for access time updates)
+		size_t length = symlink->Length;
+		auto target = std::make_unique<char_t[]>(length + 1);
+		symlink->ReadLink(current->mount.get(), &target[0], length);
+		target[length] = TEXT('\0');
+
 		// Move current to the target of the symbolic link; note that the lookup is
 		// relative to the symbolic link's parent, not the symbolic link itself
 		_ASSERTE(current->parent);
-		current = LookupPath(lock, current->parent, symlink->Target, flags, numlinks);
+		current = LookupPath(lock, current->parent, &target[0], flags, numlinks);
 	}
 
 	// If O_DIRECTORY has been specified the final path component must be a directory node

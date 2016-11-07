@@ -1066,7 +1066,6 @@ size_t TempFileSystem::DirectoryHandle::Write(const void* buffer, size_t count)
 	UNREFERENCED_PARAMETER(buffer);
 	UNREFERENCED_PARAMETER(count);
 
-	// Directory handles cannot be open for write access -> EBADF
 	throw LinuxException(UAPI_EBADF);
 }
 
@@ -1088,7 +1087,6 @@ size_t TempFileSystem::DirectoryHandle::WriteAt(size_t offset, const void* buffe
 	UNREFERENCED_PARAMETER(buffer);
 	UNREFERENCED_PARAMETER(count);
 
-	// Directory handles cannot be open for write access -> EBADF
 	throw LinuxException(UAPI_EBADF);
 }
 
@@ -1197,6 +1195,9 @@ size_t TempFileSystem::FileHandle::Read(void* buffer, size_t count)
 {
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
+
 	// Verify that the handle was not opened in write-only mode
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
 
@@ -1234,6 +1235,9 @@ size_t TempFileSystem::FileHandle::ReadAt(size_t offset, void* buffer, size_t co
 {
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
+
 	// Verify that the handle was not opened in write-only mode
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
 
@@ -1265,6 +1269,9 @@ size_t TempFileSystem::FileHandle::ReadAt(size_t offset, void* buffer, size_t co
 size_t TempFileSystem::FileHandle::Seek(ssize_t offset, int whence)
 {
 	size_t pos = m_handle->position;		// Copy the current position
+
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
 
 	// Prevent changes to the underlying data buffer while the seek is calculated
 	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->datalock);
@@ -1309,6 +1316,9 @@ size_t TempFileSystem::FileHandle::Seek(ssize_t offset, int whence)
 
 size_t TempFileSystem::FileHandle::SetLength(size_t length)
 {
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
+
 	// Verify that the handle was not opened in read-only mode
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EBADF);
 
@@ -1341,7 +1351,14 @@ size_t TempFileSystem::FileHandle::SetLength(size_t length)
 
 void TempFileSystem::FileHandle::Sync(void) const
 {
-	// todo
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
+
+	// Ensure that the file system isn't read-only and the handle isn't read-only
+	if((m_handle->node->fs->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
+	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
+
+	// no-operation
 }
 
 //---------------------------------------------------------------------------
@@ -1357,6 +1374,9 @@ void TempFileSystem::FileHandle::Sync(void) const
 size_t TempFileSystem::FileHandle::Write(const void* buffer, size_t count)
 {
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
 
 	// Verify that the handle was not opened in read-only mode
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EBADF);
@@ -1398,6 +1418,9 @@ size_t TempFileSystem::FileHandle::Write(const void* buffer, size_t count)
 
 size_t TempFileSystem::FileHandle::WriteAt(size_t offset, const void* buffer, size_t count)
 {
+	// O_PATH handles cannot be used for this operation
+	if((m_flags & UAPI_O_PATH) == UAPI_O_PATH) throw LinuxException(UAPI_EBADF);
+
 	// Verify that the handle was not opened in read-only mode
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_RDONLY) throw LinuxException(UAPI_EBADF);
 
@@ -1791,6 +1814,9 @@ void TempFileSystem::Node<_interface, _node_type>::Stat(VirtualMachine::Mount co
 	stat->st_mtime_nsec = mtime.tv_nsec;
 	stat->st_ctime = ctime.tv_sec;
 	stat->st_ctime_nsec = ctime.tv_nsec;
+
+	// Update the access time for this node based on the mount flags
+	m_node->touch_atime({ 0, UAPI_UTIME_NOW }, mount->Flags);
 }
 
 //---------------------------------------------------------------------------
@@ -1851,7 +1877,13 @@ TempFileSystem::SymbolicLink::SymbolicLink(std::shared_ptr<symlink_node_t> const
 
 std::unique_ptr<VirtualMachine::Handle> TempFileSystem::SymbolicLink::CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
 {
-	// todo - all kinds of things
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// The only valid way of creating a symbolic link handle is with O_PATH and O_NOFOLLOW.  The access
+	// mode doesn't matter since all handle operations will throw EBADF regardless
+	if((flags & (UAPI_O_PATH | UAPI_O_NOFOLLOW)) != (UAPI_O_PATH | UAPI_O_NOFOLLOW)) throw LinuxException(UAPI_ELOOP);
+
 	auto handle = std::make_shared<handle_t<symlink_node_t>>(m_node);
 	return std::make_unique<SymbolicLinkHandle>(handle, flags, mount->Flags);
 }
@@ -1871,14 +1903,44 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::SymbolicLink::Duplicate(vo
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLink::getTarget
+// TempFileSystem::SymbolicLink::getLength
 //
-// Gets the symbolic link target as a null-terminated C style string
+// Gets the length of the symbolic link target
 
-char_t const* TempFileSystem::SymbolicLink::getTarget(void) const
+size_t TempFileSystem::SymbolicLink::getLength(void) const
 {
-	// todo: need to update atime, therefore this must be a method instead that accepts a Mount*
-	return m_node->target.c_str();
+	return m_node->target.length();
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLink::ReadLink
+//
+// Gets the target of the symbolic link
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	buffer		- Output buffer
+//	count		- Length of the output buffer, in bytes
+
+size_t TempFileSystem::SymbolicLink::ReadLink(VirtualMachine::Mount const* mount, char_t* buffer, size_t count)
+{
+	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
+
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// Determine the smaller of the specified length or the target string length
+	count = std::min(count, m_node->target.length());
+
+	// Copy the calculated number of characters into the buffer, note that a null
+	// terminator is not placed at the end of the string
+	if(count > 0) memcpy(buffer, m_node->target.data(), count);
+
+	// Update the access time for this node based on the mount flags
+	m_node->touch_atime({ 0, UAPI_UTIME_NOW }, mount->Flags);
+
+	return count;
 }
 
 //
@@ -1911,7 +1973,9 @@ TempFileSystem::SymbolicLinkHandle::SymbolicLinkHandle(std::shared_ptr<handle_t<
 
 std::unique_ptr<VirtualMachine::Handle> TempFileSystem::SymbolicLinkHandle::Duplicate(uint32_t flags) const
 {
-	// todo - lots of things
+	// The only valid way of creating a symbolic link handle is with both O_PATH and O_NOFOLLOW
+	if((flags & (UAPI_O_PATH | UAPI_O_NOFOLLOW)) != (UAPI_O_PATH | UAPI_O_NOFOLLOW)) throw LinuxException(UAPI_ELOOP);
+
 	return std::make_unique<SymbolicLinkHandle>(m_handle, flags, m_mountflags);
 }
 
@@ -1937,8 +2001,11 @@ uint32_t TempFileSystem::SymbolicLinkHandle::getFlags(void) const
 
 size_t TempFileSystem::SymbolicLinkHandle::Read(void* buffer, size_t count)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	// Symbolic link handles can only be open with O_PATH; nothing works
+	throw LinuxException(UAPI_EBADF);
 }
 
 //---------------------------------------------------------------------------
@@ -1954,8 +2021,11 @@ size_t TempFileSystem::SymbolicLinkHandle::Read(void* buffer, size_t count)
 
 size_t TempFileSystem::SymbolicLinkHandle::ReadAt(size_t offset, void* buffer, size_t count)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EBADF);
 }
 
 //---------------------------------------------------------------------------
@@ -1970,8 +2040,10 @@ size_t TempFileSystem::SymbolicLinkHandle::ReadAt(size_t offset, void* buffer, s
 
 size_t TempFileSystem::SymbolicLinkHandle::Seek(ssize_t offset, int whence)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(whence);
+
+	throw LinuxException(UAPI_EBADF);
 }
 
 //---------------------------------------------------------------------------
@@ -1985,8 +2057,9 @@ size_t TempFileSystem::SymbolicLinkHandle::Seek(ssize_t offset, int whence)
 
 size_t TempFileSystem::SymbolicLinkHandle::SetLength(size_t length)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(length);
+
+	throw LinuxException(UAPI_EBADF);
 }
 
 //---------------------------------------------------------------------------
@@ -2000,8 +2073,7 @@ size_t TempFileSystem::SymbolicLinkHandle::SetLength(size_t length)
 
 void TempFileSystem::SymbolicLinkHandle::Sync(void) const
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	throw LinuxException(UAPI_EBADF);
 }
 
 //---------------------------------------------------------------------------
@@ -2016,8 +2088,10 @@ void TempFileSystem::SymbolicLinkHandle::Sync(void) const
 
 size_t TempFileSystem::SymbolicLinkHandle::Write(const void* buffer, size_t count)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EBADF);
 }
 
 //---------------------------------------------------------------------------
@@ -2034,8 +2108,11 @@ size_t TempFileSystem::SymbolicLinkHandle::Write(const void* buffer, size_t coun
 
 size_t TempFileSystem::SymbolicLinkHandle::WriteAt(size_t offset, const void* buffer, size_t count)
 {
-	// todo!
-	throw LinuxException(UAPI_EOPNOTSUPP);
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EBADF);
 }
 
 //---------------------------------------------------------------------------

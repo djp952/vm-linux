@@ -468,16 +468,24 @@ public:
 		virtual ~SymbolicLink()=default;
 
 		//-------------------------------------------------------------------
+		// Member Functions
+
+		// ReadLink
+		//
+		// Reads the value of the symbolic link
+		virtual size_t ReadLink(Mount const* mount, char_t* buffer, size_t count) = 0;
+
+		//-------------------------------------------------------------------
 		// Properties
 
-		// Target
+		// Length
 		//
-		// Exposes the symbolic link target
-		__declspec(property(get=getTarget)) char_t const* Target;
-		virtual char_t const* getTarget(void) const = 0;
+		// Gets the length of the target string, in characters
+		__declspec(property(get=getLength)) size_t Length;
+		virtual size_t getLength(void) const = 0;
 	};
 
-	//-------------------------------------------------------------------------
+	//-----------------------------------------------------------------------
 	// Member Functions
 
 	// LogMessage
