@@ -105,10 +105,8 @@ void InstanceService::ExtractInitialRamFileSystem(Namespace const* ns, Namespace
 		std::vector<uint8_t> buffer(SystemInformation::PageSize << 2);
 
 		// Write all of the data from the CpioFile data stream into the destination node
-		auto handle = node->CreateHandle(mount, UAPI_O_WRONLY);
-		auto filehandle = dynamic_cast<VirtualMachine::FileHandle*>(handle.get());
-		/// todo: if(filehandle == nullptr) throw LinuxException(UAPI_E
-		filehandle->SetLength(file.Data.Length);
+		auto handle = node->CreateFileHandle(mount, UAPI_O_WRONLY);
+		handle->SetLength(file.Data.Length);
 		while(auto read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2)) handle->Write(&buffer[0], read);
 
 		// Update the modification time of the file to match what was specified in the CPIO archive
@@ -173,8 +171,6 @@ void InstanceService::ExtractInitialRamFileSystem(Namespace const* ns, Namespace
 				
 				// Create a new regular file node as a child of the branch directory, write it, and then touch the modification time
 				auto node = branchdir->CreateFile(branchpath->Mount, filepath.leaf(), file.Mode, file.UserId, file.GroupId);
-
-				auto handle = node->CreateHandle(branchpath->Mount, UAPI_O_WRONLY);
 				WriteFileNode(branchpath->Mount, dynamic_cast<VirtualMachine::File*>(node.get()), file);
 			}
 		}

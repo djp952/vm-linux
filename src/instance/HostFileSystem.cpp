@@ -328,16 +328,16 @@ std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::CreateFile(Virt
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::Directory::CreateHandle
+// HostFileSystem::Directory::CreateDirectoryHandle
 //
-// Opens a Handle instance against this node
+// Opens a DirectoryHandle instance against this node
 //
 // Arguments:
 //
 //	mount		- Mount point on which to perform this operation
 //	flags		- Requested handle flags
 
-std::unique_ptr<VirtualMachine::Handle> HostFileSystem::Directory::CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
+std::unique_ptr<VirtualMachine::DirectoryHandle> HostFileSystem::Directory::CreateDirectoryHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
@@ -352,6 +352,21 @@ std::unique_ptr<VirtualMachine::Handle> HostFileSystem::Directory::CreateHandle(
 	return std::make_unique<DirectoryHandle>(std::make_shared<directory_handle_t>(m_node), OpenHandle(flags), flags);
 }
 		
+//---------------------------------------------------------------------------
+// HostFileSystem::Directory::CreateHandle
+//
+// Opens a Handle instance against this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	flags		- Requested handle flags
+
+std::unique_ptr<VirtualMachine::Handle> HostFileSystem::Directory::CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
+{
+	return CreateDirectoryHandle(mount, flags);
+}
+
 //---------------------------------------------------------------------------
 // HostFileSystem::Directory::CreateSymbolicLink
 //
@@ -831,16 +846,16 @@ HostFileSystem::File::File(std::shared_ptr<node_t> const& node) : Node(node)
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::File::CreateHandle
+// HostFileSystem::File::CreateFileHandle
 //
-// Opens a Handle instance against this node
+// Opens a FileHandle instance against this node
 //
 // Arguments:
 //
 //	mount		- Mount point on which to perform this operation
 //	flags		- Requested handle flags
 
-std::unique_ptr<VirtualMachine::Handle> HostFileSystem::File::CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
+std::unique_ptr<VirtualMachine::FileHandle> HostFileSystem::File::CreateFileHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
@@ -860,6 +875,21 @@ std::unique_ptr<VirtualMachine::Handle> HostFileSystem::File::CreateHandle(Virtu
 	return std::make_unique<FileHandle>(std::make_shared<file_handle_t>(m_node), OpenHandle(flags), flags);
 }
 		
+//---------------------------------------------------------------------------
+// HostFileSystem::File::CreateHandle
+//
+// Opens a Handle instance against this node
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	flags		- Requested handle flags
+
+std::unique_ptr<VirtualMachine::Handle> HostFileSystem::File::CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
+{
+	return CreateFileHandle(mount, flags);
+}
+
 //---------------------------------------------------------------------------
 // HostFileSystem::File::Duplicate
 //

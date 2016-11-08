@@ -443,6 +443,11 @@ public:
 		// Creates a directory node as a child of this directory
 		virtual std::unique_ptr<Node> CreateDirectory(Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) = 0;
 
+		// CreateDirectoryHandle
+		//
+		// Opens a DirectoryHandle instance against this node
+		virtual std::unique_ptr<DirectoryHandle> CreateDirectoryHandle(Mount const* mount, uint32_t flags) const = 0;
+
 		// CreateFile
 		//
 		// Creates a regular file node as a child of this directory
@@ -482,6 +487,14 @@ public:
 		// Destructor
 		//
 		virtual ~File()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// CreateFileHandle
+		//
+		// Opens a FileHandle instance against this node
+		virtual std::unique_ptr<FileHandle> CreateFileHandle(Mount const* mount, uint32_t flags) const = 0;
 	};
 
 	// SymbolicLink

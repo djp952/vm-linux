@@ -721,6 +721,11 @@ private:
 		// Creates a directory node as a child of this directory
 		virtual std::unique_ptr<VirtualMachine::Node> CreateDirectory(VirtualMachine::Mount const* mount, char_t const* name, uapi_mode_t mode, uapi_uid_t uid, uapi_gid_t gid) override;
 
+		// CreateDirectoryHandle (VirtualMachine::Directory)
+		//
+		// Opens a DirectoryHandle instance against this node
+		virtual std::unique_ptr<VirtualMachine::DirectoryHandle> CreateDirectoryHandle(VirtualMachine::Mount const* mount, uint32_t flags) const override;
+
 		// CreateFile (VirtualMachine::Directory)
 		//
 		// Creates a regular file node as a child of this directory
@@ -829,6 +834,11 @@ private:
 
 		//-------------------------------------------------------------------
 		// Member Functions
+
+		// CreateFileHandle (VirtualMachine::File)
+		//
+		// Opens a DirectoryHandle instance against this node
+		virtual std::unique_ptr<VirtualMachine::FileHandle> CreateFileHandle(VirtualMachine::Mount const* mount, uint32_t flags) const override;
 
 		// CreateHandle (VirtualMachine::Node)
 		//
