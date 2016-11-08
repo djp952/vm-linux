@@ -853,10 +853,10 @@ void TempFileSystem::Directory::Unlink(VirtualMachine::Mount const* mount, char_
 //
 //	handle		- Shared handle_t instance
 //	flags		- Handle instance specific flags
-//	mountflags	- Mount flags in place at the time the handle was opened
+//	mountflags	- Mount level flags in place when the handle was created
 
-TempFileSystem::DirectoryHandle::DirectoryHandle(std::shared_ptr<handle_t<directory_node_t>> const& handle, uint32_t flags, uint32_t mountflags) :
-	m_handle(handle), m_flags(flags), m_mountflags(mountflags)
+TempFileSystem::DirectoryHandle::DirectoryHandle(std::shared_ptr<handle_t<directory_node_t>> const& handle, uint32_t flags, uint32_t mountflags) : 
+	Handle(flags, mountflags), m_handle(handle)
 {
 	_ASSERTE(m_handle);
 }
@@ -896,7 +896,11 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::DirectoryHandle::Duplica
 
 void TempFileSystem::DirectoryHandle::Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
 {
+	size_t				index = 0;				// Current enumeration index value
+
 	if(func == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	size_t pos = m_handle->position;			// Copy the current position
 
 	// Lock the nodes collection for shared access
 	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->nodeslock);
@@ -905,61 +909,18 @@ void TempFileSystem::DirectoryHandle::Enumerate(std::function<bool(VirtualMachin
 	// call interfaces, use a caller-provided function to do the actual processing
 	for(auto const entry : m_handle->node->nodes) {
 
+		// Skip entries up to the current fake file position
+		if(pos > index++) continue;
+
 		// The callback function can return false to stop the enumeration
 		if(!func({ entry.second->index, entry.second->mode, entry.first.c_str() })) break;
 	}
 
-	// Update the access time for this node based on the mount flags
-	// todo: put me back, need to carry mount flags in the handle here too
-	//m_handle->node->touch_atime({ 0, UAPI_UTIME_NOW }, mount->Flags);
-}
+	// Move the fake seek pointer to the higher of the last entry index or original position
+	m_handle->position = std::max(index, pos);
 
-//---------------------------------------------------------------------------
-// TempFileSystem::DirectoryHandle::getFlags
-//
-// Gets the currently set handle flags
-
-uint32_t TempFileSystem::DirectoryHandle::getFlags(void) const
-{
-	return m_flags;
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::DirectoryHandle::Read
-//
-// Synchronously reads data from the underlying node into a buffer
-//
-// Arguments:
-//
-//	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to read into the buffer
-
-size_t TempFileSystem::DirectoryHandle::Read(void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EISDIR);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::DirectoryHandle::ReadAt
-//
-// Synchronously reads data from the underlying node into a buffer
-//
-// Arguments:
-//
-//	offset		- Offset within the data buffer to being reading
-//	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to read into the buffer
-
-size_t TempFileSystem::DirectoryHandle::ReadAt(size_t offset, void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(offset);
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EISDIR);
+	// Update the access time for this node
+	m_handle->node->touch_atime({ 0, UAPI_UTIME_NOW }, m_mountflags);
 }
 
 //---------------------------------------------------------------------------
@@ -1012,22 +973,6 @@ size_t TempFileSystem::DirectoryHandle::Seek(ssize_t offset, int whence)
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::DirectoryHandle::SetLength
-//
-// Sets the length of the file
-//
-// Arguments:
-//
-//	length		- New length to assign to the file
-
-size_t TempFileSystem::DirectoryHandle::SetLength(size_t length)
-{
-	UNREFERENCED_PARAMETER(length);
-
-	throw LinuxException(UAPI_EISDIR);
-}
-
-//---------------------------------------------------------------------------
 // TempFileSystem::DirectoryHandle::Sync
 //
 // Synchronizes all data associated with the file to storage, not metadata
@@ -1046,45 +991,6 @@ void TempFileSystem::DirectoryHandle::Sync(void) const
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
 
 	// no-operation
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::DirectoryHandle::Write
-//
-// Synchronously writes data from a buffer to the underlying node
-//
-// Arguments:
-//
-//	buffer		- Source data input buffer
-//	count		- Maximum number of bytes to write into the node
-
-size_t TempFileSystem::DirectoryHandle::Write(const void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EBADF);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::DirectoryHandle::WriteAt
-//
-// Synchronously writes data from a buffer to the underlying node
-//
-// Arguments:
-//
-//	offset		- Offset within the data buffer to being writing
-//	whence		- Location from which to apply the specified delta
-//	buffer		- Source data input buffer
-//	count		- Maximum number of bytes to write into the node
-
-size_t TempFileSystem::DirectoryHandle::WriteAt(size_t offset, const void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(offset);
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EBADF);
 }
 
 //
@@ -1155,7 +1061,7 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::File::Duplicate(void) cons
 //	mountflags	- Mount flags in effect when handle was opened
 
 TempFileSystem::FileHandle::FileHandle(std::shared_ptr<handle_t<file_node_t>> const& handle, uint32_t flags, uint32_t mountflags) : 
-	m_handle(handle), m_flags(flags), m_mountflags(mountflags)
+	Handle(flags, mountflags), m_handle(handle)
 {
 	_ASSERTE(m_handle);
 }
@@ -1177,32 +1083,6 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::FileHandle::Duplicate(ui
 	if(flags & (UAPI_FASYNC | UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TMPFILE | UAPI_O_TRUNC)) throw LinuxException(UAPI_EINVAL);
 
 	return std::make_unique<FileHandle>(m_handle, flags, m_mountflags);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::FileHandle::Enumerate
-//
-// Enumerates all of the children of this node
-//
-// Arguments:
-//
-//	func		- Enumeration callback function
-
-void TempFileSystem::FileHandle::Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
-{
-	UNREFERENCED_PARAMETER(func);
-
-	throw LinuxException(UAPI_ENOTDIR);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::FileHandle::getFlags
-//
-// Gets the currently set handle flags
-
-uint32_t TempFileSystem::FileHandle::getFlags(void) const
-{
-	return m_flags;
 }
 
 //---------------------------------------------------------------------------
@@ -1464,6 +1344,106 @@ size_t TempFileSystem::FileHandle::WriteAt(size_t offset, const void* buffer, si
 	m_handle->node->mtime = m_handle->node->ctime = convert<uapi_timespec>(datetime::now());
 
 	return count;
+}
+
+//
+// TEMPFILESYSTEM::HANDLE IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Handle Constructor
+//
+// Arguments:
+//
+//	flags			- Instance specific handle flags
+//	mountflags		- Mount flags in place when handle was created
+
+template <class _interface>
+TempFileSystem::Handle<_interface>::Handle(uint32_t flags, uint32_t mountflags) : m_flags(flags), m_mountflags(mountflags)
+{
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Handle::getFlags
+//
+// Gets the currently set handle flags
+
+template <class _interface>
+uint32_t TempFileSystem::Handle<_interface>::getFlags(void) const
+{
+	return m_flags;
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Handle::Read
+//
+// Synchronously reads data from the underlying node into a buffer
+//
+// Arguments:
+//
+//	buffer		- Destination data output buffer
+//	count		- Maximum number of bytes to read into the buffer
+
+template <class _interface>
+size_t TempFileSystem::Handle<_interface>::Read(void* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EBADF);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Handle::Seek
+//
+// Changes the file position
+//
+// Arguments:
+//
+//	offset		- Delta from the current handle position to be set
+//	whence		- Location from which to apply the specified delta
+
+template <class _interface>
+size_t TempFileSystem::Handle<_interface>::Seek(ssize_t offset, int whence)
+{
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(whence);
+
+	throw LinuxException(UAPI_EBADF);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Handle::Sync
+//
+// Synchronizes all data associated with the file to storage, not metadata
+//
+// Arguments:
+//
+//	NONE
+
+template <class _interface>
+void TempFileSystem::Handle<_interface>::Sync(void) const
+{
+	throw LinuxException(UAPI_EBADF);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::Handle::Write
+//
+// Synchronously writes data from a buffer to the underlying node
+//
+// Arguments:
+//
+//	buffer		- Source data input buffer
+//	count		- Maximum number of bytes to write into the node
+
+template <class _interface>
+size_t TempFileSystem::Handle<_interface>::Write(const void* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EBADF);
 }
 
 //
@@ -1978,10 +1958,10 @@ size_t TempFileSystem::SymbolicLink::ReadTarget(VirtualMachine::Mount const* mou
 //
 //	handle		- Shared handle_t instance
 //	flags		- Handle instance specific flags
-//	mountflags	- Mount flags in place when the handle was created
+//	mountflags	- Mount level flags in place when the handle was created
 
 TempFileSystem::SymbolicLinkHandle::SymbolicLinkHandle(std::shared_ptr<handle_t<symlink_node_t>> const& handle, uint32_t flags, uint32_t mountflags) : 
-	m_handle(handle), m_flags(flags), m_mountflags(mountflags)
+	Handle(flags, mountflags), m_handle(handle)
 {
 	_ASSERTE(m_handle);
 }
@@ -2001,158 +1981,6 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::SymbolicLinkHandle::Dupl
 	if((flags & (UAPI_O_PATH | UAPI_O_NOFOLLOW)) != (UAPI_O_PATH | UAPI_O_NOFOLLOW)) throw LinuxException(UAPI_ELOOP);
 
 	return std::make_unique<SymbolicLinkHandle>(m_handle, flags, m_mountflags);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLinkHandle::Enumerate
-//
-// Enumerates all of the children of this node
-//
-// Arguments:
-//
-//	func		- Enumeration callback function
-
-void TempFileSystem::SymbolicLinkHandle::Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
-{
-	UNREFERENCED_PARAMETER(func);
-
-	throw LinuxException(UAPI_ENOTDIR);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLinkHandle::getFlags
-//
-// Gets the currently set handle flags
-
-uint32_t TempFileSystem::SymbolicLinkHandle::getFlags(void) const
-{
-	return m_flags;
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLinkHandle::Read
-//
-// Synchronously reads data from the underlying node into a buffer
-//
-// Arguments:
-//
-//	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to read into the buffer
-
-size_t TempFileSystem::SymbolicLinkHandle::Read(void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	// Symbolic link handles can only be open with O_PATH; nothing works
-	throw LinuxException(UAPI_EBADF);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLinkHandle::ReadAt
-//
-// Synchronously reads data from the underlying node into a buffer
-//
-// Arguments:
-//
-//	offset		- Offset within the data buffer to being reading
-//	buffer		- Destination data output buffer
-//	count		- Maximum number of bytes to read into the buffer
-
-size_t TempFileSystem::SymbolicLinkHandle::ReadAt(size_t offset, void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(offset);
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EBADF);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLinkHandle::Seek
-//
-// Changes the file position
-//
-// Arguments:
-//
-//	offset		- Delta from the current handle position to be set
-//	whence		- Location from which to apply the specified delta
-
-size_t TempFileSystem::SymbolicLinkHandle::Seek(ssize_t offset, int whence)
-{
-	UNREFERENCED_PARAMETER(offset);
-	UNREFERENCED_PARAMETER(whence);
-
-	throw LinuxException(UAPI_EBADF);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLinkHandle::SetLength
-//
-// Sets the length of the file
-//
-// Arguments:
-//
-//	length		- New length to assign to the file
-
-size_t TempFileSystem::SymbolicLinkHandle::SetLength(size_t length)
-{
-	UNREFERENCED_PARAMETER(length);
-
-	throw LinuxException(UAPI_EBADF);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLinkHandle::Sync
-//
-// Synchronizes all data associated with the file to storage, not metadata
-//
-// Arguments:
-//
-//	NONE
-
-void TempFileSystem::SymbolicLinkHandle::Sync(void) const
-{
-	throw LinuxException(UAPI_EBADF);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLinkHandle::Write
-//
-// Synchronously writes data from a buffer to the underlying node
-//
-// Arguments:
-//
-//	buffer		- Source data input buffer
-//	count		- Maximum number of bytes to write into the node
-
-size_t TempFileSystem::SymbolicLinkHandle::Write(const void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EBADF);
-}
-
-//---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLinkHandle::WriteAt
-//
-// Synchronously writes data from a buffer to the underlying node
-//
-// Arguments:
-//
-//	offset		- Offset within the data buffer to being writing
-//	whence		- Location from which to apply the specified delta
-//	buffer		- Source data input buffer
-//	count		- Maximum number of bytes to write into the node
-
-size_t TempFileSystem::SymbolicLinkHandle::WriteAt(size_t offset, const void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(offset);
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EBADF);
 }
 
 //---------------------------------------------------------------------------

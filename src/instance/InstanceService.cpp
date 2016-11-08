@@ -106,7 +106,9 @@ void InstanceService::ExtractInitialRamFileSystem(Namespace const* ns, Namespace
 
 		// Write all of the data from the CpioFile data stream into the destination node
 		auto handle = node->CreateHandle(mount, UAPI_O_WRONLY);
-		handle->SetLength(file.Data.Length);
+		auto filehandle = dynamic_cast<VirtualMachine::FileHandle*>(handle.get());
+		/// todo: if(filehandle == nullptr) throw LinuxException(UAPI_E
+		filehandle->SetLength(file.Data.Length);
 		while(auto read = file.Data.Read(&buffer[0], SystemInformation::PageSize << 2)) handle->Write(&buffer[0], read);
 
 		// Update the modification time of the file to match what was specified in the CPIO archive

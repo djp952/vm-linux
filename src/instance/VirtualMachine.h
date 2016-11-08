@@ -350,30 +350,15 @@ public:
 		// Duplicates this Handle instance
 		virtual std::unique_ptr<Handle> Duplicate(uint32_t flags) const = 0;
 	
-		// Enumerate
-		//
-		// Enumerates all of the entries in this directory
-		virtual void Enumerate(std::function<bool(DirectoryEntry const&)> func) = 0;
-
 		// Read
 		//
 		// Synchronously reads data from the underlying node into a buffer
 		virtual size_t Read(void* buffer, size_t count) = 0;
 
-		// ReadAt
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t ReadAt(size_t offset, void* buffer, size_t count) = 0;
-
 		// Seek
 		//
 		// Changes the file position
 		virtual size_t Seek(ssize_t offset, int whence) = 0;
-
-		// SetLength
-		//
-		// Sets the length of the node data
-		virtual size_t SetLength(size_t length) = 0;
 
 		// Sync
 		//
@@ -385,11 +370,6 @@ public:
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t Write(const void* buffer, size_t count) = 0;
 
-		// WriteAt
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) = 0;
-
 		//--------------------------------------------------------------------
 		// Properties
 
@@ -400,61 +380,51 @@ public:
 		virtual uint32_t getFlags(void) const = 0;
 	};
 
-	//// DirectoryHandle
-	////
-	//// Interface that must be implemented by a directory handle
-	//struct DirectoryHandle : public Handle
-	//{
-	//	// Destructor
-	//	//
-	//	virtual ~DirectoryHandle()=default;
+	// DirectoryHandle
+	//
+	// Interface that must be implemented by a directory object handle
+	struct DirectoryHandle : public Handle
+	{
+		// Destructor
+		//
+		virtual ~DirectoryHandle()=default;
 
-	//	//-------------------------------------------------------------------
-	//	// Member Functions
+		//-------------------------------------------------------------------
+		// Member Functions
 
-	//	// Enumerate
-	//	//
-	//	// Enumerates all of the entries in this directory
-	//	virtual void Enumerate(std::function<bool(DirectoryEntry const&)> func) = 0;
-	//};
+		// Enumerate
+		//
+		// Enumerates all of the entries in this directory
+		virtual void Enumerate(std::function<bool(DirectoryEntry const&)> func) = 0;
+	};
 
-	//// FileHandle
-	////
-	//// Interface that must be implemented by a file handle
-	//struct FileHandle
-	//{
-	//	// Destructor
-	//	//
-	//	virtual ~FileHandle()=default;
+	// FileHandle
+	//
+	// Interface that must be implemented by a file object handle
+	struct FileHandle : public Handle
+	{
+		// Destructor
+		//
+		virtual ~FileHandle()=default;
 
-	//	//-------------------------------------------------------------------
-	//	// Member Functions
+		//-------------------------------------------------------------------
+		// Member Functions
 
-	//	// Read
-	//	//
-	//	// Synchronously reads data from the underlying node into a buffer
-	//	virtual size_t Read(void* buffer, size_t count) = 0;
+		// ReadAt
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t ReadAt(size_t offset, void* buffer, size_t count) = 0;
 
-	//	// ReadAt
-	//	//
-	//	// Synchronously reads data from the underlying node into a buffer
-	//	virtual size_t ReadAt(size_t offset, void* buffer, size_t count) = 0;
+		// SetLength
+		//
+		// Sets the length of the node data
+		virtual size_t SetLength(size_t length) = 0;
 
-	//	// SetLength
-	//	//
-	//	// Sets the length of the node data
-	//	virtual size_t SetLength(size_t length) = 0;
-
-	//	// Write
-	//	//
-	//	// Synchronously writes data from a buffer to the underlying node
-	//	virtual size_t Write(const void* buffer, size_t count) = 0;
-
-	//	// WriteAt
-	//	//
-	//	// Synchronously writes data from a buffer to the underlying node
-	//	virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) = 0;
-	//};
+		// WriteAt
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) = 0;
+	};
 
 	// Directory
 	//

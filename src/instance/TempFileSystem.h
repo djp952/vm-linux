@@ -637,6 +637,66 @@ private:
 		std::shared_ptr<_node_type> const	m_node;		// Shared node_t instance
 	};
 
+	// Handle
+	//
+	// Base implementation of a file system handle
+	template<class _interface>
+	class Handle : public _interface
+	{
+	public:
+
+		// Destructor
+		//
+		virtual ~Handle()=default;
+
+		//-------------------------------------------------------------------
+		// Member Functions
+
+		// Read (VirtualMachine::Handle)
+		//
+		// Synchronously reads data from the underlying node into a buffer
+		virtual size_t Read(void* buffer, size_t count) override;
+
+		// Seek (VirtualMachine::Handle)
+		//
+		// Changes the file position
+		virtual size_t Seek(ssize_t offset, int whence) override;
+
+		// Sync (VirtualMachine::Handle)
+		//
+		// Synchronizes all data associated with the file to storage, not metadata
+		virtual void Sync(void) const override;
+
+		// Write (VirtualMachine::Handle)
+		//
+		// Synchronously writes data from a buffer to the underlying node
+		virtual size_t Write(const void* buffer, size_t count) override;
+
+		//--------------------------------------------------------------------
+		// Properties
+
+		// Flags (VirtualMachine::Handle)
+		//
+		// Gets the handle-level flags applied to this instance
+		__declspec(property(get=getFlags)) uint32_t Flags;
+		virtual uint32_t getFlags(void) const override;
+
+	protected:
+
+		Handle(Handle const&)=delete;
+		Handle& operator=(Handle const&)=delete;
+
+		// Instance Constructor
+		//
+		Handle(uint32_t flags, uint32_t mountflags);
+
+		//-------------------------------------------------------------------
+		// Protected Member Variables
+
+		std::atomic<uint32_t>		m_flags;			// Handle flags
+		uint32_t const				m_mountflags;		// Mount flags
+	};
+
 	// Directory
 	//
 	// Implements a directory node for this file system
@@ -705,7 +765,7 @@ private:
 	// DirectoryHandle
 	//
 	// Implements VirtualMachine::Handle
-	class DirectoryHandle : public VirtualMachine::Handle
+	class DirectoryHandle : public Handle<VirtualMachine::DirectoryHandle>
 	{
 	public:
 
@@ -723,56 +783,22 @@ private:
 		// Duplicate (VirtualMachine::Handle)
 		//
 		// Duplicates this Handle instance
-		virtual std::unique_ptr<Handle> Duplicate(uint32_t flags) const override;
+		virtual std::unique_ptr<VirtualMachine::Handle> Duplicate(uint32_t flags) const override;
 	
-		// Enumerate (VirtualMachine::Handle)
+		// Enumerate (VirtualMachine::DirectoryHandle)
 		//
 		// Enumerates all of the children of this node
 		virtual void Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func) override;
-
-		// Read (VirtualMachine::Handle)
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t Read(void* buffer, size_t count) override;
-
-		// ReadAt (VirtualMachine::Handle)
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t ReadAt(size_t offset, void* buffer, size_t count) override;
 
 		// Seek (VirtualMachine::Handle)
 		//
 		// Changes the file position
 		virtual size_t Seek(ssize_t offset, int whence) override;
 
-		// SetLength (VirtualMachine::Handle)
-		//
-		// Sets the length of the node data
-		virtual size_t SetLength(size_t length) override;
-
 		// Sync (VirtualMachine::Handle)
 		//
 		// Synchronizes all data associated with the file to storage, not metadata
 		virtual void Sync(void) const override;
-
-		// Write (VirtualMachine::Handle)
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t Write(const void* buffer, size_t count) override;
-
-		// WriteAt (VirtualMachine::Handle)
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) override;
-
-		//--------------------------------------------------------------------
-		// Properties
-
-		// Flags (VirtualMachine::Handle)
-		//
-		// Gets the handle-level flags applied to this instance
-		__declspec(property(get=getFlags)) uint32_t Flags;
-		virtual uint32_t getFlags(void) const override;
 
 	private:
 
@@ -782,9 +808,7 @@ private:
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<handle_t<directory_node_t>>	m_handle;		// Shared handle_t
-		std::atomic<uint32_t>						m_flags;		// Handle flags
-		uint32_t const								m_mountflags;	// Mount flags
+		std::shared_ptr<handle_t<directory_node_t>>	m_handle;	// Shared handle_t
 	};
 
 	// File
@@ -825,7 +849,7 @@ private:
 	// FileHandle
 	//
 	// Implements VirtualMachine::Handle
-	class FileHandle : public VirtualMachine::Handle
+	class FileHandle : public Handle<VirtualMachine::FileHandle>
 	{
 	public:
 
@@ -843,19 +867,14 @@ private:
 		// Duplicate (VirtualMachine::Handle)
 		//
 		// Duplicates this Handle instance
-		virtual std::unique_ptr<Handle> Duplicate(uint32_t flags) const override;
+		virtual std::unique_ptr<VirtualMachine::Handle> Duplicate(uint32_t flags) const override;
 	
-		// Enumerate (VirtualMachine::Handle)
-		//
-		// Enumerates all of the children of this node
-		virtual void Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func) override;
-
 		// Read (VirtualMachine::Handle)
 		//
 		// Synchronously reads data from the underlying node into a buffer
 		virtual size_t Read(void* buffer, size_t count) override;
 
-		// ReadAt (VirtualMachine::Handle)
+		// ReadAt (VirtualMachine::FileHandle)
 		//
 		// Synchronously reads data from the underlying node into a buffer
 		virtual size_t ReadAt(size_t offset, void* buffer, size_t count) override;
@@ -865,7 +884,7 @@ private:
 		// Changes the file position
 		virtual size_t Seek(ssize_t offset, int whence) override;
 
-		// SetLength (VirtualMachine::Handle)
+		// SetLength (VirtualMachine::FileHandle)
 		//
 		// Sets the length of the node data
 		virtual size_t SetLength(size_t length) override;
@@ -875,7 +894,7 @@ private:
 		// Synchronizes all data associated with the file to storage, not metadata
 		virtual void Sync(void) const override;
 
-		// Write (VirtualMachine::Handle)
+		// Write (VirtualMachine::FileHandle)
 		//
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t Write(const void* buffer, size_t count) override;
@@ -885,15 +904,6 @@ private:
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) override;
 
-		//--------------------------------------------------------------------
-		// Properties
-
-		// Flags (VirtualMachine::Handle)
-		//
-		// Gets the handle-level flags applied to this instance
-		__declspec(property(get=getFlags)) uint32_t Flags;
-		virtual uint32_t getFlags(void) const override;
-
 	private:
 
 		FileHandle(FileHandle const&)=delete;
@@ -902,9 +912,7 @@ private:
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<handle_t<file_node_t>>	m_handle;		// Shared handle_t
-		std::atomic<uint32_t>					m_flags;		// Handle flags
-		uint32_t const							m_mountflags;	// Mount flags
+		std::shared_ptr<handle_t<file_node_t>>	m_handle;	// Shared handle_t
 	};
 
 	// Mount
@@ -1019,7 +1027,7 @@ private:
 	// SymbolicLinkHandle
 	//
 	// Implements VirtualMachine::Handle
-	class SymbolicLinkHandle : public VirtualMachine::Handle
+	class SymbolicLinkHandle : public Handle<VirtualMachine::Handle>
 	{
 	public:
 
@@ -1037,57 +1045,8 @@ private:
 		// Duplicate (VirtualMachine::Handle)
 		//
 		// Duplicates this Handle instance
-		virtual std::unique_ptr<Handle> Duplicate(uint32_t flags) const override;
+		virtual std::unique_ptr<VirtualMachine::Handle> Duplicate(uint32_t flags) const override;
 	
-		// Enumerate (VirtualMachine::Handle)
-		//
-		// Enumerates all of the children of this node
-		virtual void Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func) override;
-
-		// Read (VirtualMachine::Handle)
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t Read(void* buffer, size_t count) override;
-
-		// ReadAt (VirtualMachine::Handle)
-		//
-		// Synchronously reads data from the underlying node into a buffer
-		virtual size_t ReadAt(size_t offset, void* buffer, size_t count) override;
-
-		// Seek (VirtualMachine::Handle)
-		//
-		// Changes the file position
-		virtual size_t Seek(ssize_t offset, int whence) override;
-
-		// SetLength (VirtualMachine::Handle)
-		//
-		// Sets the length of the node data
-		virtual size_t SetLength(size_t length) override;
-
-		// Sync (VirtualMachine::Handle)
-		//
-		// Synchronizes all data associated with the file to storage, not metadata
-		virtual void Sync(void) const override;
-
-		// Write (VirtualMachine::Handle)
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t Write(const void* buffer, size_t count) override;
-
-		// WriteAt (VirtualMachine::Handle)
-		//
-		// Synchronously writes data from a buffer to the underlying node
-		virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) override;
-
-		//--------------------------------------------------------------------
-		// Properties
-
-		// Flags (VirtualMachine::Handle)
-		//
-		// Gets the handle-level flags applied to this instance
-		__declspec(property(get=getFlags)) uint32_t Flags;
-		virtual uint32_t getFlags(void) const override;
-
 	private:
 
 		SymbolicLinkHandle(SymbolicLinkHandle const&)=delete;
@@ -1096,9 +1055,7 @@ private:
 		//-------------------------------------------------------------------
 		// Protected Member Variables
 
-		std::shared_ptr<handle_t<symlink_node_t>>	m_handle;		// Shared handle_t
-		std::atomic<uint32_t>						m_flags;		// Handle flags
-		uint32_t const								m_mountflags;	// Mount flags
+		std::shared_ptr<handle_t<symlink_node_t>>	m_handle;	// Shared handle_t
 	};
 
 	//-----------------------------------------------------------------------

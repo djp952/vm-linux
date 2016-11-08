@@ -633,10 +633,9 @@ void HostFileSystem::Directory::Unlink(VirtualMachine::Mount const* mount, char_
 //	flags		- Handle instance flags
 
 HostFileSystem::DirectoryHandle::DirectoryHandle(std::shared_ptr<directory_handle_t> const& handle, HANDLE oshandle, uint32_t flags) : 
-	m_handle(handle), m_oshandle(oshandle), m_flags(flags)
+	Handle(oshandle, flags), m_handle(handle)
 {
 	_ASSERTE(m_handle);
-	_ASSERTE((m_oshandle) && (m_oshandle != INVALID_HANDLE_VALUE));
 	_ASSERTE((m_handle->node->attributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY);
 }
 
@@ -744,57 +743,8 @@ void HostFileSystem::DirectoryHandle::Enumerate(std::function<bool(VirtualMachin
 		if((result != NtApi::STATUS_SUCCESS) && (result != NtApi::STATUS_NO_MORE_FILES)) throw StructuredException(result);
 	}
 
-	// Move the pseudo seek pointer to the higher of the last entry index or the
-	// original position of the seek pointer, whichever is higher
+	// Move the fake seek pointer to the higher of the last entry index or original position
 	m_handle->position = std::max(index, pos);
-}
-
-//-----------------------------------------------------------------------------
-// HostFileSystem::DirectoryHandle::getFlags
-//
-// Gets the currently set of handle flags for this instance
-
-uint32_t HostFileSystem::DirectoryHandle::getFlags(void) const
-{
-	return m_flags;
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::DirectoryHandle::Read
-//
-// Synchronously reads data from the underlying node into a buffer
-//
-// Arguments:
-//
-//	buffer		- Destination data buffer
-//	count		- Maximum number of bytes to read into the buffer
-
-size_t HostFileSystem::DirectoryHandle::Read(void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EISDIR);
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::DirectoryHandle::ReadAt
-//
-// Synchronously reads data from the underlying node into a buffer
-//
-// Arguments:
-//
-//	offset		- Delta from specified starting position
-//	buffer		- Destination data buffer
-//	count		- Maximum number of bytes to read into the buffer
-
-size_t HostFileSystem::DirectoryHandle::ReadAt(size_t offset, void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(offset);
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EISDIR);
 }
 
 //---------------------------------------------------------------------------
@@ -843,22 +793,6 @@ size_t HostFileSystem::DirectoryHandle::Seek(ssize_t offset, int whence)
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::DirectoryHandle::SetLength
-//
-// Sets the length of the file
-//
-// Arguments:
-//
-//	length		- New length to assign to the file
-
-size_t HostFileSystem::DirectoryHandle::SetLength(size_t length)
-{
-	UNREFERENCED_PARAMETER(length);
-
-	throw LinuxException(UAPI_EISDIR);
-}
-
-//---------------------------------------------------------------------------
 // HostFileSystem::DirectoryHandle::Sync
 //
 // Synchronizes all data associated with the file to storage
@@ -877,45 +811,6 @@ void HostFileSystem::DirectoryHandle::Sync(void) const
 	if((m_flags & UAPI_O_ACCMODE) == UAPI_O_WRONLY) throw LinuxException(UAPI_EBADF);
 
 	FlushFileBuffers(m_oshandle);
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::DirectoryHandle::Write
-//
-// Synchronously writes data from a buffer to the underlying node
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform the operation
-//	buffer		- Source data buffer
-//	count		- Maximum number of bytes to write from the buffer
-
-size_t HostFileSystem::DirectoryHandle::Write(const void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EBADF);
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::DirectoryHandle::WriteAt
-//
-// Synchronously writes data from a buffer to the underlying node
-//
-// Arguments:
-//
-//	offset		- Delta from the specifieed whence position
-//	buffer		- Source data buffer
-//	count		- Maximum number of bytes to write from the buffer
-
-size_t HostFileSystem::DirectoryHandle::WriteAt(size_t offset, const void* buffer, size_t count)
-{
-	UNREFERENCED_PARAMETER(offset);
-	UNREFERENCED_PARAMETER(buffer);
-	UNREFERENCED_PARAMETER(count);
-
-	throw LinuxException(UAPI_EBADF);
 }
 
 //
@@ -1157,10 +1052,9 @@ void HostFileSystem::File::Stat(VirtualMachine::Mount const* mount, uapi_stat326
 //	flags		- Handle instance flags
 
 HostFileSystem::FileHandle::FileHandle(std::shared_ptr<file_handle_t> const& handle, HANDLE oshandle, uint32_t flags) : 
-	m_handle(handle), m_oshandle(oshandle), m_flags(flags)
+	Handle(oshandle, flags), m_handle(handle)
 {
 	_ASSERTE(m_handle);
-	_ASSERTE((m_oshandle) && (m_oshandle != INVALID_HANDLE_VALUE));
 	_ASSERTE((m_handle->node->attributes & FILE_ATTRIBUTE_DIRECTORY) == 0);
 }
 
@@ -1214,32 +1108,6 @@ std::unique_ptr<VirtualMachine::Handle> HostFileSystem::FileHandle::Duplicate(ui
 	}
 
 	return std::make_unique<FileHandle>(m_handle, oshandle, flags);
-}
-
-//---------------------------------------------------------------------------
-// HostFileSystem::FileHandle::Enumerate
-//
-// Enumerates all of the children of this node
-//
-// Arguments:
-//
-//	func		- Enumeration callback function
-
-void HostFileSystem::FileHandle::Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
-{
-	UNREFERENCED_PARAMETER(func);
-
-	throw LinuxException(UAPI_ENOTDIR);
-}
-
-//-----------------------------------------------------------------------------
-// HostFileSystem::FileHandle::getFlags
-//
-// Gets the currently set of handle flags for this instance
-
-uint32_t HostFileSystem::FileHandle::getFlags(void) const
-{
-	return m_flags;
 }
 
 //---------------------------------------------------------------------------
@@ -1474,6 +1342,107 @@ size_t HostFileSystem::FileHandle::WriteAt(size_t offset, const void* buffer, si
 	if(!WriteFile(m_oshandle, buffer, written, &written, &overlapped)) throw MapHostException(GetLastError());
 
 	return static_cast<size_t>(written);
+}
+
+//
+// HOSTFILESYSTEM::HANDLE IMPLEMENTATION
+//
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Handle Constructor
+//
+// Arguments:
+//
+//	oshandle		- Native operating system handle
+//	flags			- Instance specific handle flags
+
+template <class _interface>
+HostFileSystem::Handle<_interface>::Handle(HANDLE oshandle, uint32_t flags) : m_oshandle(oshandle), m_flags(flags)
+{
+	_ASSERTE((m_oshandle) && (m_oshandle != INVALID_HANDLE_VALUE));
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Handle::getFlags
+//
+// Gets the currently set handle flags
+
+template <class _interface>
+uint32_t HostFileSystem::Handle<_interface>::getFlags(void) const
+{
+	return m_flags;
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Handle::Read
+//
+// Synchronously reads data from the underlying node into a buffer
+//
+// Arguments:
+//
+//	buffer		- Destination data output buffer
+//	count		- Maximum number of bytes to read into the buffer
+
+template <class _interface>
+size_t HostFileSystem::Handle<_interface>::Read(void* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EBADF);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Handle::Seek
+//
+// Changes the file position
+//
+// Arguments:
+//
+//	offset		- Delta from the current handle position to be set
+//	whence		- Location from which to apply the specified delta
+
+template <class _interface>
+size_t HostFileSystem::Handle<_interface>::Seek(ssize_t offset, int whence)
+{
+	UNREFERENCED_PARAMETER(offset);
+	UNREFERENCED_PARAMETER(whence);
+
+	throw LinuxException(UAPI_EBADF);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Handle::Sync
+//
+// Synchronizes all data associated with the file to storage, not metadata
+//
+// Arguments:
+//
+//	NONE
+
+template <class _interface>
+void HostFileSystem::Handle<_interface>::Sync(void) const
+{
+	throw LinuxException(UAPI_EBADF);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::Handle::Write
+//
+// Synchronously writes data from a buffer to the underlying node
+//
+// Arguments:
+//
+//	buffer		- Source data input buffer
+//	count		- Maximum number of bytes to write into the node
+
+template <class _interface>
+size_t HostFileSystem::Handle<_interface>::Write(const void* buffer, size_t count)
+{
+	UNREFERENCED_PARAMETER(buffer);
+	UNREFERENCED_PARAMETER(count);
+
+	throw LinuxException(UAPI_EBADF);
 }
 
 //
