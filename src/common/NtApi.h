@@ -84,10 +84,20 @@ public:
 	static const SECTION_INHERIT ViewShare = 1;
 	static const SECTION_INHERIT ViewUnmap = 2;
 
+	// FileFullDirectoryInformation
+	//
+	// Flag passed to NtQueryDirectoryFile to retrieve directory entries
+	static const FILE_INFORMATION_CLASS FileFullDirectoryInformation = (FILE_INFORMATION_CLASS)2;
+
 	// STATUS_SUCCESS
 	//
 	// NTAPI constant not defined in the standard Win32 user-mode headers
 	static const NTSTATUS STATUS_SUCCESS = 0;
+
+	// STATUS_NO_MORE_FILES
+	//
+	// NTAPI constant not defined in the standard Win32 user-mode headers
+	static const NTSTATUS STATUS_NO_MORE_FILES = 0x80000006;
 
 	// NTAPI Functions
 	//
@@ -100,6 +110,7 @@ public:
 	using NtLockVirtualMemoryFunc			= NTSTATUS(NTAPI*)(HANDLE, PVOID*, PSIZE_T, ULONG);
 	using NtMapViewOfSectionFunc			= NTSTATUS(NTAPI*)(HANDLE, HANDLE, PVOID*, ULONG_PTR, SIZE_T, PLARGE_INTEGER, PSIZE_T, SECTION_INHERIT, ULONG, ULONG);
 	using NtProtectVirtualMemoryFunc		= NTSTATUS(NTAPI*)(HANDLE, PVOID*, PSIZE_T, ULONG, PULONG);
+	using NtQueryDirectoryFileFunc			= NTSTATUS(NTAPI*)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS, BOOLEAN, PUNICODE_STRING, BOOLEAN);
 	using NtReadVirtualMemoryFunc			= NTSTATUS(NTAPI*)(HANDLE, LPCVOID, PVOID, SIZE_T, PSIZE_T);
 	using NtResumeProcessFunc				= NTSTATUS(NTAPI*)(HANDLE);
 	using NtSuspendProcessFunc				= NTSTATUS(NTAPI*)(HANDLE);
@@ -143,6 +154,7 @@ public:
 	static const NtLockVirtualMemoryFunc			NtLockVirtualMemory;
 	static const NtMapViewOfSectionFunc				NtMapViewOfSection;
 	static const NtProtectVirtualMemoryFunc			NtProtectVirtualMemory;
+	static const NtQueryDirectoryFileFunc			NtQueryDirectoryFile;
 	static const NtReadVirtualMemoryFunc			NtReadVirtualMemory;
 	static const NtResumeProcessFunc				NtResumeProcess;
 	static const NtSuspendProcessFunc				NtSuspendProcess;

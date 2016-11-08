@@ -224,7 +224,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 			// Read the symbolic link target (changed to a method to allow for access time updates)
 			size_t length = symlink->Length;
 			auto target = std::make_unique<char_t[]>(length + 1);
-			symlink->ReadLink(current->mount.get(), &target[0], length);
+			symlink->ReadTarget(current->mount.get(), &target[0], length);
 			target[length] = TEXT('\0');
 			
 			// Move current to the target of the symbolic link; note that the lookup is
@@ -258,7 +258,7 @@ std::shared_ptr<Namespace::path_t> Namespace::LookupPath(sync::reader_writer_loc
 		// Read the symbolic link target (changed to a method to allow for access time updates)
 		size_t length = symlink->Length;
 		auto target = std::make_unique<char_t[]>(length + 1);
-		symlink->ReadLink(current->mount.get(), &target[0], length);
+		symlink->ReadTarget(current->mount.get(), &target[0], length);
 		target[length] = TEXT('\0');
 
 		// Move current to the target of the symbolic link; note that the lookup is

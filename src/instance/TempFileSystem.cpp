@@ -695,39 +695,6 @@ std::unique_ptr<VirtualMachine::Node> TempFileSystem::Directory::Duplicate(void)
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::Directory::Enumerate
-//
-// Enumerates all of the entries in this directory
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform this operation
-//	func		- Callback function to invoke for each entry; return false to stop
-
-void TempFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(func == nullptr) throw LinuxException(UAPI_EFAULT);
-
-	// Check that the mount is for this file system
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-
-	// Lock the nodes collection for shared access
-	sync::reader_writer_lock::scoped_lock_read reader(m_node->nodeslock);
-
-	// There are many different formats used when reading directories from the system 
-	// call interfaces, use a caller-provided function to do the actual processing
-	for(auto const entry : m_node->nodes) {
-
-		// The callback function can return false to stop the enumeration
-		if(!func({ entry.second->index, entry.second->mode, entry.first.c_str() })) break;
-	}
-
-	// Update the access time for this node based on the mount flags
-	m_node->touch_atime({ 0, UAPI_UTIME_NOW }, mount->Flags);
-}
-
-//---------------------------------------------------------------------------
 // TempFileSystem::Directory::Link
 //
 // Links an existing node as a child of this directory
@@ -915,6 +882,36 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::DirectoryHandle::Duplica
 	if((flags & UAPI_O_ACCMODE) != UAPI_O_RDONLY) throw LinuxException(UAPI_EISDIR);
 
 	return std::make_unique<DirectoryHandle>(m_handle, flags, m_mountflags);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::DirectoryHandle::Enumerate
+//
+// Enumerates all of the entries in this directory
+//
+// Arguments:
+//
+//	mount		- Mount point on which to perform this operation
+//	func		- Callback function to invoke for each entry; return false to stop
+
+void TempFileSystem::DirectoryHandle::Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
+{
+	if(func == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	// Lock the nodes collection for shared access
+	sync::reader_writer_lock::scoped_lock_read reader(m_handle->node->nodeslock);
+
+	// There are many different formats used when reading directories from the system 
+	// call interfaces, use a caller-provided function to do the actual processing
+	for(auto const entry : m_handle->node->nodes) {
+
+		// The callback function can return false to stop the enumeration
+		if(!func({ entry.second->index, entry.second->mode, entry.first.c_str() })) break;
+	}
+
+	// Update the access time for this node based on the mount flags
+	// todo: put me back, need to carry mount flags in the handle here too
+	//m_handle->node->touch_atime({ 0, UAPI_UTIME_NOW }, mount->Flags);
 }
 
 //---------------------------------------------------------------------------
@@ -1118,7 +1115,14 @@ TempFileSystem::File::File(std::shared_ptr<file_node_t> const& node) : Node(node
 
 std::unique_ptr<VirtualMachine::Handle> TempFileSystem::File::CreateHandle(VirtualMachine::Mount const* mount, uint32_t flags) const
 {
-	// todo - all kinds of things
+	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
+	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// Check for incompatible or unsupported flags; this function opens an existing node so
+	// flags like O_CREAT, O_EXCL and O_TRUNC are not compatible here
+	if((flags & UAPI_O_DIRECTORY) == UAPI_O_DIRECTORY) throw LinuxException(UAPI_ENOTDIR);
+	if(flags & (UAPI_FASYNC | UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TMPFILE | UAPI_O_TRUNC)) throw LinuxException(UAPI_EINVAL);
+
 	auto handle = std::make_shared<handle_t<file_node_t>>(m_node);
 	return std::make_unique<FileHandle>(handle, flags, mount->Flags);
 }
@@ -1167,8 +1171,28 @@ TempFileSystem::FileHandle::FileHandle(std::shared_ptr<handle_t<file_node_t>> co
 
 std::unique_ptr<VirtualMachine::Handle> TempFileSystem::FileHandle::Duplicate(uint32_t flags) const
 {
-	// todo - lots of things
+	// Check for incompatible or unsupported flags; this function opens an existing node so
+	// flags like O_CREAT, O_EXCL and O_TRUNC are not compatible here
+	if((flags & UAPI_O_DIRECTORY) == UAPI_O_DIRECTORY) throw LinuxException(UAPI_ENOTDIR);
+	if(flags & (UAPI_FASYNC | UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TMPFILE | UAPI_O_TRUNC)) throw LinuxException(UAPI_EINVAL);
+
 	return std::make_unique<FileHandle>(m_handle, flags, m_mountflags);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::FileHandle::Enumerate
+//
+// Enumerates all of the children of this node
+//
+// Arguments:
+//
+//	func		- Enumeration callback function
+
+void TempFileSystem::FileHandle::Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
+{
+	UNREFERENCED_PARAMETER(func);
+
+	throw LinuxException(UAPI_ENOTDIR);
 }
 
 //---------------------------------------------------------------------------
@@ -1913,7 +1937,7 @@ size_t TempFileSystem::SymbolicLink::getLength(void) const
 }
 
 //---------------------------------------------------------------------------
-// TempFileSystem::SymbolicLink::ReadLink
+// TempFileSystem::SymbolicLink::ReadTarget
 //
 // Gets the target of the symbolic link
 //
@@ -1923,7 +1947,7 @@ size_t TempFileSystem::SymbolicLink::getLength(void) const
 //	buffer		- Output buffer
 //	count		- Length of the output buffer, in bytes
 
-size_t TempFileSystem::SymbolicLink::ReadLink(VirtualMachine::Mount const* mount, char_t* buffer, size_t count)
+size_t TempFileSystem::SymbolicLink::ReadTarget(VirtualMachine::Mount const* mount, char_t* buffer, size_t count)
 {
 	if((count > 0) && (buffer == nullptr)) throw LinuxException(UAPI_EFAULT);
 
@@ -1977,6 +2001,22 @@ std::unique_ptr<VirtualMachine::Handle> TempFileSystem::SymbolicLinkHandle::Dupl
 	if((flags & (UAPI_O_PATH | UAPI_O_NOFOLLOW)) != (UAPI_O_PATH | UAPI_O_NOFOLLOW)) throw LinuxException(UAPI_ELOOP);
 
 	return std::make_unique<SymbolicLinkHandle>(m_handle, flags, m_mountflags);
+}
+
+//---------------------------------------------------------------------------
+// TempFileSystem::SymbolicLinkHandle::Enumerate
+//
+// Enumerates all of the children of this node
+//
+// Arguments:
+//
+//	func		- Enumeration callback function
+
+void TempFileSystem::SymbolicLinkHandle::Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
+{
+	UNREFERENCED_PARAMETER(func);
+
+	throw LinuxException(UAPI_ENOTDIR);
 }
 
 //---------------------------------------------------------------------------

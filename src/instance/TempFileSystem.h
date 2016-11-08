@@ -681,11 +681,6 @@ private:
 		// Duplicates this node instance
 		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
 
-		// Enumerate (VirtualMachine::Directory)
-		//
-		// Enumerates all of the entries in this directory
-		virtual void Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func) override;
-
 		// Link (VirtualMachine::Directory)
 		//
 		// Links an existing node as a child of this directory
@@ -725,42 +720,47 @@ private:
 		//-------------------------------------------------------------------
 		// Member Functions
 
-		// Duplicate
+		// Duplicate (VirtualMachine::Handle)
 		//
 		// Duplicates this Handle instance
 		virtual std::unique_ptr<Handle> Duplicate(uint32_t flags) const override;
 	
-		// Read
+		// Enumerate (VirtualMachine::Handle)
+		//
+		// Enumerates all of the children of this node
+		virtual void Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func) override;
+
+		// Read (VirtualMachine::Handle)
 		//
 		// Synchronously reads data from the underlying node into a buffer
 		virtual size_t Read(void* buffer, size_t count) override;
 
-		// ReadAt
+		// ReadAt (VirtualMachine::Handle)
 		//
 		// Synchronously reads data from the underlying node into a buffer
 		virtual size_t ReadAt(size_t offset, void* buffer, size_t count) override;
 
-		// Seek
+		// Seek (VirtualMachine::Handle)
 		//
 		// Changes the file position
 		virtual size_t Seek(ssize_t offset, int whence) override;
 
-		// SetLength
+		// SetLength (VirtualMachine::Handle)
 		//
 		// Sets the length of the node data
 		virtual size_t SetLength(size_t length) override;
 
-		// Sync
+		// Sync (VirtualMachine::Handle)
 		//
 		// Synchronizes all data associated with the file to storage, not metadata
 		virtual void Sync(void) const override;
 
-		// Write
+		// Write (VirtualMachine::Handle)
 		//
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t Write(const void* buffer, size_t count) override;
 
-		// WriteAt
+		// WriteAt (VirtualMachine::Handle)
 		//
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) override;
@@ -768,7 +768,7 @@ private:
 		//--------------------------------------------------------------------
 		// Properties
 
-		// Flags
+		// Flags (VirtualMachine::Handle)
 		//
 		// Gets the handle-level flags applied to this instance
 		__declspec(property(get=getFlags)) uint32_t Flags;
@@ -840,42 +840,47 @@ private:
 		//-------------------------------------------------------------------
 		// Member Functions
 
-		// Duplicate
+		// Duplicate (VirtualMachine::Handle)
 		//
 		// Duplicates this Handle instance
 		virtual std::unique_ptr<Handle> Duplicate(uint32_t flags) const override;
 	
-		// Read
+		// Enumerate (VirtualMachine::Handle)
+		//
+		// Enumerates all of the children of this node
+		virtual void Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func) override;
+
+		// Read (VirtualMachine::Handle)
 		//
 		// Synchronously reads data from the underlying node into a buffer
 		virtual size_t Read(void* buffer, size_t count) override;
 
-		// ReadAt
+		// ReadAt (VirtualMachine::Handle)
 		//
 		// Synchronously reads data from the underlying node into a buffer
 		virtual size_t ReadAt(size_t offset, void* buffer, size_t count) override;
 
-		// Seek
+		// Seek (VirtualMachine::Handle)
 		//
 		// Changes the file position
 		virtual size_t Seek(ssize_t offset, int whence) override;
 
-		// SetLength
+		// SetLength (VirtualMachine::Handle)
 		//
 		// Sets the length of the node data
 		virtual size_t SetLength(size_t length) override;
 
-		// Sync
+		// Sync (VirtualMachine::Handle)
 		//
 		// Synchronizes all data associated with the file to storage, not metadata
 		virtual void Sync(void) const override;
 
-		// Write
+		// Write (VirtualMachine::Handle)
 		//
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t Write(const void* buffer, size_t count) override;
 
-		// WriteAt
+		// WriteAt (VirtualMachine::Handle)
 		//
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) override;
@@ -883,7 +888,7 @@ private:
 		//--------------------------------------------------------------------
 		// Properties
 
-		// Flags
+		// Flags (VirtualMachine::Handle)
 		//
 		// Gets the handle-level flags applied to this instance
 		__declspec(property(get=getFlags)) uint32_t Flags;
@@ -991,10 +996,10 @@ private:
 		// Duplicates this node instance
 		virtual std::unique_ptr<VirtualMachine::Node> Duplicate(void) const override;
 
-		// ReadLink (VirtualMachine::SymbolicLink)
+		// ReadTarget (VirtualMachine::SymbolicLink)
 		//
 		// Reads the value of the symbolic link
-		virtual size_t ReadLink(VirtualMachine::Mount const* mount, char_t* buffer, size_t count) override;
+		virtual size_t ReadTarget(VirtualMachine::Mount const* mount, char_t* buffer, size_t count) override;
 
 		//-------------------------------------------------------------------
 		// Properties
@@ -1029,42 +1034,47 @@ private:
 		//-------------------------------------------------------------------
 		// Member Functions
 
-		// Duplicate
+		// Duplicate (VirtualMachine::Handle)
 		//
 		// Duplicates this Handle instance
 		virtual std::unique_ptr<Handle> Duplicate(uint32_t flags) const override;
 	
-		// Read
+		// Enumerate (VirtualMachine::Handle)
+		//
+		// Enumerates all of the children of this node
+		virtual void Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func) override;
+
+		// Read (VirtualMachine::Handle)
 		//
 		// Synchronously reads data from the underlying node into a buffer
 		virtual size_t Read(void* buffer, size_t count) override;
 
-		// ReadAt
+		// ReadAt (VirtualMachine::Handle)
 		//
 		// Synchronously reads data from the underlying node into a buffer
 		virtual size_t ReadAt(size_t offset, void* buffer, size_t count) override;
 
-		// Seek
+		// Seek (VirtualMachine::Handle)
 		//
 		// Changes the file position
 		virtual size_t Seek(ssize_t offset, int whence) override;
 
-		// SetLength
+		// SetLength (VirtualMachine::Handle)
 		//
 		// Sets the length of the node data
 		virtual size_t SetLength(size_t length) override;
 
-		// Sync
+		// Sync (VirtualMachine::Handle)
 		//
 		// Synchronizes all data associated with the file to storage, not metadata
 		virtual void Sync(void) const override;
 
-		// Write
+		// Write (VirtualMachine::Handle)
 		//
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t Write(const void* buffer, size_t count) override;
 
-		// WriteAt
+		// WriteAt (VirtualMachine::Handle)
 		//
 		// Synchronously writes data from a buffer to the underlying node
 		virtual size_t WriteAt(size_t offset, const void* buffer, size_t count) override;
@@ -1072,7 +1082,7 @@ private:
 		//--------------------------------------------------------------------
 		// Properties
 
-		// Flags
+		// Flags (VirtualMachine::Handle)
 		//
 		// Gets the handle-level flags applied to this instance
 		__declspec(property(get=getFlags)) uint32_t Flags;

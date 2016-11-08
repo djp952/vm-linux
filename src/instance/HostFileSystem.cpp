@@ -25,6 +25,8 @@
 
 #include <align.h>
 #include <convert.h>
+#include <NtApi.h>
+#include <StructuredException.h>
 
 #include "LinuxException.h"
 #include "MountOptions.h"
@@ -392,27 +394,6 @@ std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::Duplicate(void)
 }
 
 //---------------------------------------------------------------------------
-// HostFileSystem::Directory::Enumerate
-//
-// Enumerates all of the entries in this directory
-//
-// Arguments:
-//
-//	mount		- Mount point on which to perform this operation
-//	func		- Callback function to invoke for each entry; return false to stop
-
-void HostFileSystem::Directory::Enumerate(VirtualMachine::Mount const* mount, std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
-{
-	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
-	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
-
-	// todo - needs to move to Handle anyway since lseek() can move the pointer
-	// into the operation.  FindFirstFile/etc maintains it's own pointer as part
-	// of the underlying handle, but I don't think it can be seeked?
-	throw LinuxException(UAPI_EPERM);
-}
-
-//---------------------------------------------------------------------------
 // HostFileSystem::Directory::Link
 //
 // Links an existing node as a child of this directory
@@ -697,6 +678,77 @@ std::unique_ptr<VirtualMachine::Handle> HostFileSystem::DirectoryHandle::Duplica
 	return std::make_unique<DirectoryHandle>(m_handle, oshandle, flags);
 }
 
+//---------------------------------------------------------------------------
+// HostFileSystem::DirectoryHandle::Enumerate
+//
+// Enumerates all of the entries in this directory
+//
+// Arguments:
+//
+//	func		- Callback function to invoke for each entry; return false to stop
+
+void HostFileSystem::DirectoryHandle::Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
+{
+	IO_STATUS_BLOCK				iosb;			// I/O operation status block
+	size_t						index = 0;		// Current enumeration index value
+
+	if(func == nullptr) throw LinuxException(UAPI_EFAULT);
+
+	//
+	// This is an unfortunate case where using a low-level NTAPI function is required; there is no way
+	// that I can find to reset the pointer set by GetFileInformationByHandleEx(FileFullDirectoryInfo),
+	// making it impossible to enumerate the directory more than once without opening a new handle.
+	// Zw/NtQueryDirectoryFile() provides for a BOOLEAN flag that starts over.  Also unfortunately there
+	// seems to be no way to set the seek pointer, so entries just have to be skipped as necessary.
+	//
+
+	auto buffer = std::make_unique<uint8_t[]>(4 KiB);		// 4KiB buffer
+	size_t pos = m_handle->position;						// Copy the current position
+
+	// ProcessDirectoryEntry (local)
+	//
+	// Processes a single directory entry and invokes the provided callback function
+	auto ProcessDirectoryEntry = [&](PFILE_FULL_DIR_INFO dirinfo) -> bool
+	{
+		// Skip entries up to the current fake file position
+		if(pos > index++) return true;
+
+		std::string filename = std::to_string(dirinfo->FileName, dirinfo->FileNameLength);
+		// todo: inode number and mode goes here, interesting dilemma for inode number
+		// -- looks like it must be switched to always be a 64-bit value
+		return func({ 0 /*Index*/, 0 /*Mode*/, filename.c_str() });
+	};
+
+	// Query the information about the first block of files in the directory
+	NTSTATUS result = NtApi::NtQueryDirectoryFile(m_oshandle, nullptr, nullptr, nullptr, &iosb, &buffer[0], 4 KiB, 
+		NtApi::FileFullDirectoryInformation, FALSE, nullptr, TRUE);
+	if((result != NtApi::STATUS_SUCCESS) && (result != NtApi::STATUS_NO_MORE_FILES)) throw StructuredException(result);
+
+	// Keep going until all entries are processed or the callback function breaks out
+	while(result != NtApi::STATUS_NO_MORE_FILES) {
+
+		// Process the first entry returned from NtQueryDirectoryFile; break if callback returns false
+		PFILE_FULL_DIR_INFO dirinfo = reinterpret_cast<PFILE_FULL_DIR_INFO>(&buffer[0]);
+		if(!ProcessDirectoryEntry(dirinfo)) { m_handle->position = std::max(index, pos); return; }
+
+		// Process all subsequent entries contained in the current data buffer; break if callback returns false
+		while(dirinfo->NextEntryOffset) {
+
+			dirinfo = reinterpret_cast<PFILE_FULL_DIR_INFO>(reinterpret_cast<uint8_t*>(dirinfo) + dirinfo->NextEntryOffset);
+			if(!ProcessDirectoryEntry(dirinfo)) { m_handle->position = std::max(index, pos); return; }
+		}
+
+		// Query the information about the next block of files in the directory
+		result = NtApi::NtQueryDirectoryFile(m_oshandle, nullptr, nullptr, nullptr, &iosb, &buffer[0], 8192, 
+			NtApi::FileFullDirectoryInformation, FALSE, nullptr, FALSE);
+		if((result != NtApi::STATUS_SUCCESS) && (result != NtApi::STATUS_NO_MORE_FILES)) throw StructuredException(result);
+	}
+
+	// Move the pseudo seek pointer to the higher of the last entry index or the
+	// original position of the seek pointer, whichever is higher
+	m_handle->position = std::max(index, pos);
+}
+
 //-----------------------------------------------------------------------------
 // HostFileSystem::DirectoryHandle::getFlags
 //
@@ -897,6 +949,11 @@ std::unique_ptr<VirtualMachine::Handle> HostFileSystem::File::CreateHandle(Virtu
 {
 	if(mount == nullptr) throw LinuxException(UAPI_EFAULT);
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
+
+	// Check for incompatible or unsupported flags; this function opens an existing node so
+	// flags like O_CREAT, O_EXCL and O_TRUNC are not compatible here
+	if((flags & UAPI_O_DIRECTORY) == UAPI_O_DIRECTORY) throw LinuxException(UAPI_ENOTDIR);
+	if(flags & (UAPI_FASYNC | UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TMPFILE | UAPI_O_TRUNC)) throw LinuxException(UAPI_EINVAL);
 
 	// Ensure that the mount-level MS_NOEXEC flag isn't set in conjunction with O_KERNEL_EXEC
 	if(((mount->Flags & UAPI_MS_NOEXEC) == UAPI_MS_NOEXEC) && ((flags & UAPI_O_KERNEL_EXEC) == UAPI_O_KERNEL_EXEC)) throw LinuxException(UAPI_EACCES);
@@ -1121,10 +1178,11 @@ std::unique_ptr<VirtualMachine::Handle> HostFileSystem::FileHandle::Duplicate(ui
 	DWORD		access = 0;									// Default to query-only access (O_PATH)
 	DWORD		attributes = FILE_FLAG_POSIX_SEMANTICS;		// Default handle attributes
 
-	// Check for flags that aren't compatible with duplicating file objects; note that O_KERNEL_EXEC
-	// is listed here - that special flag can only be applied by the virtual machine against new handles
-	if(flags & (UAPI_O_DIRECTORY | UAPI_FASYNC | UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TMPFILE | UAPI_O_TRUNC | UAPI_O_KERNEL_EXEC)) 
-		throw LinuxException(UAPI_EINVAL);
+	// Check for incompatible or unsupported flags; this function opens an existing node so
+	// flags like O_CREAT, O_EXCL and O_TRUNC are not compatible here.  Also note that O_KERNEL_EXEC
+	// is not supported when duplicating a handle - that flag can only be applied against new handles
+	if((flags & UAPI_O_DIRECTORY) == UAPI_O_DIRECTORY) throw LinuxException(UAPI_ENOTDIR);
+	if(flags & (UAPI_FASYNC | UAPI_O_CREAT | UAPI_O_EXCL | UAPI_O_TMPFILE | UAPI_O_TRUNC | UAPI_O_KERNEL_EXEC)) throw LinuxException(UAPI_EINVAL);
 
 	// O_PATH, O_RDONLY, O_WRONLY, O_RDWR - Use appropriate access rights
 	if((flags & UAPI_O_PATH) == 0) {
@@ -1156,6 +1214,22 @@ std::unique_ptr<VirtualMachine::Handle> HostFileSystem::FileHandle::Duplicate(ui
 	}
 
 	return std::make_unique<FileHandle>(m_handle, oshandle, flags);
+}
+
+//---------------------------------------------------------------------------
+// HostFileSystem::FileHandle::Enumerate
+//
+// Enumerates all of the children of this node
+//
+// Arguments:
+//
+//	func		- Enumeration callback function
+
+void HostFileSystem::FileHandle::Enumerate(std::function<bool(VirtualMachine::DirectoryEntry const&)> func)
+{
+	UNREFERENCED_PARAMETER(func);
+
+	throw LinuxException(UAPI_ENOTDIR);
 }
 
 //-----------------------------------------------------------------------------
