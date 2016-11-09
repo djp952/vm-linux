@@ -1618,7 +1618,7 @@ uapi_gid_t TempFileSystem::Node<_interface, _node_type>::getGroupId(void) const
 // Gets the node index within the file system (inode number)
 
 template <class _interface, typename _node_type>
-intptr_t TempFileSystem::Node<_interface, _node_type>::getIndex(void) const
+int64_t TempFileSystem::Node<_interface, _node_type>::getIndex(void) const
 {
 	return m_node->index;
 }

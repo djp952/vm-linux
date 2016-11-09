@@ -298,8 +298,8 @@ private:
 		// Index (VirtualMachine::Node)
 		//
 		// Gets the node index within the file system (inode number)
-		__declspec(property(get=getIndex)) intptr_t Index;
-		virtual intptr_t getIndex(void) const override;
+		__declspec(property(get=getIndex)) int64_t Index;
+		virtual int64_t getIndex(void) const override;
 
 		// ModificationTime (VirtualMachine::Node)
 		//

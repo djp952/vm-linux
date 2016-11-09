@@ -710,10 +710,10 @@ void HostFileSystem::DirectoryHandle::Enumerate(std::function<bool(VirtualMachin
 
 	//
 	// This is an unfortunate case where using a low-level NTAPI function is required; there is no way
-	// that I can find to reset the pointer set by GetFileInformationByHandleEx(FileFullDirectoryInfo),
+	// that I can find to reset the pointer set by GetFileInformationByHandleEx(FileIdFullDirectoryInfo),
 	// making it impossible to enumerate the directory more than once without opening a new handle.
-	// Zw/NtQueryDirectoryFile() provides for a BOOLEAN flag that starts over.  Also unfortunately there
-	// seems to be no way to set the seek pointer, so entries just have to be skipped as necessary.
+	// Zw/NtQueryDirectoryFile() provides for a BOOLEAN flag that starts over.  Also there seems
+	// to be no valid way to assign the seek pointer, so entries just have to be skipped as necessary.
 	//
 
 	auto buffer = std::make_unique<uint8_t[]>(4 KiB);		// 4KiB buffer
@@ -722,39 +722,43 @@ void HostFileSystem::DirectoryHandle::Enumerate(std::function<bool(VirtualMachin
 	// ProcessDirectoryEntry (local)
 	//
 	// Processes a single directory entry and invokes the provided callback function
-	auto ProcessDirectoryEntry = [&](PFILE_FULL_DIR_INFO dirinfo) -> bool
+	auto ProcessDirectoryEntry = [&](NtApi::PFILE_ID_FULL_DIR_INFORMATION dirinfo) -> bool
 	{
 		// Skip entries up to the current fake file position
 		if(pos > index++) return true;
 
+		// Convert the unicode file name into an ANSI file name to pass into the callback
 		std::string filename = std::to_string(dirinfo->FileName, dirinfo->FileNameLength);
-		// todo: inode number and mode goes here, interesting dilemma for inode number
-		// -- looks like it must be switched to always be a 64-bit value
-		return func({ 0 /*Index*/, 0 /*Mode*/, filename.c_str() });
+
+		// Only directory and regular files are currently supported by HostFileSystem
+		uapi_mode_t mode = ((dirinfo->FileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? UAPI_S_IFDIR : UAPI_S_IFREG) | 0777;
+
+		// Invoke the caller-supplied function with a new VirtualMachine::DirectoryEntry structure
+		return func({ dirinfo->FileId.QuadPart, mode, filename.c_str() });
 	};
 
 	// Query the information about the first block of files in the directory
 	NTSTATUS result = NtApi::NtQueryDirectoryFile(m_oshandle, nullptr, nullptr, nullptr, &iosb, &buffer[0], 4 KiB, 
-		NtApi::FileFullDirectoryInformation, FALSE, nullptr, TRUE);
+		NtApi::FileIdFullDirectoryInformation, FALSE, nullptr, TRUE);
 	if((result != NtApi::STATUS_SUCCESS) && (result != NtApi::STATUS_NO_MORE_FILES)) throw StructuredException(result);
 
 	// Keep going until all entries are processed or the callback function breaks out
 	while(result != NtApi::STATUS_NO_MORE_FILES) {
 
 		// Process the first entry returned from NtQueryDirectoryFile; break if callback returns false
-		PFILE_FULL_DIR_INFO dirinfo = reinterpret_cast<PFILE_FULL_DIR_INFO>(&buffer[0]);
+		NtApi::PFILE_ID_FULL_DIR_INFORMATION dirinfo = reinterpret_cast<NtApi::PFILE_ID_FULL_DIR_INFORMATION>(&buffer[0]);
 		if(!ProcessDirectoryEntry(dirinfo)) { m_handle->position = std::max(index, pos); return; }
 
 		// Process all subsequent entries contained in the current data buffer; break if callback returns false
 		while(dirinfo->NextEntryOffset) {
 
-			dirinfo = reinterpret_cast<PFILE_FULL_DIR_INFO>(reinterpret_cast<uint8_t*>(dirinfo) + dirinfo->NextEntryOffset);
+			dirinfo = reinterpret_cast<NtApi::PFILE_ID_FULL_DIR_INFORMATION>(reinterpret_cast<uint8_t*>(dirinfo) + dirinfo->NextEntryOffset);
 			if(!ProcessDirectoryEntry(dirinfo)) { m_handle->position = std::max(index, pos); return; }
 		}
 
 		// Query the information about the next block of files in the directory
 		result = NtApi::NtQueryDirectoryFile(m_oshandle, nullptr, nullptr, nullptr, &iosb, &buffer[0], 8192, 
-			NtApi::FileFullDirectoryInformation, FALSE, nullptr, FALSE);
+			NtApi::FileIdFullDirectoryInformation, FALSE, nullptr, FALSE);
 		if((result != NtApi::STATUS_SUCCESS) && (result != NtApi::STATUS_NO_MORE_FILES)) throw StructuredException(result);
 	}
 
@@ -1623,13 +1627,15 @@ uapi_gid_t HostFileSystem::Node<_interface>::getGroupId(void) const
 // Gets the node index within the file system (inode number)
 
 template <class _interface>
-intptr_t HostFileSystem::Node<_interface>::getIndex(void) const
+int64_t HostFileSystem::Node<_interface>::getIndex(void) const
 {
-	// The node index is actually available via GetFileInformationByHandle(), but it's
-	// returned as a 64-bit value which can't be used directly on 32-bit builds, and
-	// it's an expensive operation for something that needs to be very fast.  Use the
-	// address of the node pointer as a pseudo inode number
-	return intptr_t(m_node.get());
+	// todo: this isn't going to match what Directory returns ... got the real index there
+	//
+	// might need to add a Hash() function or something that can be used quickly
+	// without retrieving the actual node number until specifically requested. The 
+	// node index is available via GetFileInformationByHandle() only, which would
+	// be an expensive call to make frequently since a handle is required
+	return reinterpret_cast<int64_t>(m_node.get());
 }
 
 //---------------------------------------------------------------------------

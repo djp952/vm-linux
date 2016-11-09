@@ -102,7 +102,7 @@ public:
 		// Index
 		//
 		// The node index (inode number)
-		intptr_t Index;
+		int64_t Index;
 
 		// Mode
 		//
@@ -311,8 +311,8 @@ public:
 		// Index
 		//
 		// Gets the node index within the file system (inode number)
-		__declspec(property(get=getIndex)) intptr_t Index;
-		virtual intptr_t getIndex(void) const = 0;
+		__declspec(property(get=getIndex)) int64_t Index;
+		virtual int64_t getIndex(void) const = 0;
 
 		// Mode
 		//

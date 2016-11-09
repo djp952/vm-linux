@@ -46,6 +46,27 @@ public:
 	// NTAPI constant not defined in the standard Win32 user-mode headers
 	static const int DUPLICATE_SAME_ATTRIBUTES = 0x04;
 
+	// FILE_ID_FULL_DIR_INFORMATION
+	//
+	// NTAPI structure not defined in the standard Win32 user-mode headers
+	typedef struct _FILE_ID_FULL_DIR_INFORMATION {
+
+		ULONG NextEntryOffset;
+		ULONG FileIndex;
+		LARGE_INTEGER CreationTime;
+		LARGE_INTEGER LastAccessTime;
+		LARGE_INTEGER LastWriteTime;
+		LARGE_INTEGER ChangeTime;
+		LARGE_INTEGER EndOfFile;
+		LARGE_INTEGER AllocationSize;
+		ULONG FileAttributes;
+		ULONG FileNameLength;
+		ULONG EaSize;
+		LARGE_INTEGER FileId;
+		WCHAR FileName[1];
+
+	} FILE_ID_FULL_DIR_INFORMATION, *PFILE_ID_FULL_DIR_INFORMATION;
+
 	// MAP_PROCESS / MAP_SYSTEM
 	//
 	// NTAPI constants not defined in the standard Win32 user-mode headers
@@ -84,10 +105,10 @@ public:
 	static const SECTION_INHERIT ViewShare = 1;
 	static const SECTION_INHERIT ViewUnmap = 2;
 
-	// FileFullDirectoryInformation
+	// FileIdFullDirectoryInformation
 	//
 	// Flag passed to NtQueryDirectoryFile to retrieve directory entries
-	static const FILE_INFORMATION_CLASS FileFullDirectoryInformation = (FILE_INFORMATION_CLASS)2;
+	static const FILE_INFORMATION_CLASS FileIdFullDirectoryInformation = (FILE_INFORMATION_CLASS)38;
 
 	// STATUS_SUCCESS
 	//
