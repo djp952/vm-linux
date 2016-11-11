@@ -321,6 +321,20 @@ VirtualMachine::Node* Namespace::Path::getNode(void) const
 	return m_path->node.get();
 }
 		
+//---------------------------------------------------------------------------
+// Namespace::Path::Open
+//
+// Opens a handle against the node pointed to by this path
+//
+// Arguments:
+//
+//	flags		- Handle instance flags
+
+std::unique_ptr<VirtualMachine::Handle> Namespace::Path::Open(uint32_t flags) const
+{
+	return m_path->node->CreateHandle(m_path->mount.get(), flags);
+}
+
 //
 // NAMESPACE::PATH_T IMPLEMENTATION
 //

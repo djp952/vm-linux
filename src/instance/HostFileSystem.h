@@ -139,6 +139,11 @@ private:
 		// Shared pointer to the parent file system
 		std::shared_ptr<HostFileSystem> const fs;
 
+		// index
+		//
+		// Host file system node index
+		int64_t index;
+
 		// path
 		//
 		// Path to the underlying host file system node

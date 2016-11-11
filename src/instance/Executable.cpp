@@ -23,18 +23,18 @@
 #include "stdafx.h"
 #include "Executable.h"
 
-#include "FileDescriptor.h"
-
 #pragma warning(push, 4)
 
 //---------------------------------------------------------------------------
 // Executable Constructor
 //
-// TODO: TEMPORARY
+// Arguments:
+//
+//	path		- Path instance to the executable to load
 
-Executable::Executable(std::unique_ptr<FileDescriptor>&& fd)
+Executable::Executable(std::unique_ptr<Namespace::Path>&& path)
 {
-	UNREFERENCED_PARAMETER(fd);
+	UNREFERENCED_PARAMETER(path);
 }
 
 //---------------------------------------------------------------------------

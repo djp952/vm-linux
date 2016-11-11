@@ -26,11 +26,10 @@
 
 #include <text.h>
 
-#pragma warning(push, 4)
+#include "Namespace.h"
+#include "VirtualMachine.h"
 
-// FORWARD DECLARATIONS
-//
-class FileDescriptor;
+#pragma warning(push, 4)
 
 //-----------------------------------------------------------------------------
 // Class Executable
@@ -43,7 +42,7 @@ public:
 
 	// Instance Constructors
 	//
-	Executable(std::unique_ptr<FileDescriptor>&& fd);
+	Executable(std::unique_ptr<Namespace::Path>&& path);
 
 	// Destructor
 	//

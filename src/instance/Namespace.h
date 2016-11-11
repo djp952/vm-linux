@@ -80,6 +80,14 @@ public:
 		~Path()=default;
 
 		//-------------------------------------------------------------------
+		// Member Functions
+
+		// Open
+		//
+		// Opens a handle against the node pointed to by this path
+		std::unique_ptr<VirtualMachine::Handle> Open(uint32_t flags) const;
+
+		//-------------------------------------------------------------------
 		// Properties
 
 		// Mount

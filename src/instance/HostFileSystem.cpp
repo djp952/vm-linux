@@ -106,7 +106,7 @@ static windows_path NormalizePath(wchar_t const* objectpath)
 
 			// If the buffer is too small, this will return the required size including the null terminator
 			// otherwise it will return the number of characters copied into the output buffer
-			cch = GetFinalPathNameByHandleW(oshandle, path.get(), pathlen, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+			cch = GetFinalPathNameByHandle(oshandle, path.get(), pathlen, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
 			if(cch == 0) throw MapHostException(GetLastError());
 
 			if(cch > pathlen) {
@@ -207,6 +207,20 @@ HostFileSystem::node_t::node_t(std::shared_ptr<HostFileSystem> const& filesystem
 
 	// Ensure that the target node attributes are valid, the object may not actually exist
 	if(attributes == INVALID_FILE_ATTRIBUTES) throw LinuxException(UAPI_ENOENT);
+
+	///// TODO: TEMPORARY
+	// The node index needs to be known there isn't much way around this.  Refactor to just query for it all the time,
+	// I was really hoping to avoid this and just use the file path
+	DWORD flags = FILE_FLAG_POSIX_SEMANTICS;
+	if((attributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY) flags |= FILE_FLAG_BACKUP_SEMANTICS;
+	HANDLE h = CreateFile(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, flags, nullptr);
+	if(h == INVALID_HANDLE_VALUE) throw MapHostException(GetLastError());
+
+	BY_HANDLE_FILE_INFORMATION info;
+	GetFileInformationByHandle(h, &info);
+	index = static_cast<int64_t>(static_cast<uint64_t>(info.nFileIndexHigh) << 32 | info.nFileIndexLow);
+	CloseHandle(h);
+	/////////////
 }
 
 //
@@ -497,6 +511,9 @@ std::unique_ptr<VirtualMachine::Node> HostFileSystem::Directory::Lookup(VirtualM
 	if(mount->FileSystem != m_node->fs.get()) throw LinuxException(UAPI_EXDEV);
 	if((mount->Flags & UAPI_MS_RDONLY) == UAPI_MS_RDONLY) throw LinuxException(UAPI_EROFS);
 
+	// todo: if directories carry a handle around, this can be done with a handle query which gets
+	// the node number and attributes ... just sayin'
+
 	// Combine the requested name with the normalized directory path
 	if(name == nullptr) throw LinuxException(UAPI_EFAULT);
 	auto path = m_node->path.append(name);
@@ -579,7 +596,7 @@ void HostFileSystem::Directory::Stat(VirtualMachine::Mount const* mount, uapi_st
 	auto mtime = convert<uapi_timespec>(info.ftLastWriteTime);
 
 	//stat->st_dev = 0;							// todo - no device support yet
-	stat->st_ino = reinterpret_cast<__int3264>(m_node.get());
+	stat->st_ino = static_cast<uint64_t>(info.nFileIndexHigh) << 32 | info.nFileIndexLow;
 	stat->st_nlink = info.nNumberOfLinks;
 	stat->st_mode = UAPI_S_IFDIR | 0777;
 	stat->st_uid = 0;
@@ -1051,7 +1068,7 @@ void HostFileSystem::File::Stat(VirtualMachine::Mount const* mount, uapi_stat326
 	auto mtime = convert<uapi_timespec>(info.ftLastWriteTime);
 
 	//stat->st_dev = 0;							// todo - no device support yet
-	stat->st_ino = reinterpret_cast<__int3264>(m_node.get());
+	stat->st_ino = static_cast<uint64_t>(info.nFileIndexHigh) << 32 | info.nFileIndexLow;
 	stat->st_nlink = info.nNumberOfLinks;
 	stat->st_mode = UAPI_S_IFREG | 0777;
 	stat->st_uid = 0;
@@ -1629,13 +1646,7 @@ uapi_gid_t HostFileSystem::Node<_interface>::getGroupId(void) const
 template <class _interface>
 int64_t HostFileSystem::Node<_interface>::getIndex(void) const
 {
-	// todo: this isn't going to match what Directory returns ... got the real index there
-	//
-	// might need to add a Hash() function or something that can be used quickly
-	// without retrieving the actual node number until specifically requested. The 
-	// node index is available via GetFileInformationByHandle() only, which would
-	// be an expensive call to make frequently since a handle is required
-	return reinterpret_cast<int64_t>(m_node.get());
+	return m_node->index;
 }
 
 //---------------------------------------------------------------------------

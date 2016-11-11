@@ -245,9 +245,6 @@
     <ClInclude Include="..\common\timespan.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
-    <ClInclude Include="FileDescriptor.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -458,9 +455,6 @@
       <Filter>Source Files\common</Filter>
     </ClCompile>
     <ClCompile Include="convert.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="FileDescriptor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

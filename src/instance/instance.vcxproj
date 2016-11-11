@@ -221,7 +221,6 @@
     <ClInclude Include="CpioArchive.h" />
     <ClInclude Include="Executable.h" />
     <ClInclude Include="ExecutableFormat.h" />
-    <ClInclude Include="FileDescriptor.h" />
     <ClInclude Include="HostFileSystem.h" />
     <ClInclude Include="IndexPool.h" />
     <ClInclude Include="LinuxException.h" />
@@ -508,7 +507,6 @@
     <ClCompile Include="convert.cpp" />
     <ClCompile Include="CpioArchive.cpp" />
     <ClCompile Include="Executable.cpp" />
-    <ClCompile Include="FileDescriptor.cpp" />
     <ClCompile Include="HostFileSystem.cpp" />
     <ClCompile Include="LinuxException.cpp" />
     <ClCompile Include="main.cpp" />

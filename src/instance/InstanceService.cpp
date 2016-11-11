@@ -36,7 +36,6 @@
 #include "CompressedFileReader.h"
 #include "CpioArchive.h"
 #include "Executable.h"
-#include "FileDescriptor.h"
 #include "HostFileSystem.h"
 #include "LinuxException.h"
 #include "Process.h"
@@ -309,17 +308,26 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// CREATE AND MOUNT ROOT FILE SYSTEM
 		//
 
-		// Find the file system mount function in the collection
-		auto const& rootfsentry = m_fstypes.find(param_rootfstype);
-		if(rootfsentry == m_fstypes.end()) throw FileSystemTypeNotFoundException(static_cast<std::tstring>(param_rootfstype).c_str());
-
-		// Generate/convert the root file system flags
-		uint32_t rootfsflags = UAPI_MS_KERNMOUNT | ((param_ro) ? UAPI_MS_RDONLY : 0);
-		std::string rootflagsstr = std::to_string(param_rootflags);
-
-		// Attempt to create the root file system instance using the specified parameters
 		std::unique_ptr<VirtualMachine::Mount> rootmount;
-		try { rootmount = rootfsentry->second(std::to_string(param_root).c_str(), rootfsflags, rootflagsstr.data(), rootflagsstr.length()); }
+
+		try {
+
+			// If an initramfs archive has been specified, the root file system is always TempFileSystem
+			if(param_initrd) rootmount = MountTempFileSystem("rootfs", UAPI_MS_KERNMOUNT | UAPI_MS_SILENT, nullptr, 0);
+
+			else {
+
+				// Find the file system mount function in the collection
+				auto const& rootfsentry = m_fstypes.find(param_rootfstype);
+				if(rootfsentry == m_fstypes.end()) throw FileSystemTypeNotFoundException(static_cast<std::tstring>(param_rootfstype).c_str());
+
+				// Attempt to create/mount the specified file system using the specified source and flags
+				uint32_t rootflags = UAPI_MS_KERNMOUNT | ((param_ro) ? UAPI_MS_RDONLY : 0);
+				std::string rootflagsstr = std::to_string(param_rootflags);
+				rootmount = rootfsentry->second(std::to_string(param_root).c_str(), rootflags , rootflagsstr.data(), rootflagsstr.length());
+			}
+		}
+
 		catch(std::exception& ex) { throw MountRootFileSystemException(ex.what()); }
 
 		//
@@ -333,7 +341,7 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		auto rootpath = m_rootns->GetRootPath();
 
 		//
-		// EXTRACT INITRAMFS INTO ROOT FILE SYSTEM
+		// EXTRACT INITRAMFS ARCHIVE INTO ROOT FILE SYSTEM
 		//
 
 		if(param_initrd) {
@@ -349,13 +357,13 @@ void InstanceService::OnStart(int argc, LPTSTR* argv)
 		// LAUNCH INIT PROCESS
 		//
 
-		std::string initpath = std::to_string(param_init);				// Pull out the param_init string
+		// The path to the init executable is always simply "init" when an initramfs archive has been used
+		std::string initpath = (param_initrd) ? "init" : std::to_string(param_init);
 
 		try {
 
-			// Create and launch the specified init binary via a standard read-only file descriptor
-			auto initfd = std::make_unique<FileDescriptor>(m_rootns->LookupPath(rootpath.get(), initpath.c_str(), 0), UAPI_O_RDONLY);
-			auto init = std::make_unique<Process>(std::make_unique<Executable>(std::move(initfd)));
+			auto initexe = std::make_unique<Executable>(m_rootns->LookupPath(rootpath.get(), initpath.c_str(), 0));
+			//auto initproc = std::make_unique<Process>(std::move(initexe));
 		}
 
 		catch(std::exception& ex) { throw LaunchInitException(initpath.c_str(), ex.what()); }

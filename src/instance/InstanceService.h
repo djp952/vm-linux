@@ -180,7 +180,7 @@ private:
 	Parameter<void>						param_ro;
 	Parameter<std::tstring>				param_root;
 	Parameter<std::tstring>				param_rootflags;
-	Parameter<std::tstring>				param_rootfstype	= TEXT("rootfs");
+	Parameter<std::tstring>				param_rootfstype	= TEXT("tmpfs");
 	Parameter<void>						param_rw;
 };
 
