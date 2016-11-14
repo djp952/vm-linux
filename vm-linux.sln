@@ -67,6 +67,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "buildinitramfs", "src\build
 		{A74855D9-1B0B-4913-87F8-2B7F22F0ECE1} = {A74855D9-1B0B-4913-87F8-2B7F22F0ECE1}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "initramfs.busybox", "src\initramfs.busybox\initramfs.busybox.vcxproj", "{F014A6D3-99F9-44F6-B129-4A71ADC7064E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA} = {1463FF74-6C7D-41B9-8FCC-D45150B68BFA}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -151,6 +156,14 @@ Global
 		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Release|Win32.Build.0 = Release|x86
 		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Release|x64.ActiveCfg = Release|x64
 		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Release|x64.Build.0 = Release|x64
+		{F014A6D3-99F9-44F6-B129-4A71ADC7064E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F014A6D3-99F9-44F6-B129-4A71ADC7064E}.Debug|Win32.Build.0 = Debug|Win32
+		{F014A6D3-99F9-44F6-B129-4A71ADC7064E}.Debug|x64.ActiveCfg = Debug|x64
+		{F014A6D3-99F9-44F6-B129-4A71ADC7064E}.Debug|x64.Build.0 = Debug|x64
+		{F014A6D3-99F9-44F6-B129-4A71ADC7064E}.Release|Win32.ActiveCfg = Release|Win32
+		{F014A6D3-99F9-44F6-B129-4A71ADC7064E}.Release|Win32.Build.0 = Release|Win32
+		{F014A6D3-99F9-44F6-B129-4A71ADC7064E}.Release|x64.ActiveCfg = Release|x64
+		{F014A6D3-99F9-44F6-B129-4A71ADC7064E}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
