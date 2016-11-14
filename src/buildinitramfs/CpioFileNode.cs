@@ -189,7 +189,7 @@ namespace zuki.vm.linux
 				using (StreamReader sr = new StreamReader(File.OpenRead(filename)))
 				{
 					// ... and a writer against the destination stream
-					using (StreamWriter sw = new StreamWriter(memstream))
+					using (StreamWriter sw = new StreamWriter(memstream, Encoding.UTF8, 2048, true))
 					{
 						sw.NewLine = "\n";      // <-- Use Unix line endings
 
