@@ -62,6 +62,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		vm-linux.msbuild = vm-linux.msbuild
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "buildinitramfs", "src\buildinitramfs\buildinitramfs.csproj", "{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A74855D9-1B0B-4913-87F8-2B7F22F0ECE1} = {A74855D9-1B0B-4913-87F8-2B7F22F0ECE1}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -138,6 +143,14 @@ Global
 		{B2927D54-91DC-4EF9-AE27-92193AB5718C}.Release|Win32.Build.0 = Release|Win32
 		{B2927D54-91DC-4EF9-AE27-92193AB5718C}.Release|x64.ActiveCfg = Release|x64
 		{B2927D54-91DC-4EF9-AE27-92193AB5718C}.Release|x64.Build.0 = Release|x64
+		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Debug|Win32.ActiveCfg = Debug|x86
+		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Debug|Win32.Build.0 = Debug|x86
+		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Debug|x64.ActiveCfg = Debug|x64
+		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Debug|x64.Build.0 = Debug|x64
+		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Release|Win32.ActiveCfg = Release|x86
+		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Release|Win32.Build.0 = Release|x86
+		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Release|x64.ActiveCfg = Release|x64
+		{1463FF74-6C7D-41B9-8FCC-D45150B68BFA}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
