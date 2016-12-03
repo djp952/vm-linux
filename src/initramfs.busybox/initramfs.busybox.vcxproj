@@ -27,25 +27,25 @@
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="busybox-x64.xml">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -compress:gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz" "%(FullPath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -compress:gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz" "%(FullPath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -compress:gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz" "%(FullPath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -compress:gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz" "%(FullPath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)tmp\initramfs\initramfs-busybox-x64.cpio.gz</Outputs>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </CustomBuild>
     <CustomBuild Include="busybox-x86.xml">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -compress:gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz" "%(FullPath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -compress:gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz" "%(FullPath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -compress:gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz" "%(FullPath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(SolutionDir)out\$(Platform)\$(Configuration)\zuki.vm.linux.buildinitramfs.exe" -compress:gzip "$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz" "%(FullPath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)tmp\initramfs\initramfs-busybox-x86.cpio.gz</Outputs>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>

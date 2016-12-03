@@ -23,13 +23,22 @@
 //---------------------------------------------------------------------------
 // Usage: 
 //
-// buildinitramfs {archive} {manifest} [-gzip]
+// buildinitramfs {archive} {manifest} [-compress:{bzip2|gzip|lz4|lz4-legacy|lzma|xz}]
 //
 // Creates an initramfs CPIO archive based on an XML manifest
 //
-//  archive     - archive file to be created
-//  manifest    - manifest file describing the archive contents
-//	-gzip       - compress the created archive (gzip)
+//  archive				- archive file to be created
+//  manifest			- manifest file describing the archive contents
+//	-compress:[method]	- compress the created archive
+//
+// Valid compression [method] values:
+//
+//	bzip2		- compress using BZIP2 compression encoder
+//	gzip		- compress using GZIP compression encoder
+//	lz4			- compress using LZ4 compression encoder
+//	lz4-legacy	- compress using LZ4 legacy format compression encoder
+//	lzma		- compress using LZMA compression encoder
+//	xz			- compress using XZ compression encoder
 //---------------------------------------------------------------------------
 
 using System;
@@ -37,6 +46,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Xml;
+using zuki.io.compression;
 
 namespace zuki.vm.linux
 {
@@ -61,14 +71,21 @@ namespace zuki.vm.linux
 				// There needs to be exactly 2 command line arguments present - {archive} and {manifest}
 				if (commandline.Arguments.Count != 2) throw new ArgumentException("Invalid command line arguments");
 
-				// Pull out the -gzip option flags
-				//
-				// TODO: initramfs can actually be compressed with any number of methods:
-				// gzip, bzip2, lz4, lzma, lzo and xz.  It may be prohibitive to do those
-				// with .NET but the libraries are all present in the solution on the C++ side
-				// so it wouldn't be too horrible (and potentially useful later on) to whip
-				// up some quick compression stream classes in managed C++ for all of them
-				bool compress = commandline.Switches.ContainsKey("gzip");
+				// Create an appropriate compression encoder if specified
+				Encoder compressor = null;
+				if (commandline.Switches.ContainsKey("compress"))
+				{
+					switch (commandline.Switches["compress"].ToLower())
+					{
+						case "bzip2": compressor = CreateBzip2Encoder(); break;
+						case "gzip": compressor = CreateGzipEncoder(); break;
+						case "lz4": compressor = CreateLz4Encoder(); break;
+						case "lz4-legacy": compressor = CreateLz4LegacyEncoder(); break;
+						case "lzma": compressor = CreateLzmaEncoder(); break;
+						case "xz": compressor = CreateXzEncoder(); break;
+						default: throw new ArgumentException("Invalid compression method '" + commandline.Switches["compress"] + "'.");
+					}
+				}
 
 				// Append the archive file name to the current directory in case it's relative
 				string archivefile = Path.Combine(Environment.CurrentDirectory, commandline.Arguments[0]);
@@ -79,34 +96,23 @@ namespace zuki.vm.linux
 
 				try
 				{
-					// Create the output archive base file stream instance
-					using (Stream outstream = File.Create(archivefile))
+					// Use a CpioGenerator to build the output data incrementally in a stream
+					using (CpioGenerator generator = new CpioGenerator(LoadManifest(commandline.Arguments[1])))
 					{
-						// Optionally wrap the output stream with a GzipStream to compress it while it's generated
-						using (Stream writer = ((compress) ? new GZipStream(outstream, CompressionLevel.Optimal) : outstream))
+						// Create the output archive file stream
+						using (Stream outstream = File.Create(archivefile))
 						{
-							long archivelength = 0;			// overall archive length
-							uint nodeindex = 721;			// see gen_init_cpio.c
-
-							// Iterate over every node in the manifest in the order presented
-							foreach (CpioNode node in LoadManifest(commandline.Arguments[1]))
-							{
-								archivelength += node.Write(writer, nodeindex++);
-							}
-
-							// Write the TRAILER!!! node to complete the archive
-							archivelength += new CpioTrailerNode().Write(writer, nodeindex++);
-
-							// 512-byte alignment padding to finalize the archive
-							int padding = (int)(archivelength.AlignUp(512) - archivelength);
-							writer.Write(new Byte[padding], 0, padding);
-
-							// Output the final block count
-							Console.WriteLine(String.Format("{0} blocks", (archivelength + padding) / 512));
+							// Stream the CpioGenerator into the output file, optionally passing 
+							// it through one of the compression encoders
+							if (compressor == null) generator.CopyTo(outstream);
+							else compressor.Encode(generator, outstream);
 
 							// Flush the changes to the output stream
-							writer.Flush();
+							outstream.Flush();
 						}
+
+						// Output the final block count from the generator stream
+						Console.WriteLine(String.Format("{0} blocks", (generator.Length) / 512));
 					}
 
 					return 0;
@@ -129,6 +135,72 @@ namespace zuki.vm.linux
 		//-------------------------------------------------------------------
 		// Private Member Functions
 		//-------------------------------------------------------------------
+
+		/// <summary>
+		/// Creates an instance of the Bzip2Encoder for compression
+		/// </summary>
+		private static Encoder CreateBzip2Encoder()
+		{
+			Bzip2Encoder encoder = new Bzip2Encoder();
+			encoder.CompressionLevel = Bzip2CompressionLevel.Optimal;
+
+			return encoder;
+		}
+
+		/// <summary>
+		/// Creates an instance of the GzipEncoder for compression
+		/// </summary>
+		private static Encoder CreateGzipEncoder()
+		{
+			GzipEncoder encoder = new GzipEncoder();
+			encoder.CompressionLevel = GzipCompressionLevel.Optimal;
+
+			return encoder;
+		}
+
+		/// <summary>
+		/// Creates an instance of the Lz4Encoder for compression
+		/// </summary>
+		private static Encoder CreateLz4Encoder()
+		{
+			Lz4Encoder encoder = new Lz4Encoder();
+			encoder.CompressionLevel = Lz4CompressionLevel.Optimal;
+
+			return encoder;
+		}
+
+		/// <summary>
+		/// Creates an instance of the Lz4LegacyEncoder for compression
+		/// </summary>
+		private static Encoder CreateLz4LegacyEncoder()
+		{
+			Lz4LegacyEncoder encoder = new Lz4LegacyEncoder();
+			encoder.CompressionLevel = Lz4CompressionLevel.Optimal;
+
+			return encoder;
+		}
+
+		/// <summary>
+		/// Creates an instance of the LzmaEncoder for compression
+		/// </summary>
+		private static Encoder CreateLzmaEncoder()
+		{
+			LzmaEncoder encoder = new LzmaEncoder();
+			encoder.CompressionLevel = LzmaCompressionLevel.Optimal;
+
+			return encoder;
+		}
+
+		/// <summary>
+		/// Creates an instance of the XzEncoder for compression
+		/// </summary>
+		private static Encoder CreateXzEncoder()
+		{
+			XzEncoder encoder = new XzEncoder();
+			encoder.CompressionLevel = LzmaCompressionLevel.Optimal;
+
+			return encoder;
+		}
 
 		/// <summary>
 		/// Loads all of the archive file information from the manifest file
