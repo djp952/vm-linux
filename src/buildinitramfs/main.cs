@@ -23,7 +23,7 @@
 //---------------------------------------------------------------------------
 // Usage: 
 //
-// buildinitramfs {archive} {manifest} [-compress:{bzip2|gzip|lz4|lz4-legacy|lzma|xz}]
+// buildinitramfs {archive} {manifest} [-compress:{bzip2|gzip|lz4|lzma|xz}]
 //
 // Creates an initramfs CPIO archive based on an XML manifest
 //
@@ -35,8 +35,7 @@
 //
 //	bzip2		- compress using BZIP2 compression encoder
 //	gzip		- compress using GZIP compression encoder
-//	lz4			- compress using LZ4 compression encoder
-//	lz4-legacy	- compress using LZ4 legacy format compression encoder
+//	lz4			- compress using LZ4 compression encoder (legacy mode)
 //	lzma		- compress using LZMA compression encoder
 //	xz			- compress using XZ compression encoder
 //---------------------------------------------------------------------------
@@ -80,7 +79,6 @@ namespace zuki.vm.linux
 						case "bzip2": compressor = CreateBzip2Encoder(); break;
 						case "gzip": compressor = CreateGzipEncoder(); break;
 						case "lz4": compressor = CreateLz4Encoder(); break;
-						case "lz4-legacy": compressor = CreateLz4LegacyEncoder(); break;
 						case "lzma": compressor = CreateLzmaEncoder(); break;
 						case "xz": compressor = CreateXzEncoder(); break;
 						default: throw new ArgumentException("Invalid compression method '" + commandline.Switches["compress"] + "'.");
@@ -141,6 +139,8 @@ namespace zuki.vm.linux
 		/// </summary>
 		private static Encoder CreateBzip2Encoder()
 		{
+			// bzip2 -9
+			//
 			Bzip2Encoder encoder = new Bzip2Encoder();
 			encoder.CompressionLevel = Bzip2CompressionLevel.Optimal;
 
@@ -152,6 +152,8 @@ namespace zuki.vm.linux
 		/// </summary>
 		private static Encoder CreateGzipEncoder()
 		{
+			// gzip -9
+			//
 			GzipEncoder encoder = new GzipEncoder();
 			encoder.CompressionLevel = GzipCompressionLevel.Optimal;
 
@@ -159,21 +161,12 @@ namespace zuki.vm.linux
 		}
 
 		/// <summary>
-		/// Creates an instance of the Lz4Encoder for compression
+		/// Creates an instance of the CreateLz4Encoder for compression
 		/// </summary>
 		private static Encoder CreateLz4Encoder()
 		{
-			Lz4Encoder encoder = new Lz4Encoder();
-			encoder.CompressionLevel = Lz4CompressionLevel.Optimal;
-
-			return encoder;
-		}
-
-		/// <summary>
-		/// Creates an instance of the Lz4LegacyEncoder for compression
-		/// </summary>
-		private static Encoder CreateLz4LegacyEncoder()
-		{
+			// lz4 -l -9
+			//
 			Lz4LegacyEncoder encoder = new Lz4LegacyEncoder();
 			encoder.CompressionLevel = Lz4CompressionLevel.Optimal;
 
@@ -185,6 +178,8 @@ namespace zuki.vm.linux
 		/// </summary>
 		private static Encoder CreateLzmaEncoder()
 		{
+			// lzma -9
+			//
 			LzmaEncoder encoder = new LzmaEncoder();
 			encoder.CompressionLevel = LzmaCompressionLevel.Optimal;
 
@@ -196,8 +191,12 @@ namespace zuki.vm.linux
 		/// </summary>
 		private static Encoder CreateXzEncoder()
 		{
+			// xz --check=crc32 --lzma2=dict=1MiB
+			//
 			XzEncoder encoder = new XzEncoder();
 			encoder.CompressionLevel = LzmaCompressionLevel.Optimal;
+			encoder.Checksum = XzChecksum.CRC32;
+			encoder.DictionarySize = (1 << 20);
 
 			return encoder;
 		}

@@ -57,8 +57,8 @@
     <Reference Include="System.Xml.Linq" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Xml" />
-    <Reference Include="zuki.io.compression, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cfebd77d2a6aaf0f, processorArchitecture=x86">
-      <HintPath>..\..\packages\zuki.io.compression.1.0.0.6180\lib\net45\zuki.io.compression.dll</HintPath>
+    <Reference Include="zuki.io.compression, Version=1.1.0.0, Culture=neutral, PublicKeyToken=cfebd77d2a6aaf0f, processorArchitecture=x86">
+      <HintPath>..\..\packages\zuki.io.compression.1.1.0.6181\lib\net45\zuki.io.compression.dll</HintPath>
       <Private>True</Private>
     </Reference>
   </ItemGroup>
@@ -95,12 +95,12 @@
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="..\..\packages\zuki.io.compression.1.0.0.6180\build\net45\zuki.io.compression.targets" Condition="Exists('..\..\packages\zuki.io.compression.1.0.0.6180\build\net45\zuki.io.compression.targets')" />
+  <Import Project="..\..\packages\zuki.io.compression.1.1.0.6181\build\net45\zuki.io.compression.targets" Condition="Exists('..\..\packages\zuki.io.compression.1.1.0.6181\build\net45\zuki.io.compression.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\..\packages\zuki.io.compression.1.0.0.6180\build\net45\zuki.io.compression.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\zuki.io.compression.1.0.0.6180\build\net45\zuki.io.compression.targets'))" />
+    <Error Condition="!Exists('..\..\packages\zuki.io.compression.1.1.0.6181\build\net45\zuki.io.compression.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\zuki.io.compression.1.1.0.6181\build\net45\zuki.io.compression.targets'))" />
   </Target>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
