@@ -27,7 +27,6 @@
 #include <GZipStreamReader.h>
 #include <Lz4StreamReader.h>
 #include <LzmaStreamReader.h>
-#include <LzopStreamReader.h>
 #include <MemoryStreamReader.h>
 #include <Win32Exception.h>
 #include <XzStreamReader.h>
@@ -124,12 +123,8 @@ CompressedFileReader::CompressedFileReader(tchar_t const* path, size_t offset, s
 				// LZMA
 				else if(CheckMagic(m_view, length, UINT8_C(0x5D), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00))) 
 					m_stream = std::make_unique<LzmaStreamReader>(m_view, length);
-	
-				// LZOP
-				else if(CheckMagic(m_view, length, UINT8_C(0x89), 'L', 'Z', 'O', UINT8_C(0x00), UINT8_C(0x0D), UINT8_C(0x0A), UINT8_C(0x1A), UINT8_C(0x0A))) 
-					m_stream = std::make_unique<LzopStreamReader>(m_view, length);
 
-				// LZ4
+				// LZ4 (Legacy Format)
 				else if(CheckMagic(m_view, length, UINT8_C(0x02), UINT8_C(0x21), UINT8_C(0x4C), UINT8_C(0x18))) 
 					m_stream = std::make_unique<Lz4StreamReader>(m_view, length);
 

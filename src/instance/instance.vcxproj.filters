@@ -48,10 +48,6 @@
       <UniqueIdentifier>{95f9d401-8d0b-4622-8567-bdab70b058ac}</UniqueIdentifier>
       <SourceControlFiles>False</SourceControlFiles>
     </Filter>
-    <Filter Include="External Libraries\minilzo">
-      <UniqueIdentifier>{9a3dd8a3-3b46-40e9-83d6-c9db5c10b341}</UniqueIdentifier>
-      <SourceControlFiles>False</SourceControlFiles>
-    </Filter>
     <Filter Include="External Libraries\xz-embedded">
       <UniqueIdentifier>{3dea01b7-bb95-42bb-8c62-fe24c02b6321}</UniqueIdentifier>
       <SourceControlFiles>False</SourceControlFiles>
@@ -188,15 +184,6 @@
     <ClInclude Include="..\..\..\external-lzma\C\LzmaDec.h">
       <Filter>External Libraries\lzma</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\external-minilzo\lzoconf.h">
-      <Filter>External Libraries\minilzo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\external-minilzo\lzodefs.h">
-      <Filter>External Libraries\minilzo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\external-minilzo\minilzo.h">
-      <Filter>External Libraries\minilzo</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\external-zlib\zconf.h">
       <Filter>External Libraries\zlib</Filter>
     </ClInclude>
@@ -225,9 +212,6 @@
       <Filter>Header Files\common</Filter>
     </ClInclude>
     <ClInclude Include="..\common\LzmaStreamReader.h">
-      <Filter>Header Files\common</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\LzopStreamReader.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
     <ClInclude Include="..\common\MemoryStreamReader.h">
@@ -382,9 +366,6 @@
     <ClCompile Include="..\..\..\external-lzma\C\LzmaDec.c">
       <Filter>External Libraries\lzma</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\external-minilzo\minilzo.c">
-      <Filter>External Libraries\minilzo</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\external-zlib\adler32.c">
       <Filter>External Libraries\zlib</Filter>
     </ClCompile>
@@ -434,9 +415,6 @@
       <Filter>Source Files\common</Filter>
     </ClCompile>
     <ClCompile Include="..\common\LzmaStreamReader.cpp">
-      <Filter>Source Files\common</Filter>
-    </ClCompile>
-    <ClCompile Include="..\common\LzopStreamReader.cpp">
       <Filter>Source Files\common</Filter>
     </ClCompile>
     <ClCompile Include="..\common\MemoryStreamReader.cpp">

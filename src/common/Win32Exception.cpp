@@ -117,7 +117,7 @@ char* Win32Exception::AllocateMessage(DWORD result)
 //-----------------------------------------------------------------------------
 // Win32Exception::getCode
 //
-// Gets the Linux/POSIX result code
+// Gets the Win32 result code
 
 DWORD Win32Exception::getCode(void) const
 {
